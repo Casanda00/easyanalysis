@@ -1,0 +1,12 @@
+.VMI9-NEW.xlsx
+.VMI11-NEW.xlsx
+.VMI12-NEW.xlsx
+.Renviron
+.Rhistory
+.clean_vmi.R
+.Shiny_app.code-workspace
+.Soil-growth-prediction.dcf
+.growthsoil.dcf
+shinylive_poc_site/
+webapp_site/
+
