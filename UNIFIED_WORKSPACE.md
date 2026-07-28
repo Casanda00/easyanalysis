@@ -238,3 +238,18 @@ Build-check without launching: the one-liner in [CLAUDE.md](CLAUDE.md).
   (shell, pools, module contract, memory mgmt), [MEMORY.md](MEMORY.md) (gotchas).
 - Claude private memories: `unified-workspace-direction`, `workspace-canvas-rule`,
   `product-thesis-one-place`, `local-first-direction`.
+
+### Project file cleanup (fixed 2026-07-28)
+Removing a spatial layer used to leave the copy the project had made of it in
+`<project>/files`, so orphans accumulated. Two functions in `project_store.R`
+fix it:
+
+- `ea_project_remove_file(id, path)` — deletes the copy when a layer is removed,
+  and takes a shapefile's sidecars with it.
+- `ea_project_prune_files(id, keep)` — run on project open, clears orphans left
+  by earlier versions.
+
+**Safety:** both refuse to touch anything outside `ea_project_files_dir(id)`, so a
+layer that points at the user's own file is never deleted. Verified with a test
+covering: copied raster removed, shapefile sidecars removed, a path outside the
+project refused, and orphan pruning that keeps referenced files.

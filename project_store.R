@@ -246,6 +246,47 @@ ea_project_import_file <- function(id, src, name = basename(src), extra = charac
   dest
 }
 
+# Delete a file this project copied into its own files/ folder.
+#
+# SAFETY: it deletes ONLY inside `ea_project_files_dir(id)`. A layer whose path
+# points at the user's own file (the fallback when no project was open, or a
+# path reference) is left completely alone — removing a layer must never delete
+# the user's data.
+ea_project_remove_file <- function(id, path) {
+  if (!nzchar(path %||% "") || !nzchar(id %||% "")) return(invisible(FALSE))
+  dir <- normalizePath(ea_project_files_dir(id), winslash = "/", mustWork = FALSE)
+  p   <- normalizePath(path, winslash = "/", mustWork = FALSE)
+  if (!startsWith(p, paste0(dir, "/"))) return(invisible(FALSE))   # outside: refuse
+  if (!file.exists(p)) return(invisible(FALSE))
+  ok <- tryCatch(unlink(p, force = TRUE) == 0, error = function(e) FALSE)
+  # A shapefile is several files sharing one stem — take its sidecars too.
+  if (identical(tolower(tools::file_ext(p)), "shp")) {
+    stem <- tools::file_path_sans_ext(p)
+    for (ext in c("shx", "dbf", "prj", "cpg", "qpj", "sbn", "sbx", "shp.xml"))
+      try(unlink(paste0(stem, ".", ext), force = TRUE), silent = TRUE)
+  }
+  invisible(ok)
+}
+
+# Delete anything in files/ that no layer references any more. Catches orphans
+# left by earlier versions (removing a layer used to leave its copy behind).
+# `keep` = the paths still in use.
+ea_project_prune_files <- function(id, keep = character(0)) {
+  dir <- ea_project_files_dir(id)
+  if (!dir.exists(dir)) return(invisible(0L))
+  keep_n <- normalizePath(keep[nzchar(keep)], winslash = "/", mustWork = FALSE)
+  # a kept .shp implies its sidecars are kept too
+  for (k in keep_n[tolower(tools::file_ext(keep_n)) == "shp"]) {
+    stem <- tools::file_path_sans_ext(k)
+    keep_n <- c(keep_n, paste0(stem, ".", c("shx","dbf","prj","cpg","qpj","sbn","sbx")))
+  }
+  have <- list.files(dir, full.names = TRUE, recursive = FALSE)
+  have_n <- normalizePath(have, winslash = "/", mustWork = FALSE)
+  drop <- have[!(have_n %in% keep_n)]
+  for (f in drop) try(unlink(f, force = TRUE, recursive = FALSE), silent = TRUE)
+  invisible(length(drop))
+}
+
 # ---- data -----------------------------------------------------------------
 # tables: named list of data.frames. spatial: list of {name, kind, path}.
 ea_project_save_data <- function(id, tables = list(), spatial = list(),

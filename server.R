@@ -503,6 +503,16 @@ server <- function(input, output, session) {
     } else if (val %in% names(reactiveValuesToList(vector_pool))) {
       vector_pool[[val]] <- NULL
     }
+    # Delete the copy this project made of a spatial layer, so removing a layer
+    # does not leave an orphaned file behind. ea_project_remove_file() only ever
+    # deletes inside the project's own files/ folder — the user's original file
+    # is never touched.
+    local({
+      pid <- current_project(); src <- .src_path(val)
+      if (!is.null(pid) && nzchar(src))
+        try(ea_project_remove_file(pid, src), silent = TRUE)
+      src_paths[[val]] <- NULL
+    })
     gc(FALSE)                     # reclaim the removed object's memory
     ds_refresh(ds_refresh() + 1)  # force datasets_list to drop the removed name
     # Clear the file-upload widget's leftover filename text (it keeps showing the
@@ -575,6 +585,11 @@ server <- function(input, output, session) {
         sprintf("Could not reload %d spatial layer(s): %s",
                 length(failed), paste(failed, collapse = ", ")),
         type = "warning", duration = 8)
+
+    # Sweep orphans left in files/ by earlier versions (removing a layer used to
+    # leave its copy behind). Keeps only what the project still references.
+    try(ea_project_prune_files(
+      pid, vapply(st$spatial, function(s) s$path %||% "", character(1))), silent = TRUE)
 
     current_project(pid)
     ad <- st$meta$active_dataset
