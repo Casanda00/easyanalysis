@@ -7,10 +7,27 @@
 # Null-coalescing: return a if non-null and non-empty, else b.
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
+# Robust optional-package loader for the browser (webR) build. A compiled
+# package's FIRST lazy link can transiently fail in wasm (the package file
+# reference "could not be read" on the first attempt) even though the package
+# IS bundled and works — a plain requireNamespace() then wrongly reports it
+# missing and the screen shows "install package". Retrying the load succeeds
+# (verified in-app: klaR loads on a later attempt and klaR::loclda fits fine).
+# All module guards call this instead of requireNamespace(); any extra args
+# (e.g. quietly=TRUE, carried over from the old call sites) are swallowed by ...
+.ensure_pkg <- function(p, ..., tries = 8) {
+  for (i in seq_len(tries)) {
+    if (isNamespaceLoaded(p)) return(TRUE)
+    if (isTRUE(tryCatch({ loadNamespace(p); TRUE }, error = function(e) FALSE)))
+      return(TRUE)
+  }
+  isNamespaceLoaded(p)
+}
+
 # Optional-package access via strings so packages without WebAssembly builds
 # (ggord, heplots) stay invisible to shinylive's dependency scanner — a
 # literal requireNamespace()/pkg:: reference to them makes the export fail.
-.opt_pkg <- function(p) requireNamespace(p, quietly = TRUE)
+.opt_pkg <- function(p) .ensure_pkg(p)
 .opt_fun <- function(p, f) utils::getFromNamespace(f, p)
 
 # ==========================================================================

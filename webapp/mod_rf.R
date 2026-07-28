@@ -28,8 +28,7 @@ rfCanvasUI <- function(id) {
     card(
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Variable Importance",
                   div(class = "d-flex gap-2",
-                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary"),
-                    downloadButton(ns("download_varimp"), "Download Plot", class = "btn-sm btn-outline-success"))),
+                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary"))),
       div(style = "padding: 5px;", plotOutput(ns("varimp"), height = "460px"))
     ),
     layout_columns(
@@ -45,8 +44,7 @@ rfCanvasUI <- function(id) {
       )
     ),
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Partial Dependence Plots (PDP)",
-                  downloadButton(ns("download_pdp"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Partial Dependence Plots (PDP)"),
       div(class = "d-flex align-items-end gap-2",
           selectInput(ns("pdp_var"), "Select Predictor for PDP:", choices = NULL),
           div(style = "margin-bottom: 16px;", actionButton(ns("run_pdp"), "Generate PDP", class = "btn-info"))
@@ -86,7 +84,10 @@ rfServer <- function(id, dataset_pool, active_dataset) {
         showNotification("Not enough complete rows to train Random Forest.", type = "error")
         return()
       }
-      form_str <- paste(input$target, "~", paste(input$predictors, collapse = " + "))
+      # Backtick-quote every name so columns with digits/dots/spaces (e.g. VMI
+      # codes) don't break formula parsing ("unexpected input" error).
+      form_str <- paste0("`", input$target, "` ~ ",
+                         paste(sprintf("`%s`", input$predictors), collapse = " + "))
       withProgress(message = 'Training Random Forest...', value = 0, {
         tryCatch({
           incProgress(0.5, detail = paste(input$ntree, "trees"))
@@ -196,10 +197,7 @@ rfServer <- function(id, dataset_pool, active_dataset) {
         write.csv(imp, file, row.names = FALSE)
       }
     )
-    output$download_varimp <- downloadHandler(
-      filename = function() { paste0("rf_variable_importance_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 1000, height = 700); varimp_fn(); dev.off() }
-    )
+    
 
     pdp_plot_obj <- reactiveVal(NULL)
 
@@ -226,15 +224,7 @@ rfServer <- function(id, dataset_pool, active_dataset) {
       if (is.null(p)) { show_placeholder("Select a predictor and click 'Generate PDP'."); return() }
       print(p)
     })
-    output$download_pdp <- downloadHandler(
-      filename = function() { paste0("rf_pdp_", Sys.Date(), ".png") },
-      content = function(file) {
-        p <- pdp_plot_obj()
-        png(file, width = 900, height = 600)
-        if (is.null(p)) show_placeholder("Generate a PDP first.") else print(p)
-        dev.off()
-      }
-    )
+    
 
     # Context (+ plot) for the AI Co-Pilot.
     list(

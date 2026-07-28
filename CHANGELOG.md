@@ -1,0 +1,453 @@
+# Changelog — EasyAnalysis
+
+Every build/push gets a version and an entry here. Version is single-sourced in
+`global.R` (`APP_VERSION`) and shown in the app's status bar + About panel.
+
+Format: `MAJOR.MINOR.PATCH`. Bump PATCH for fixes, MINOR for features, MAJOR for
+breaking changes. Newest first.
+
+---
+
+## v0.8.0 — 2026-07-27
+
+**The unified workspace.** The ~35 separate analysis screens are now one workspace:
+a GeoLibre-style menu bar, a layers panel, a canvas that follows your data, a tool
+panel and a results dock. Plus a public site and a macOS/Linux installer.
+
+### Workspace
+- **One frame, two views** — *Map view* and *Data view*, plus a resizable *Split*.
+  A project with spatial data opens on the map; a table-only project opens on data.
+- **GeoLibre menu bar in the top bar** — Project · Edit · View · Add Data · Processing ·
+  Controls · Packages · Settings · Help, with hover fly-outs and a tool search box.
+  Every analysis is launched from **Processing**; the old per-screen menus are retired.
+- **Layers panel** — every dataset and layer in one list, each with a visibility toggle
+  and an expandable legend / styling.
+- **Tools open in the side panel, results in the centre.** A tool can be floated
+  (draggable, resizable) or minimised to the dock; past results park there as chips.
+- **R console** is a bottom dock that slides up on demand.
+- **Data & Exploration operations are individual menu entries** — pick "Row filtering"
+  and only that operation's controls appear.
+- **Map:** real layer rendering (rasters + vectors), 14 basemaps, and the view is
+  preserved when you switch basemap. The attribute table shows the **active vector
+  layer's own attributes**.
+- **Charts:** a plot builder with a **Static ⇄ Interactive** toggle (plotly), and a
+  draggable split between plot and table.
+
+### Look & feel
+- **Six colour sets** (Forest, Light, Midnight, Ocean, Plum, Paper) — instant, remembered.
+- **App icon is now a lightbulb**; the app is **emoji-free** (icons only).
+- **Fixed the startup dim at the root** — Shiny fades every output while it recomputes;
+  now suppressed and replaced with a proper boot screen, shimmer loaders and subtle
+  result reveals (CSS only — no animation library).
+- **Contrast swept:** 0 low-contrast text in all six themes.
+
+### Assistant
+- **Recommend is merged into the Co-Analyst** — one surface: recommend a method, then
+  ask it to run the analysis.
+
+### Packages
+- **Packages menu** (was "Plugins") with a real CRAN search that tolerates typos, honest
+  per-package progress, and immediate loading — **no restart needed**.
+
+### Fixes
+- Single click on a project card opens it (pre-rendered clicks were being lost).
+- Map zooms to your raster (the fit is applied when the map is built, not via a proxy
+  call that could be discarded).
+- Uploading a file no longer jumps you to another screen.
+- LAS/LAZ: reopening a project no longer runs out of memory.
+- Memory: the results store is bounded, the CRAN index is released, and session state is
+  cleared on disconnect.
+
+### Distribution
+- **`install.sh`** — one-line install for **macOS and Linux** (mirrors `install.ps1`).
+- **`landing/`** — public site: landing page with a 3D LiDAR hero, a how-to-use
+  walkthrough and full documentation. Self-contained; no CDN.
+
+### Security
+- Documented in ARCHITECTURE.md §10: no secrets in the repo, no user data tracked, and
+  the only outbound calls are the Co-Analyst (opt-in), CRAN, basemap tiles and satellite
+  search. Removed unused PowerShell dialog helpers.
+
+---
+
+## v0.7.15 — 2026-07-22
+- **DA plots now show something useful with >1 predictor.** The 1-D decision plots
+  (Scatter+Regions/Class Lanes/Class Density) require a single axis; with 2+ predictors they
+  showed "requires exactly 1 numeric predictor". Now they **fall back to the 2-D PCA/LD
+  projection** (points by class + predicted-class ellipses) so a plot renders whatever's
+  selected. (TODO next: true filled decision-boundary regions in the 2-D PCA plane — needs a
+  grid-predict that also handles the PCA-decorrelated LLDA model.)
+- **Download hardening.** The `ea-download` blob save now runs against the top document when
+  possible, to escape iframe download restrictions (CSV/TSV export).
+
+## v0.7.14 — 2026-07-22
+- **Fix: CSV/TSV export wasn't downloading in the browser build.** The standard Shiny
+  `downloadHandler` doesn't reliably trigger a file download under webR. Replaced it with a
+  message-based download — R builds the file text and sends it to the browser, where a small
+  JS handler saves it as a Blob. Multi-format (CSV / TSV) + optional filename preserved.
+  (Same webR limitation likely affects the hover plot-PNG download — a follow-up.)
+
+## v0.7.13 — 2026-07-22
+- **LLDA now works with multiple correlated predictors.** `klaR::loclda` inverts a *local*
+  covariance; with >1 collinear predictor (e.g. two diameter columns) that's singular
+  (`dgesv: system is exactly singular`), so the fit died before any plot. Now, on that
+  failure the numeric predictors are **decorrelated via PCA** (orthogonal → never collinear)
+  and loclda is refit on the components — labelled "Locally Linear DA (PCA-decorrelated)".
+  Multi-predictor LLDA plots (the PCA-projection scatter) now render because the fit succeeds.
+  (A 3D rotating scatter is the next increment.)
+
+## v0.7.12 — 2026-07-21
+- **Fix: the Rows overview tile showed a blank icon** — `icon("rows")` isn't a real FontAwesome
+  name; swapped for a valid one.
+
+## v0.7.11 — 2026-07-21
+- **Fix: a deleted dataset reappeared in the left data rail.** The list now explicitly drops
+  any pool entry whose value is NULL — in this webR build `pool[[key]] <- NULL` can leave the
+  name behind, so the deleted dataset kept showing. Now it stays gone.
+- **Fix: CSV download on the Dataset Overview could error.** The handler now guards against no
+  active dataset / empty data and sanitizes the filename.
+- **Clickable overview tiles (drill-down).** Each tile on the Dataset Overview now opens a
+  detail modal: **Total NA** → per-column NA counts + a table of the actual rows with missing
+  values; Columns → type/missing/unique per column; Numeric/Categorical → those columns;
+  Complete rows → the incomplete rows; Rows → the full table.
+- **Multi-format, named export.** The export toolbar now offers **CSV / TSV** and an optional
+  **file name** (defaults to the dataset name). TSV opens directly in Excel; native `.xlsx`
+  export is a follow-up (the `writexl` wasm bundle needs sorting — shinylive skipped it).
+
+## v0.7.10 — 2026-07-21
+- **Added the EasyAnalysis favicon** (the EA app icon). Center-cropped to a square PNG,
+  copied into the site root as `favicon.png` + `favicon.ico`, and linked from the page
+  `<head>` (also stops the `/favicon.ico` 404 in the console).
+- **First-boot UX (the "doesn't work on new browsers" report).** Confirmed by watching a
+  *fresh, uncached* browser boot the deployed site end-to-end: v0.7.9 boots fine — it just
+  takes ~5–8 min the first time (downloading the R environment). The problem was the splash's
+  **safety timeout removing the splash after only 8 min**, so a slower first boot got cut off
+  and looked like "loads forever then ends". Raised the timeout to **20 min**, and the splash
+  note now says "3–8 minutes (longer on a slow connection) … keep this tab open." The splash
+  still fades immediately once the app is actually ready (`ea-app-ready`).
+
+## v0.7.9 — 2026-07-20
+- **Critical fix: the app was stuck on the splash and never booted** (regression from v0.7.7).
+  `mod_docs.R`'s `.doc_b()` helper took a single argument but was called with two in the
+  Documentation overview, throwing "unused argument" *while building the UI* — so the app never
+  rendered and the splash never received its ready signal. `.doc_b()` now accepts `...`.
+  (Parse-checks pass on this kind of bug; the full `source(global/ui/server)` build check is now
+  the gate before every push.)
+
+## v0.7.8 — 2026-07-19
+- **Splash: removed the sliding light-sweep** (and leftover progress-bar CSS) — no sliding
+  bar element on the splash at all now; the globe/satellite/radar/bars motion stays.
+- **Co-Pilot: Enter now reliably sends.** The old handler clicked the send button, which could
+  fire before Shiny had synced the typed text (sending stale/empty). Enter now passes the
+  input's current value straight to the server (`input$enter`), race-free.
+- **Added `llms.txt`** (llmstxt.org) served at `/llms.txt` — a detailed description of
+  EasyAnalysis for LLMs and search: what it is, features, data formats, analyses, privacy,
+  tech, and author. Copied into the site on every build by `webapp_export.R`.
+
+## v0.7.7 — 2026-07-19
+- **Honest "Running…" progress indicator.** A global pill shows the *elapsed* time
+  ("Running… 0:08", counting up) whenever the app is computing for more than half a
+  second — no fabricated "time remaining" (we can't know an analysis's duration, so we
+  don't pretend to). Driven by Shiny's busy/idle events; works on every screen.
+- **Co-Pilot status now reflects the real step.** Instead of a hardcoded "Thinking…",
+  the progress message updates to what the agent is actually doing — "Reading your data…",
+  "Running a random forest…", "Computing correlations…", etc. — via a status callback
+  threaded through the agent's tool loop.
+- **New in-app Documentation screen** (`mod_docs.R`): a full user guide — interface,
+  loading data, exploring, running analyses, the AI Co-Pilot, R Console, privacy, and a
+  Tips/FAQ — reachable from the top menu, with a jump-to-section contents list.
+
+## v0.7.6 — 2026-07-19
+- **Redesigned loading splash.** Replaced the plain screen with an animated hero — a
+  rotating Earth-observation globe (raster shimmer, meridian wireframe), an orbiting
+  satellite, radar pings and rising data bars — over a frosted-glass card with drifting
+  aurora depth and a panning data-lattice. SVG line-icons (no emoji) for the four
+  highlights: AI Co-Pilot, Recommend, Any data, Fully private. Respects
+  `prefers-reduced-motion`.
+- Also includes the v0.7.5 fixes below (delete-name fix, About/Acknowledgements split).
+
+## v0.7.5 — 2026-07-19
+- **Fix: deleted dataset's name lingered in the left data panel.** Clicking × removed
+  the data from the pool but the label stayed, because `reactiveValuesToList()` reliably
+  re-fires on key ADDs (uploads appear) but not on key REMOVALs in this webR build. Added
+  a `ds_refresh` trigger that the delete handler bumps and `datasets_list` depends on, so
+  the list re-renders and the removed name disappears.
+- **About / Acknowledgements split.** About now reads "a platform for conducting analyses
+  without writing complex code…". Moved "University of Eastern Finland" out of About into
+  a new **Acknowledgements** section crediting UEF for code contributions and for data used
+  in analyses and testing — EasyAnalysis is an independent build, not a university product.
+
+## v0.7.4 — 2026-07-19
+- **Reverted the v0.7.3 boot-load experiment** (it broke booting — see below) and confirmed
+  the finding in `webapp/global.R`: compiled ML/stats packages can't link in this
+  spatial-heavy browser build, late OR at boot. Fix is a separate lean build.
+- Retained: `.ensure_pkg()` retry helper (v0.7.2), Decision Tree `pickerInput` selector,
+  and the "3–5 minutes" splash estimate.
+
+## v0.7.3 — 2026-07-19
+- **Boot-load the compiled analysis packages that fail on late link (experiment).**
+  v0.7.2's retry fixed *R-level* packages (klaR::loclda works), but compiled ones
+  loaded lazily still fail to register native routines: rpart `C_rpart not found`,
+  xgboost `XGDMatrixCreateFromMat_R not found`, tidyr `bad export type '_ZTINSt3…'`
+  (the kmeans cluster-map uses tidyr via factoextra). The proven fix is linking at
+  BOOT (as the lidR stack does). Now `webapp/global.R` links **base64enc first**
+  (so boot is safe), then **tidyr, rpart, xgboost** — a small measured set; will
+  grow once confirmed boot survives the module-link budget in the browser.
+- **Decision Tree predictor selector** now uses the `pickerInput` chip/search
+  widget (with select-all), matching Random Forest instead of a plain dropdown.
+
+## v0.7.2 — 2026-07-18
+- **Fix: bundled optional packages still showed "install package" on first use.**
+  The v0.7.1 packages (klaR, kernlab, xgboost, rpart, glmnet, mgcv, survival,
+  car, lavaan, tseries, trend, Hmisc, BayesFactor) are bundled and work, but in
+  the browser (webR) a compiled package's **first** lazy-load can transiently
+  fail ("file could not be read") even though a retry succeeds — proven in-app:
+  `klaR::loclda()` fits fine, yet the screen's one-shot `requireNamespace()`
+  reported it missing. Replaced every guard with a retrying `.ensure_pkg()`
+  helper (helpers.R) that attempts the load up to 8× before giving up, so the
+  first-try flake no longer surfaces as a false "install package" message.
+- Splash note now reads "3–5 minutes" for the first-visit load estimate.
+
+## v0.7.1 — 2026-07-18
+- **Bundle the optional analysis packages into the browser build.** klaR, kernlab,
+  xgboost, glmnet, mgcv, survival, rpart, car, lavaan, tseries, trend, Hmisc, and
+  BayesFactor are now included, so the Discriminant Analysis (LLDA/RLDA/KDA/MMC),
+  GAM, Survival, Decision Tree, SEM, Bayesian, Time Series, XGBoost, and Ridge/Lasso
+  screens can load them. Added via `webapp/_deps.R` (shinylive's scanner doesn't
+  follow `requireNamespace()` guards, so these were simply never being bundled).
+- **Correction to the v0.7.0 "hard budget" note.** The "install package" messages
+  were *not* (primarily) a link-budget problem — the packages were never included
+  in the build at all. Each has a WebAssembly build on repo.r-wasm.org; they just
+  weren't scanned. (heplots/ggord/mda genuinely have no wasm build and still fall
+  back to string-indirection.)
+
+## v0.7.0 — 2026-07-18
+- **Branded loading screen.** The ~1-3 min first boot now shows an EasyAnalysis
+  splash: what the app is, an elapsed timer, a "first visit is slow, then instant"
+  note, rotating tips, a privacy line, and an auto-generated **"What's new"** from
+  this changelog. Fades out when the app is actually ready (`ea-app-ready` signal).
+  Injected by `webapp_export.R` from `splash_template.html`.
+- **Random Forest "unexpected input" error fixed** (see below) — RF itself works
+  (randomForest attaches at boot).
+- **Known limitation (browser build): some optional compiled ML/stats packages
+  can't load** — xgboost, glmnet, kernlab, mgcv, survival, rpart, car, klaR.
+  Their screens show "install package". Root cause: this webR build has a hard
+  budget for how many compiled `.so` can dynamically link before a libc++ symbol
+  becomes unavailable; the LiDAR stack already consumes most of it, and preloading
+  these pushed past the budget and broke the whole app's boot. Making them work in
+  the browser needs a slimmer-boot strategy (future) — for now they run in the
+  server build. (Not a regression; they were never working in the browser.)
+- **Fix: Random Forest "unexpected input" training error** — column names weren't
+  backtick-quoted in the formula, so names with digits/dots/spaces (VMI codes)
+  broke parsing. Fixed in RF and the same bug in Decision Tree, SVM, Neural Net,
+  and GAM.
+- **Co-Pilot: no unsolicited advice, stricter grounding, accurate capabilities.**
+  The agent no longer volunteers "best next step" suggestions unless you ask for a
+  recommendation; the prompt hardens the no-hallucination rule (only tool outputs
+  / context / image); and it's now given the app's real method list, so it stops
+  claiming built-in methods (e.g. LLDA) are missing — it points you to the screen
+  instead.
+- **Fix: deleted-dataset name lingering** in the file-upload widget — cleared on
+  delete.
+
+## v0.6.3 — 2026-07-18
+- **Browser tab title → "EasyAnalysis"** (shinylive shipped "Shiny App"). Patched
+  in `webapp_export.R`.
+- **Clip LAS to a shapefile.** New "Clip LAS to this shapefile" button in the LiDAR
+  tools — clips the point cloud to the polygon selected in *Plot Shapefile* (from
+  an uploaded vector), matching CRS then `lidR::clip_roi`. The manual 4-coordinate
+  clip is kept as an alternative.
+- **Auto-zoom to spatial data**: already implemented (raster `.zoom_to` on load,
+  LAS `fitBounds` on its location map) — the reason it appeared not to work was the
+  raster *display* failing, which v0.6.2 fixes. No new code needed; noting it here.
+
+## v0.6.2 — 2026-07-18
+- **LiDAR: access the full point cloud.** Read cap raised 500k → 5M (full
+  plot-level clouds now load; still a memory safety net for huge files), and the
+  "Max display points" slider now reaches the **full loaded cloud** (its max is
+  set to the actual point count on upload). Default display stays 60k for a
+  responsive 3D viewer.
+- **Fix "Install the 'rstac' package".** rstac/exactextractr were bundled in
+  v0.6.1 but their `requireNamespace()` guard runs on a button click = LATE, and
+  exactextractr is compiled → same late-link ABI bug. Now **preloaded at boot**,
+  so the guards pass. (If you still saw the message, you were on the pre-v0.6.1
+  deploy.)
+- **Raster/TIFF display fix.** `leafem::addGeoRaster` (client-side JS renderer) is
+  fragile in the wasm build; added a fallback to `leaflet::addRasterImage`
+  (server-side PNG overlay via the now-working cairo device). Display errors,
+  previously swallowed silently ("feels like it doesn't load"), are now shown.
+
+## v0.6.1 — 2026-07-18
+- **Fix: .laz / .tif uploads failed** with `bad export type for
+  '_ZTINSt3__216__owns_one_stateIcEE'`. Root cause: v0.5.0 made `lidR`/`stars`
+  lazy-loaded; a heavy C++ .so that links LATE (on first `pkg::` use) fails in
+  this webR build — the same failure as the cairo/LAPACK bug. **Reverted:**
+  `lidR`, `sf`, `terra`, `stars` are attached at boot again. Heavy C++ packages
+  cannot be lazy-loaded here; lazy-loading is off the table as a fast-start
+  approach for the spatial stack. (The v0.5.0 change was "verified" in the Node
+  harness, which does not reproduce the browser's linking limits — only the
+  browser does.)
+- **Fix: "Install the 'rstac' package to use satellite search".** `rstac` and
+  `exactextractr` (both behind `requireNamespace()` guards, so invisible to the
+  shinylive scanner) are now force-bundled via `webapp/_deps.R`. Download Spatial
+  Data and zonal stats work in the browser build.
+- **About panel**: added a short description of what EasyAnalysis is (runs in your
+  browser, your data never leaves your machine).
+- **Upload diagnostics**: spatial-file load errors are now persistent and shown in
+  full, plus an empty/unreadable-file guard — to pin down the .laz/.tif upload
+  issue. (Verified in webR that terra/sf/lidR *can* read TIF/SHP/LAS; the
+  remaining variable is the browser upload→filesystem step, so we need the exact
+  on-screen error to finish the fix.)
+
+## v0.6.0 — 2026-07-17
+- **R Console** (`mod_rconsole.R`) — new "R Console" screen. Run arbitrary R
+  directly on your data: the active dataset is `df`, every loaded dataset is
+  available by name, assignments persist between runs, and a single evaluation
+  captures both printed output and any plot (base or ggplot — no double-eval, so
+  RNG/side-effects behave correctly). Click-to-insert examples, Ctrl+Enter to run.
+  - Safe in the browser build: each user runs their own sandboxed webR session in
+    their own browser on their own data. (Would be arbitrary code execution on a
+    shared server; the shipped product is the browser build.)
+  - Verified via testServer: text output, persistent state, base+ggplot capture,
+    error handling, the lm/LAPACK path, and clear all work.
+
+## v0.5.0 — 2026-07-17
+- **Lazy-load the heavy spatial stack.** `lidR`, `stars` (and `rlas` via lidR) are
+  no longer attached in `global.R`; they load on first use. Every call to them is
+  `pkg::fn()` qualified (audited: zero unqualified call sites across all modules —
+  the 13 apparent hits were all CSS/strings/labels), and `::` loads a namespace on
+  demand, so this needed no code changes. Sessions that never open a LiDAR/Surface
+  screen never fetch them.
+  - Bonus: it *reinforces* the v0.2.2 cairo/LAPACK fix — those libs failed when
+    linking after the spatial stack, which now isn't loaded at boot at all.
+  - **Ceiling:** `sf`/`terra` still load at boot because `leaflet` (needed at UI
+    build for 8 `leafletOutput()` calls) imports `sf`. Making those lazy too
+    requires deferring the map screens' UI behind `uiOutput()` placeholders.
+  - **Constraint:** keep heavy-package calls `pkg::` qualified. An unqualified
+    `rast()` would now fail at runtime.
+- **Build is now self-healing** (`webapp_export.R`), after a careless
+  `cp mod_*.R webapp/` broke two builds:
+  - Prunes files `global.R` doesn't source. `mod_gee.R` (rgee/reticulate, no wasm
+    build) had poisoned the bundle → "fatal-missing: reticulate".
+  - Applies the no-wasm indirection (`ggord`/`heplots` → `.opt_pkg`/`.opt_fun`)
+    itself, instead of relying on `webapp/mod_da.R` not being overwritten.
+  - Both hard-fail with an explanation if they can't be satisfied.
+
+## v0.4.0 — 2026-07-17
+- **Renamed to EasyAnalysis** in the UI: top-bar brand and About monogram
+  (`SA` → `EA`). Status bar/About already used `APP_VERSION`.
+- **Co-Pilot: fixed the 400 error.** GPT-5 family models (incl. the configured
+  `gpt-5.4-nano`) **reject the `temperature` parameter** —
+  *"Unsupported value: 'temperature' does not support 0.1 with this model"*.
+  `temperature` is now only sent for models that accept it. (The model id itself
+  was fine — verified against OpenAI's current model list.)
+- **Co-Pilot send UX:** animated typing indicator while the agent works (a turn
+  with tool calls + vision can take 10–30s and the panel previously looked dead),
+  send button disabled during a turn, double-sends ignored, auto-scroll to the
+  newest message.
+- **Co-Pilot capabilities:** two new agent tools —
+  - `column_stats(dataset, column)` — full numeric summary (quartiles, sd,
+    skewness, IQR outliers) or level frequencies, incl. a skew hint suggesting a
+    transform.
+  - `correlate(dataset, columns, method)` — Pearson/Spearman with the strongest
+    pairs ranked first, for "what relates to what" questions.
+  Both verified end-to-end, including error paths.
+
+## v0.3.0 — 2026-07-17
+- **Run button on every model screen.** All 18 model screens now fit only on an
+  explicit click (ANOVA, Logistic, Clustering and Discriminant Analysis were
+  still refitting reactively on every input change). This matters most in the
+  browser build, where each fit runs on the user's own single-threaded machine —
+  a stray dropdown click could previously freeze the tab on a random forest.
+  Recorded as UX rule #8 in DESIGN.md. Cheap outputs (descriptive stats,
+  distribution plots) stay live.
+- **Removed 20 redundant plot-download buttons** (+ their 20 handlers) across 14
+  modules. The global hover overlay already injects a PNG button on every plot —
+  verified working in the wasm build before removing anything. All 43 CSV /
+  raster / GeoJSON downloads are untouched (the overlay can't handle those).
+
+## v0.2.2 — 2026-07-17
+**Fix (the real one): blank plots AND "LAPACK routines cannot be loaded".**
+- **Root cause:** R links some of its own shared libraries *lazily, on first use* —
+  `cairo.so` on the first plot, `libRlapack.so` on the first linear-algebra call.
+  In this app that first use happens **after** ~40 packages incl. the heavy C++
+  side-modules (terra/sf/lidR/rgl) are loaded, and in the **browser** build that
+  late link fails. Two symptoms, one bug: blank plots + dead model summaries.
+- **Fix:** `global.R` now touches both at startup — a throwaway PNG device and a
+  2×2 `svd()`/`solve()` — **before** `library(lidR)/sf/terra/rgl`. Load order is
+  the entire point; keep those probes above the spatial libraries.
+- Verified in the browser: plot renders (real PNG), model summaries work, and the
+  `cairo`/`bad export type`/`LAPACK` console errors are gone.
+
+> **Correction to v0.2.1:** that entry blamed the terra `R.js` patch. That was
+> **wrong** — the patch is fine (Node runs terra + plots with it happily). The
+> control experiment that "proved" it changed two variables at once (pristine
+> R.js *and* a tiny package set), so it isolated nothing. The surgical patch in
+> v0.2.1 is still worth keeping (it is narrower and safer), but it was never the
+> cause. Node cannot reproduce this bug at all — only a real browser can.
+
+## v0.2.1 — 2026-07-17
+**Fix: all plots rendered blank in the browser build.**
+- Root cause: the `R.js` terra/PROJ patch introduced in v0.1.0 was far too broad.
+  It rewrote the generic wasm stub factory and threw on *any* unresolved symbol,
+  which broke side-module loading — `cairo.so` failed (`bad export type for
+  '_ZTINSt3__216__owns_one_stateIcEE'`), R's PNG device never initialised, and
+  every `renderPlot` silently produced nothing. It also surfaced as "LAPACK
+  routines cannot be loaded" on screens doing linear algebra.
+- Proven by a control app: pristine `R.js` + identical pins renders plots fine.
+- Fix: patch **only** `resolveSymbol()`, supplying a no-op **only** for genuinely
+  unresolved `internal_proj_*` symbols. No throw, nothing else touched.
+  (R.js is now +83 bytes vs pristine, was +1969.)
+- `webapp_export.R` now writes patched files with `writeBin` — `writeLines` was
+  silently converting every LF to CRLF on Windows.
+- New `serve_local.R`: serves `webapp_site/` with COOP/COEP headers via
+  `httpuv::staticPath`, so local testing is cross-origin isolated (webR uses the
+  fast SharedArrayBuffer channel) **and** Range/HEAD still work for webR's lazy
+  file loading. Use this instead of `httpuv::runStaticServer` for local testing.
+
+## v0.2.0 — 2026-07-16
+- **References screen** — new "References" item in the menubar. Lists the
+  published methods implemented in the app (currently Kalliovirta & Tokola 2005),
+  each with full citation, the named method(s) derived, where it's used, and a DOI
+  link. Single-sourced in `references.R` (`APP_REFERENCES`), kept in sync with
+  `papers/METHODS.md`.
+- **About panel** refreshed: name → EasyAnalysis, live `APP_VERSION`, tagline
+  "A universal scientific analysis platform" (was stale "v0.9.0" / forestry-only).
+- **Source now lives in the deploy repo** — a curated `src/` copy of the app
+  source was added to the EasyAnalysis repo (not just the compiled site), so it is
+  a full project repo.
+
+## v0.1.0 — 2026-07-16
+First versioned baseline. The app now exists in two builds from one codebase, with
+an AI agent and the first paper-derived methodology implemented.
+
+**Platform**
+- **Browser build** via Shinylive/WebAssembly — the whole app runs in each user's
+  browser, no R server. Built by `webapp_export.R` (pins shinylive assets 0.10.10 /
+  R 4.5 channel, patches the terra PROJ loader, bumps the SW cache, integrity-checks
+  the bundle).
+- **Deployment**: static site + Vercel serverless AI proxy (`api/chat.js`); the
+  OpenAI key lives only in Vercel env, never in the client. Cross-origin isolation
+  headers set in `vercel.json`.
+
+**AI Co-Pilot → agent**
+- The Co-Pilot now RUNS analyses via OpenAI tool-calling (`agent_tools.R`):
+  `list_datasets`, `describe_dataset`, `run_analysis` (descriptive, lm, anova,
+  ttest, lme, logistic, rf, clustering, pca), using the app's own fitting functions.
+- Dual transport (httr on server, sync-XHR via webR in browser); user-supplied key
+  overrides the shared proxy key.
+
+**Analysis features**
+- **Dependent-variable transforms** in Linear Regression (log / log1p / sqrt / 1/Y),
+  in addition to predictor transforms. Options always visible (nothing hidden).
+- **Bias-corrected back-transformation** to the original Y scale — *Kalliovirta &
+  Tokola 2005* — with original-scale metrics. Verified numerically.
+
+**Docs**
+- ARCHITECTURE.md, DESIGN.md, MEMORY.md, CLAUDE.md rewritten around the
+  "universal scientific analysis platform" vision.
+- `papers/` folder + `papers/METHODS.md` catalog (paper → named method → status).
+
+**Cataloged papers**
+- Kalliovirta & Tokola 2005 — stem diameter & tree age models (bias-corrected
+  transformed-Y regression). core methodology implemented.

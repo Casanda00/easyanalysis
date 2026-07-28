@@ -80,7 +80,7 @@ bayesianCanvasUI <- function(id) {
 bayesianServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    has_bf <- requireNamespace("BayesFactor", quietly = TRUE)
+    has_bf <- .ensure_pkg("BayesFactor", quietly = TRUE)
 
     active_data <- reactive({
       ds <- active_dataset(); req(!is.null(ds)); dataset_pool[[ds]]

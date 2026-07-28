@@ -94,8 +94,14 @@ daToolsUI <- function(id) {
       ),
       hr(),
       selectInput(ns("lda_selected_plots"), "Select Diagnostics to View:",
-        choices = c("LD Scatter/Density", "Stacked Histogram", "Biplot (ggord)", "Pairs Plot", "Partition Plot (partimat)", "Variable Importance"),
-        selected = c("LD Scatter/Density", "Stacked Histogram"), multiple = TRUE)
+        choices = c("Scatter + Regions", "Class Density", "LD Scatter/Density", "Stacked Histogram",
+                    "Biplot (ggord)", "Pairs Plot", "Partition Plot (partimat)", "Variable Importance"),
+        selected = c("Scatter + Regions", "Class Density"), multiple = TRUE),
+      hr(),
+      .cv_ui(ns),
+      hr(style = "margin:10px 0;"),
+      actionButton(ns("run_model"), "Run Model",
+        class = "btn-success w-100", icon = icon("play"))
     )
   )
 }
@@ -160,7 +166,9 @@ daServer <- function(id, dataset_pool, active_dataset) {
     })
 
     # ---- Model fitting (9 methods) ----
-    model_obj <- reactive({
+    # Button-triggered: DA fits (esp. KDA/LLDA/MMC) are expensive and run on the
+    # user's own machine in the browser build (UX rule #14).
+    model_obj <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       req(active_dataset(), input$category)
       df <- active_data()
       form_str <- lda_formula_str()
@@ -172,9 +180,30 @@ daServer <- function(id, dataset_pool, active_dataset) {
       clean_df <- clean_df[complete.cases(clean_df), , drop = FALSE]
       if (nrow(clean_df) < 10) return("Data Error: Insufficient complete cases.")
       clean_df[[input$category]] <- as.factor(clean_df[[input$category]])
+      clean_df[[input$category]] <- droplevels(clean_df[[input$category]])
       if (length(unique(clean_df[[input$category]])) < 2) return("Data Error: Target requires >= 2 distinct levels.")
       method <- if (isTruthy(input$method_type)) input$method_type else "LDA"
       predictors <- all_vars[-1]
+      # Rare-class guard: drop classes with too few rows (mirrors simple.R data_filtered step).
+      # QDA needs p+2 per class; LDA/RLDA/WLDA need >=2; LLDA needs k+1.
+      num_pred_cols <- sum(sapply(clean_df[, predictors, drop = FALSE], is.numeric))
+      min_n <- switch(method,
+        "QDA"  = max(num_pred_cols + 2L, 3L),
+        "LLDA" = {k <- if (isTruthy(input$llda_k)) input$llda_k else 5L; k + 1L},
+        2L)
+      cls_counts  <- table(clean_df[[input$category]])
+      rare_cls    <- names(cls_counts[cls_counts < min_n])
+      if (length(rare_cls) > 0) {
+        clean_df <- clean_df[!clean_df[[input$category]] %in% rare_cls, , drop = FALSE]
+        clean_df[[input$category]] <- droplevels(clean_df[[input$category]])
+        showNotification(
+          paste0("Auto-dropped ", length(rare_cls), " class(es) with too few rows for ", method,
+                 " (need >= ", min_n, "): ", paste(rare_cls, collapse = ", "),
+                 ". Use the Data module to remove or merge them to avoid this."),
+          type = "warning", duration = 8)
+        if (length(unique(clean_df[[input$category]])) < 2)
+          return("Data Error: After dropping rare classes, fewer than 2 classes remain.")
+      }
       tryCatch({
         if (method == "LDA") {
           model <- MASS::lda(as.formula(form_str), data = clean_df); preds <- predict(model)
@@ -206,8 +235,29 @@ daServer <- function(id, dataset_pool, active_dataset) {
           k_val <- if (isTruthy(input$llda_k)) input$llda_k else 5
           clean_df_j <- clean_df
           for (p in predictors) if (is.numeric(clean_df_j[[p]])) clean_df_j[[p]] <- jitter(clean_df_j[[p]], amount = 0.0001)
-          model <- klaR::loclda(as.formula(form_str), data = clean_df_j, k = k_val); preds <- predict(model)
-          list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors, method_name = "Locally Linear DA", has_ld = FALSE, ld_scores = NULL)
+          num_p <- predictors[sapply(clean_df_j[, predictors, drop = FALSE], is.numeric)]
+          cat_p <- setdiff(predictors, num_p)
+          # loclda inverts a LOCAL covariance; with >1 collinear predictor that is
+          # singular ("dgesv: exactly singular"). On failure, decorrelate the numeric
+          # predictors via PCA (orthogonal, so never collinear) and refit on the PCs.
+          model <- tryCatch(klaR::loclda(as.formula(form_str), data = clean_df_j, k = k_val),
+                            error = function(e) e)
+          llda_pca <- FALSE
+          if (inherits(model, "error")) {
+            if (length(num_p) < 2) stop(model)          # not a collinearity case -> friendly handler
+            pc   <- prcomp(clean_df_j[, num_p, drop = FALSE], center = TRUE, scale. = TRUE)
+            keep <- which(pc$sdev > 1e-4 * pc$sdev[1])  # drop near-zero-variance directions
+            pcs  <- as.data.frame(pc$x[, keep, drop = FALSE]); names(pcs) <- paste0("PC", seq_along(keep))
+            dat2 <- cbind(pcs, clean_df_j[, c(input$category, cat_p), drop = FALSE])
+            form2 <- paste0("`", input$category, "` ~ ",
+                            paste(c(names(pcs), sprintf("`%s`", cat_p)), collapse = " + "))
+            model <- klaR::loclda(as.formula(form2), data = dat2, k = k_val)  # may re-raise -> handler
+            preds <- predict(model, dat2); llda_pca <- TRUE
+          } else {
+            preds <- predict(model)
+          }
+          list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors,
+               method_name = if (llda_pca) "Locally Linear DA (PCA-decorrelated)" else "Locally Linear DA", has_ld = FALSE, ld_scores = NULL)
         } else if (method == "MMC") {
           if (!requireNamespace("kernlab", quietly = TRUE)) return("Package 'kernlab' required. Install with: install.packages('kernlab')")
           C_val <- if (isTruthy(input$mmc_C)) input$mmc_C else 1
@@ -296,18 +346,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$download_da_assumption_plot <- downloadHandler(
-      filename = function() { paste0("assumption_check_", Sys.Date(), ".png") },
-      content = function(file) {
-        png(file, width = 800, height = 600)
-        switch(input$view,
-               "1. Covariance Ellipses" = da_plot_ellipses_fn(),
-               "2. Equal Variance (Boxplots)" = da_plot_box_fn(),
-               "3. Normality (Q-Q Plots)" = da_plot_qq_fn(),
-               "4. Distribution Density" = da_plot_density_fn())
-        dev.off()
-      }
-    )
+    
 
     # ---- Model diagnostic plots ----
     plot_lda_single <- function(m, plot_name) {
@@ -324,7 +363,26 @@ daServer <- function(id, dataset_pool, active_dataset) {
                   facet_wrap(~ Class, ncol = 1, scales = "free_y") + theme_minimal(base_size = 14) +
                   labs(title = paste("Stacked Histogram of LD1 Scores -", m$method_name), x = "LD1 Score", y = "Count") +
                   theme(legend.position = "none", strip.background = element_rect(fill = "#e9ecef", color = NA), strip.text = element_text(face = "bold", size = 12), panel.spacing = unit(1, "lines")))
-        } else show_placeholder(paste("LD scores not available for", m$method_name, ". This plot is only for LDA-based methods."))
+        } else {
+          # No LD scores (LLDA, KDA, QDA, etc.): histogram of predictor(s) by actual class
+          num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
+          if (length(num_preds) == 0) { show_placeholder("No numeric predictors for histogram."); return() }
+          px <- num_preds[1]
+          df_plot <- data.frame(x = m$data[[px]], Class = as.factor(m$data[[m$target_var]]),
+                                Predicted = as.factor(m$pred_class))
+          print(
+            ggplot(df_plot, aes(x = x, fill = Class)) +
+              geom_histogram(color = "darkgray", bins = 30, alpha = 0.8) +
+              facet_wrap(~ Class, ncol = 1, scales = "free_y") +
+              labs(title = paste("Histogram of", px, "by Class —", m$method_name),
+                   x = px, y = "Count") +
+              theme_minimal(base_size = 14) +
+              theme(legend.position = "none",
+                    strip.background = element_rect(fill = "#e9ecef", color = NA),
+                    strip.text = element_text(face = "bold", size = 12),
+                    panel.spacing = unit(1, "lines"))
+          )
+        }
       } else if (plot_name == "Biplot (ggord)") {
         if (!isTRUE(m$has_ld)) { show_placeholder(paste("Biplot not available for", m$method_name, ". Only for LDA/Weighted LDA.")); return() }
         if (requireNamespace("ggord", quietly = TRUE)) tryCatch(print(ggord::ggord(m$model)), error = function(e) show_placeholder(paste("ggord error:", e$message)))
@@ -345,11 +403,143 @@ daServer <- function(id, dataset_pool, active_dataset) {
           else print(ggplot(df_plot, aes(x = LD1, y = LD2, color = Class)) + geom_point(size = 3, alpha = 0.8) + stat_ellipse() + theme_minimal(base_size = 14) + labs(title = paste("Scatter (LD1 vs LD2) -", m$method_name)))
         } else {
           num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
-          if (length(num_preds) < 2) { show_placeholder("Need at least 2 numeric predictors for PCA projection."); return() }
+          if (length(num_preds) < 2) {
+            show_placeholder("For 1 predictor, use 'Decision Regions', 'Class Lanes', or 'Class Density'.")
+            return()
+          }
           pca_res <- prcomp(scale(m$data[, num_preds, drop = FALSE]), center = FALSE, scale. = FALSE)
-          df_plot <- data.frame(PC1 = pca_res$x[, 1], PC2 = pca_res$x[, min(2, ncol(pca_res$x))], Predicted = as.factor(m$pred_class), Actual = m$data[[m$target_var]])
-          print(ggplot(df_plot, aes(x = PC1, y = PC2, color = Predicted, shape = Actual)) + geom_point(size = 3, alpha = 0.8) + stat_ellipse(aes(group = Predicted), linetype = "dashed") + theme_minimal(base_size = 14) + labs(title = paste("PCA Projection -", m$method_name), x = "PC1", y = "PC2"))
+          df_plot <- data.frame(PC1 = pca_res$x[, 1], PC2 = pca_res$x[, min(2, ncol(pca_res$x))],
+                                Predicted = as.factor(m$pred_class), Actual = m$data[[m$target_var]])
+          print(ggplot(df_plot, aes(x = PC1, y = PC2, color = Predicted, shape = Actual)) +
+                  geom_point(size = 3, alpha = 0.8) +
+                  stat_ellipse(aes(group = Predicted), linetype = "dashed") +
+                  theme_minimal(base_size = 14) +
+                  labs(title = paste("PCA Projection —", m$method_name), x = "PC1", y = "PC2"))
         }
+      } else if (plot_name %in% c("Scatter + Regions", "Decision Regions", "Class Lanes", "Class Density")) {
+        num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
+        if (length(num_preds) == 0) { show_placeholder("No numeric predictors."); return() }
+        # These 1-D decision plots need a single axis. With >1 predictor there's no
+        # single axis, so fall back to the PCA/LD 2-D projection instead of erroring.
+        if (length(num_preds) > 1)  { plot_lda_single(m, "LD Scatter/Density"); return() }
+        px      <- num_preds[1]
+        grid_x  <- seq(min(m$data[[px]], na.rm = TRUE) - 0.5,
+                        max(m$data[[px]], na.rm = TRUE) + 0.5, length.out = 500)
+        grid_df <- setNames(data.frame(grid_x), px)
+        for (.p in m$predictors) {
+          if (.p == px) next
+          .col <- m$data[[.p]]
+          if (is.numeric(.col)) {
+            grid_df[[.p]] <- median(.col, na.rm = TRUE)
+          } else {
+            .mode <- names(sort(table(.col), decreasing = TRUE))[1]
+            grid_df[[.p]] <- if (is.factor(.col)) factor(.mode, levels = levels(.col)) else .mode
+          }
+        }
+        grid_pred <- tryCatch({
+          mn <- m$method_name
+          if (mn %in% c("Kernel DA (SVM-RBF)", "Maximum Margin (Linear SVM)"))
+            as.character(kernlab::predict(m$model, newdata = grid_df))
+          else
+            as.character(predict(m$model, newdata = grid_df)$class)
+        }, error = function(e) NULL)
+        if (is.null(grid_pred)) { show_placeholder("Could not compute decision regions."); return() }
+        # Boundary x positions
+        rle_p     <- rle(grid_pred)
+        bnd_x     <- grid_x[cumsum(rle_p$lengths)[-length(rle_p$lengths)]]
+        grid_data <- data.frame(x = grid_x, Predicted = as.factor(grid_pred))
+        df_pts    <- data.frame(x = m$data[[px]], Actual = as.factor(m$data[[m$target_var]]))
+        # Shared manual color palette keyed by class name (covers both Predicted and Actual)
+        all_cls      <- union(levels(df_pts$Actual), unique(grid_pred))
+        pal_hex      <- viridisLite::viridis(length(all_cls), option = "D")
+        class_colors <- setNames(pal_hex, all_cls)
+
+        if (plot_name == "Scatter + Regions") {
+          shapes_vec <- setNames(
+            c(16, 17, 15, 18, 8, 3, 4)[seq_along(levels(df_pts$Actual))],
+            levels(df_pts$Actual))
+          p <- ggplot() +
+            geom_tile(data = grid_data,
+                      aes(x = x, y = 0, height = Inf, fill = Predicted), alpha = 0.2) +
+            geom_jitter(data = df_pts,
+                        aes(x = x, y = 0, color = Actual, shape = Actual),
+                        height = 0.3, size = 2.5, alpha = 0.75) +
+            scale_fill_manual(values = class_colors, name = "Predicted") +
+            scale_color_manual(values = class_colors, name = "Actual") +
+            scale_shape_manual(values = shapes_vec, name = "Actual") +
+            theme_minimal(base_size = 14) +
+            theme(axis.text.y = element_blank(), axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),
+                  legend.position = "bottom") +
+            labs(title    = paste(m$method_name, "— Decision Regions"),
+                 subtitle = "Background = predicted class  |  Points = actual class (shape + colour)",
+                 x = px)
+          if (length(bnd_x) > 0)
+            p <- p + geom_vline(xintercept = bnd_x, linetype = "dashed",
+                                color = "black", linewidth = 0.8)
+          print(p)
+
+        } else if (plot_name == "Decision Regions") {
+          # Option A: background regions + explicit boundaries + rug (your original style)
+          p <- ggplot() +
+            geom_tile(data = grid_data, aes(x = x, y = 0, height = Inf, fill = Predicted), alpha = 0.2) +
+            geom_rug(data = df_pts, aes(x = x, color = Actual),
+                     sides = "b", length = unit(0.1, "npc"), linewidth = 0.5) +
+            scale_fill_manual(values = class_colors, name = paste(m$method_name, "Prediction")) +
+            scale_color_manual(values = class_colors, name = "Actual Data") +
+            theme_minimal(base_size = 14) +
+            theme(axis.text.y = element_blank(), axis.title.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank()) +
+            labs(title    = paste(m$method_name, "— Decision Regions"),
+                 subtitle = "Background = predicted class  |  Rug ticks = actual class",
+                 x = px)
+          if (length(bnd_x) > 0)
+            p <- p + geom_vline(xintercept = bnd_x, linetype = "dashed",
+                                color = "black", linewidth = 0.8)
+          print(p)
+
+        } else if (plot_name == "Class Lanes") {
+          # Option B: each actual class in its own horizontal lane
+          lvls     <- levels(df_pts$Actual)
+          n_cls    <- length(lvls)
+          mid_y    <- (n_cls + 1) / 2
+          df_lanes <- data.frame(x      = m$data[[px]],
+                                 Actual = as.factor(m$data[[m$target_var]]),
+                                 lane_y = as.numeric(as.factor(m$data[[m$target_var]])))
+          print(
+            ggplot() +
+              geom_tile(data = grid_data,
+                        aes(x = x, y = mid_y, height = n_cls + 0.5, fill = Predicted), alpha = 0.2) +
+              geom_point(data = df_lanes,
+                         aes(x = x, y = lane_y, color = Actual),
+                         size = 2, alpha = 0.8, shape = 16) +
+              scale_fill_manual(values = class_colors, name = paste(m$method_name, "Prediction")) +
+              scale_color_manual(values = class_colors, name = "Actual Class") +
+              scale_y_continuous(breaks = seq_along(lvls), labels = lvls,
+                                 limits = c(0.5, n_cls + 0.5)) +
+              theme_minimal(base_size = 14) +
+              theme(panel.grid.minor.y = element_blank()) +
+              labs(title    = paste(m$method_name, "— Class Lanes"),
+                   subtitle = "Background = predicted region  |  Each row = one actual class",
+                   x = px, y = "Actual Class")
+          )
+
+        } else {
+          # Class Density: density curves only, no background
+          print(
+            ggplot(df_pts, aes(x = x, fill = Actual, color = Actual)) +
+              geom_density(alpha = 0.5, linewidth = 0.8) +
+              scale_fill_manual(values = class_colors) +
+              scale_color_manual(values = class_colors) +
+              theme_minimal(base_size = 14) +
+              theme(legend.position = "bottom") +
+              labs(title = paste(m$method_name, "— Class Density"),
+                   x = px, y = "Density")
+          )
+        }
+
       } else if (plot_name == "Variable Importance") {
         if (isTRUE(m$has_importance) && m$method_name == "Random Forest") {
           old_par <- par(mar = c(4, 8, 3, 2)); on.exit(par(old_par)); randomForest::varImpPlot(m$model, main = "Variable Importance (Random Forest)")
@@ -377,26 +567,137 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$lda_matrix <- renderPrint({
+    output$conf_plot_da <- renderPlot({
       res <- model_obj()
-      if (is.character(res)) return(cat("Awaiting valid model..."))
-      op <- options(width = 1000)
-      on.exit(options(op))
-      print(table(Predicted = res$pred_class, Actual = res$data[[input$category]]))
+      if (is.character(res)) { show_placeholder("Awaiting valid model..."); return() }
+      cm <- table(Predicted = res$pred_class, Actual = res$data[[input$category]])
+      print(.plot_conf_matrix(cm, title = paste(res$method_name, "— Training Confusion Matrix")))
     })
 
-    output$lda_accuracy <- renderText({
+    output$lda_accuracy <- renderPrint({
       res <- model_obj()
-      if (is.character(res)) return("")
-      acc <- mean(as.character(res$pred_class) == as.character(res$data[[input$category]])) * 100
-      paste(res$method_name, "Accuracy:", round(acc, 2), "%")
+      if (is.character(res)) return(invisible(NULL))
+      pred    <- as.character(res$pred_class)
+      actual  <- as.character(res$data[[input$category]])
+      acc     <- mean(pred == actual) * 100
+      classes <- levels(as.factor(actual))
+      cat(sprintf("Training Accuracy: %.2f%%\n\nClass breakdown:\n", acc))
+      for (cls in classes) {
+        n_act <- sum(actual == cls)
+        n_cor <- sum(pred == cls & actual == cls)
+        pct   <- if (n_act > 0) round(100 * n_cor / n_act) else 0
+        cat(sprintf("  %-28s  n=%-5d  correct=%-5d  (%d%%)\n", cls, n_act, n_cor, pct))
+      }
     })
 
-    output$lda_plot_pairs <- renderPlot({ plot_lda_single(model_obj(), "Pairs Plot") })
-    output$lda_plot_hist <- renderPlot({ plot_lda_single(model_obj(), "Stacked Histogram") })
-    output$lda_plot_biplot <- renderPlot({ plot_lda_single(model_obj(), "Biplot (ggord)") })
+    output$val_acc_da <- renderPrint({
+      cv <- da_cv_result_r()
+      if (is.null(cv)) return(invisible(NULL))
+      pred    <- as.character(cv$predicted)
+      actual  <- as.character(cv$actual)
+      keep    <- !is.na(pred) & !is.na(actual)
+      pred    <- pred[keep]; actual <- actual[keep]
+      acc     <- mean(pred == actual) * 100
+      classes <- sort(unique(actual))
+      cat(sprintf("%s Accuracy: %.2f%%\n\nClass breakdown:\n", cv$lbl, acc))
+      for (cls in classes) {
+        n_act <- sum(actual == cls)
+        n_cor <- sum(pred == cls & actual == cls)
+        pct   <- if (n_act > 0) round(100 * n_cor / n_act) else 0
+        cat(sprintf("  %-28s  n=%-5d  correct=%-5d  (%d%%)\n", cls, n_act, n_cor, pct))
+      }
+    })
+
+    da_cv_result_r <- reactive({
+      res <- model_obj()
+      if (is.character(res) || is.null(res)) return(NULL)
+      tryCatch({
+        mn   <- res$method_name
+        data <- res$data; tv <- res$target_var; pvars <- res$predictors
+        fml  <- as.formula(paste(paste0("`", tv, "`"), "~",
+                                 paste(paste0("`", pvars, "`"), collapse = "+")))
+        if (mn %in% c("LDA", "Weighted LDA")) {
+          loo <- MASS::lda(fml, data = data, CV = TRUE)
+          list(actual    = as.character(data[[tv]]),
+               predicted = as.character(loo$class),
+               lbl       = "LOOCV")
+        } else {
+          n <- nrow(data); k <- .cv_k(input, data); lbl <- .cv_label(k, n)
+          set.seed(42); folds <- sample(rep_len(seq_len(k), n))
+          all_p <- c(); all_a <- c()
+          for (fold in seq_len(k)) {
+            tr <- data[folds != fold, , drop = FALSE]
+            te <- data[folds == fold, , drop = FALSE]
+            m <- tryCatch({
+              if (mn == "QDA")
+                MASS::qda(fml, data = tr)
+              else if (mn == "Regularized LDA" && requireNamespace("klaR", quietly = TRUE))
+                klaR::rda(fml, data = tr, gamma = seq(0,1,0.1), lambda = seq(0,1,0.1))
+              else if (mn %in% c("Kernel DA (SVM-RBF)", "Maximum Margin (Linear SVM)") &&
+                       requireNamespace("kernlab", quietly = TRUE))
+                kernlab::ksvm(fml, data = tr,
+                              kernel = if (mn == "Kernel DA (SVM-RBF)") "rbfdot" else "vanilladot")
+              else if (mn == "Locally Linear DA" && requireNamespace("klaR", quietly = TRUE)) {
+                tr_j <- tr
+                for (p in pvars) if (is.numeric(tr_j[[p]])) tr_j[[p]] <- jitter(tr_j[[p]], amount = 0.0001)
+                klaR::loclda(fml, data = tr_j, k = 5)
+              }
+              else MASS::lda(fml, data = tr)
+            }, error = function(e) NULL)
+            if (is.null(m)) next
+            p <- tryCatch({
+              if (mn %in% c("Kernel DA (SVM-RBF)", "Maximum Margin (Linear SVM)"))
+                as.character(kernlab::predict(m, newdata = te))
+              else
+                as.character(predict(m, newdata = te)$class)
+            }, error = function(e) NULL)
+            if (is.null(p)) next
+            all_p <- c(all_p, p)
+            all_a <- c(all_a, as.character(te[[tv]]))
+          }
+          if (length(all_p) == 0) return(NULL)
+          list(actual = all_a, predicted = all_p, lbl = lbl)
+        }
+      }, error = function(e) NULL)
+    })
+
+    output$prf_loocv_dt <- renderDT({
+      res <- model_obj()
+      if (is.character(res) || is.null(res))
+        return(DT::datatable(data.frame(Message = "Awaiting model.")))
+      tryCatch({
+        train_prf <- .clf_prf(as.character(res$data[[res$target_var]]),
+                              as.character(res$pred_class))
+        train_acc <- mean(as.character(res$pred_class) ==
+                          as.character(res$data[[res$target_var]]), na.rm = TRUE)
+        cv <- da_cv_result_r()
+        if (!is.null(cv)) {
+          cv_prf <- .clf_prf(cv$actual, cv$predicted)
+          cv_acc <- mean(cv$predicted == cv$actual, na.rm = TRUE)
+          prf_list <- setNames(list(train_prf, cv_prf), c("Training", cv$lbl))
+          acc_list <- setNames(list(train_acc, cv_acc), c("Training", cv$lbl))
+        } else {
+          prf_list <- list(Training = train_prf)
+          acc_list <- list(Training = train_acc)
+        }
+        .prf_dt(prf_list, acc_list)
+      }, error = function(e) DT::datatable(data.frame(Error = e$message)))
+    })
+
+    output$val_conf_plot_da <- renderPlot({
+      cv <- da_cv_result_r()
+      if (is.null(cv)) { show_placeholder("Awaiting CV results..."); return() }
+      cm <- table(Predicted = cv$predicted, Actual = cv$actual)
+      print(.plot_conf_matrix(cm, title = paste(cv$lbl, "— Validation Confusion Matrix")))
+    })
+
+    output$lda_plot_scatter_regions <- renderPlot({ plot_lda_single(model_obj(), "Scatter + Regions") })
+    output$lda_plot_class_density   <- renderPlot({ plot_lda_single(model_obj(), "Class Density") })
+    output$lda_plot_pairs    <- renderPlot({ plot_lda_single(model_obj(), "Pairs Plot") })
+    output$lda_plot_hist     <- renderPlot({ plot_lda_single(model_obj(), "Stacked Histogram") })
+    output$lda_plot_biplot   <- renderPlot({ plot_lda_single(model_obj(), "Biplot (ggord)") })
     output$lda_plot_partimat <- renderPlot({ plot_lda_single(model_obj(), "Partition Plot (partimat)") })
-    output$lda_plot_scatter <- renderPlot({ plot_lda_single(model_obj(), "LD Scatter/Density") })
+    output$lda_plot_scatter  <- renderPlot({ plot_lda_single(model_obj(), "LD Scatter/Density") })
     output$lda_plot_importance <- renderPlot({ plot_lda_single(model_obj(), "Variable Importance") })
 
     output$lda_single_selector <- renderUI({
@@ -413,6 +714,8 @@ daServer <- function(id, dataset_pool, active_dataset) {
         sel <- input$lda_selected_plots
         if (length(sel) == 0) return(markdown("*Please select plots from the sidebar.*"))
         ui_list <- list()
+        if ("Scatter + Regions" %in% sel) ui_list <- append(ui_list, list(plotOutput(ns("lda_plot_scatter_regions"), height = "450px")))
+        if ("Class Density" %in% sel) ui_list <- append(ui_list, list(plotOutput(ns("lda_plot_class_density"), height = "450px")))
         if ("Pairs Plot" %in% sel) ui_list <- append(ui_list, list(plotOutput(ns("lda_plot_pairs"), height = "450px")))
         if ("Stacked Histogram" %in% sel) ui_list <- append(ui_list, list(plotOutput(ns("lda_plot_hist"), height = "450px")))
         if ("Biplot (ggord)" %in% sel) ui_list <- append(ui_list, list(plotOutput(ns("lda_plot_biplot"), height = "450px")))
@@ -424,14 +727,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$download_da_lda_plot <- downloadHandler(
-      filename = function() { paste0("da_diagnostic_", Sys.Date(), ".png") },
-      content = function(file) {
-        if (isTruthy(input$lda_view_mode) && input$lda_view_mode == "Single Plot") {
-          png(file, width = 800, height = 600); plot_lda_single(model_obj(), input$lda_single_plot_choice); dev.off()
-        } else { png(file, width = 600, height = 400); show_placeholder("Please switch to 'Single Plot' mode to download."); dev.off() }
-      }
-    )
+    
 
     # ---- The dynamic canvas (assumption checks vs run model) ----
     output$dynamic_content <- renderUI({
@@ -440,7 +736,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       if (mode == "1. Assumption Checks") {
         view <- input$view
         if (!isTruthy(view)) return(div(style = "padding:20px;", h4("Loading diagnostic views...", class = "text-muted")))
-        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title, downloadButton(ns("download_da_assumption_plot"), "Download Plot", class = "btn-sm btn-outline-success"))
+        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title)
         if (view == "1. Covariance Ellipses") card(make_header("Covariance Ellipses"), plotOutput(ns("plot_ellipses"), height = "500px"))
         else if (view == "2. Equal Variance (Boxplots)") card(make_header("Equal Variance Check"), plotOutput(ns("plot_box"), height = "500px"))
         else if (view == "3. Normality (Q-Q Plots)") card(make_header("Multivariate Normality (Q-Q)"), plotOutput(ns("plot_qq"), height = "500px"))
@@ -452,8 +748,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
             card_header(class = "d-flex justify-content-between align-items-center bg-light", "Discriminant Diagnostics",
                         div(class = "d-flex align-items-center gap-2 header-controls",
                             radioGroupButtons(ns("lda_view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                            uiOutput(ns("lda_single_selector")),
-                            downloadButton(ns("download_da_lda_plot"), "Download Plot", class = "btn-sm btn-outline-success"))),
+                            uiOutput(ns("lda_single_selector")))),
             div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_lda_plot_ui")))
           ),
           layout_columns(
@@ -465,7 +760,20 @@ daServer <- function(id, dataset_pool, active_dataset) {
             ),
             card(
               card_header(class = "bg-light", "Confusion Matrix & Accuracy"),
-              div(style = "overflow-y: auto; height: 345px; padding: 5px;", verbatimTextOutput(ns("lda_matrix")), hr(), tags$b(textOutput(ns("lda_accuracy"))))
+              div(style = "height: 240px; padding: 5px;", plotOutput(ns("conf_plot_da"), height = "220px")),
+              div(style = "padding: 2px 8px;", verbatimTextOutput(ns("lda_accuracy")))
+            )
+          ),
+          layout_columns(
+            col_widths = c(6, 6),
+            card(
+              card_header(class = "bg-light", "Precision / Recall / F1 + Cross-Validation"),
+              div(style = "padding: 5px;", DTOutput(ns("prf_loocv_dt")))
+            ),
+            card(
+              card_header(class = "bg-light", "Validation Confusion Matrix"),
+              div(style = "height: 240px; padding: 5px;", plotOutput(ns("val_conf_plot_da"), height = "220px")),
+              div(style = "padding: 2px 8px;", verbatimTextOutput(ns("val_acc_da")))
             )
           )
         )

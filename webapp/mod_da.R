@@ -3,7 +3,7 @@
 # daToolsUI / daCanvasUI / daServer(id, dataset_pool, active_dataset)
 # Two modes: (1) Assumption Checks (ellipses/boxplots/Q-Q/density/stat tests)
 #            (2) Run Model (9 methods: LDA/WLDA/QDA/RLDA/KDA/LLDA/MMC/RF/NN)
-# Optional pkgs (klaR/kernlab/heplots/ggord) are guarded by requireNamespace().
+# Optional pkgs (klaR/kernlab/heplots/ggord) are guarded by .ensure_pkg().
 # ==========================================================================
 
 daToolsUI <- function(id) {
@@ -98,7 +98,10 @@ daToolsUI <- function(id) {
                     "Biplot (ggord)", "Pairs Plot", "Partition Plot (partimat)", "Variable Importance"),
         selected = c("Scatter + Regions", "Class Density"), multiple = TRUE),
       hr(),
-      .cv_ui(ns)
+      .cv_ui(ns),
+      hr(style = "margin:10px 0;"),
+      actionButton(ns("run_model"), "Run Model",
+        class = "btn-success w-100", icon = icon("play"))
     )
   )
 }
@@ -163,7 +166,9 @@ daServer <- function(id, dataset_pool, active_dataset) {
     })
 
     # ---- Model fitting (9 methods) ----
-    model_obj <- reactive({
+    # Button-triggered: DA fits (esp. KDA/LLDA/MMC) are expensive and run on the
+    # user's own machine in the browser build (UX rule #14).
+    model_obj <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       req(active_dataset(), input$category)
       df <- active_data()
       form_str <- lda_formula_str()
@@ -215,25 +220,46 @@ daServer <- function(id, dataset_pool, active_dataset) {
           model <- MASS::qda(as.formula(form_str), data = clean_df); preds <- predict(model)
           list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors, method_name = "QDA", has_ld = FALSE, ld_scores = NULL)
         } else if (method == "RLDA") {
-          if (!requireNamespace("klaR", quietly = TRUE)) return("Package 'klaR' required. Install with: install.packages('klaR')")
+          if (!.ensure_pkg("klaR", quietly = TRUE)) return("Package 'klaR' required. Install with: install.packages('klaR')")
           model <- klaR::rda(as.formula(form_str), data = clean_df, gamma = seq(0, 1, 0.1), lambda = seq(0, 1, 0.1)); preds <- predict(model)
           list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors, method_name = "Regularized LDA", has_ld = FALSE, ld_scores = NULL)
         } else if (method == "KDA") {
-          if (!requireNamespace("kernlab", quietly = TRUE)) return("Package 'kernlab' required. Install with: install.packages('kernlab')")
+          if (!.ensure_pkg("kernlab", quietly = TRUE)) return("Package 'kernlab' required. Install with: install.packages('kernlab')")
           sigma_val <- if (isTruthy(input$kda_sigma)) input$kda_sigma else 0.01
           C_val <- if (isTruthy(input$kda_C)) input$kda_C else 0.1
           model <- kernlab::ksvm(as.formula(form_str), data = clean_df, kernel = "rbfdot", kpar = list(sigma = sigma_val), C = C_val, prob.model = TRUE)
           pred_class <- kernlab::predict(model, clean_df)
           list(model = model, data = clean_df, preds = NULL, pred_class = pred_class, target_var = input$category, predictors = predictors, method_name = "Kernel DA (SVM-RBF)", has_ld = FALSE, ld_scores = NULL)
         } else if (method == "LLDA") {
-          if (!requireNamespace("klaR", quietly = TRUE)) return("Package 'klaR' required. Install with: install.packages('klaR')")
+          if (!.ensure_pkg("klaR", quietly = TRUE)) return("Package 'klaR' required. Install with: install.packages('klaR')")
           k_val <- if (isTruthy(input$llda_k)) input$llda_k else 5
           clean_df_j <- clean_df
           for (p in predictors) if (is.numeric(clean_df_j[[p]])) clean_df_j[[p]] <- jitter(clean_df_j[[p]], amount = 0.0001)
-          model <- klaR::loclda(as.formula(form_str), data = clean_df_j, k = k_val); preds <- predict(model)
-          list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors, method_name = "Locally Linear DA", has_ld = FALSE, ld_scores = NULL)
+          num_p <- predictors[sapply(clean_df_j[, predictors, drop = FALSE], is.numeric)]
+          cat_p <- setdiff(predictors, num_p)
+          # loclda inverts a LOCAL covariance; with >1 collinear predictor that is
+          # singular ("dgesv: exactly singular"). On failure, decorrelate the numeric
+          # predictors via PCA (orthogonal, so never collinear) and refit on the PCs.
+          model <- tryCatch(klaR::loclda(as.formula(form_str), data = clean_df_j, k = k_val),
+                            error = function(e) e)
+          llda_pca <- FALSE
+          if (inherits(model, "error")) {
+            if (length(num_p) < 2) stop(model)          # not a collinearity case -> friendly handler
+            pc   <- prcomp(clean_df_j[, num_p, drop = FALSE], center = TRUE, scale. = TRUE)
+            keep <- which(pc$sdev > 1e-4 * pc$sdev[1])  # drop near-zero-variance directions
+            pcs  <- as.data.frame(pc$x[, keep, drop = FALSE]); names(pcs) <- paste0("PC", seq_along(keep))
+            dat2 <- cbind(pcs, clean_df_j[, c(input$category, cat_p), drop = FALSE])
+            form2 <- paste0("`", input$category, "` ~ ",
+                            paste(c(names(pcs), sprintf("`%s`", cat_p)), collapse = " + "))
+            model <- klaR::loclda(as.formula(form2), data = dat2, k = k_val)  # may re-raise -> handler
+            preds <- predict(model, dat2); llda_pca <- TRUE
+          } else {
+            preds <- predict(model)
+          }
+          list(model = model, data = clean_df, preds = preds, pred_class = preds$class, target_var = input$category, predictors = predictors,
+               method_name = if (llda_pca) "Locally Linear DA (PCA-decorrelated)" else "Locally Linear DA", has_ld = FALSE, ld_scores = NULL)
         } else if (method == "MMC") {
-          if (!requireNamespace("kernlab", quietly = TRUE)) return("Package 'kernlab' required. Install with: install.packages('kernlab')")
+          if (!.ensure_pkg("kernlab", quietly = TRUE)) return("Package 'kernlab' required. Install with: install.packages('kernlab')")
           C_val <- if (isTruthy(input$mmc_C)) input$mmc_C else 1
           model <- kernlab::ksvm(as.formula(form_str), data = clean_df, kernel = "vanilladot", C = C_val)
           pred_class <- kernlab::predict(model, clean_df)
@@ -320,18 +346,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$download_da_assumption_plot <- downloadHandler(
-      filename = function() { paste0("assumption_check_", Sys.Date(), ".png") },
-      content = function(file) {
-        png(file, width = 800, height = 600)
-        switch(input$view,
-               "1. Covariance Ellipses" = da_plot_ellipses_fn(),
-               "2. Equal Variance (Boxplots)" = da_plot_box_fn(),
-               "3. Normality (Q-Q Plots)" = da_plot_qq_fn(),
-               "4. Distribution Density" = da_plot_density_fn())
-        dev.off()
-      }
-    )
+    
 
     # ---- Model diagnostic plots ----
     plot_lda_single <- function(m, plot_name) {
@@ -373,7 +388,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
         if (.opt_pkg("ggord")) tryCatch(print(.opt_fun("ggord", "ggord")(m$model)), error = function(e) show_placeholder(paste("ggord error:", e$message)))
         else show_placeholder("Please install 'ggord' from GitHub: remotes::install_github('fawda123/ggord')")
       } else if (plot_name == "Partition Plot (partimat)") {
-        if (requireNamespace("klaR", quietly = TRUE)) tryCatch({
+        if (.ensure_pkg("klaR", quietly = TRUE)) tryCatch({
           num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
           if (length(num_preds) < 2) { show_placeholder("Need at least 2 numeric predictors."); return() }
           vars <- if (length(num_preds) > 4) num_preds[1:4] else num_preds
@@ -404,7 +419,9 @@ daServer <- function(id, dataset_pool, active_dataset) {
       } else if (plot_name %in% c("Scatter + Regions", "Decision Regions", "Class Lanes", "Class Density")) {
         num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
         if (length(num_preds) == 0) { show_placeholder("No numeric predictors."); return() }
-        if (length(num_preds) > 1)  { show_placeholder("These plots require exactly 1 numeric predictor."); return() }
+        # These 1-D decision plots need a single axis. With >1 predictor there's no
+        # single axis, so fall back to the PCA/LD 2-D projection instead of erroring.
+        if (length(num_preds) > 1)  { plot_lda_single(m, "LD Scatter/Density"); return() }
         px      <- num_preds[1]
         grid_x  <- seq(min(m$data[[px]], na.rm = TRUE) - 0.5,
                         max(m$data[[px]], na.rm = TRUE) + 0.5, length.out = 500)
@@ -614,13 +631,13 @@ daServer <- function(id, dataset_pool, active_dataset) {
             m <- tryCatch({
               if (mn == "QDA")
                 MASS::qda(fml, data = tr)
-              else if (mn == "Regularized LDA" && requireNamespace("klaR", quietly = TRUE))
+              else if (mn == "Regularized LDA" && .ensure_pkg("klaR", quietly = TRUE))
                 klaR::rda(fml, data = tr, gamma = seq(0,1,0.1), lambda = seq(0,1,0.1))
               else if (mn %in% c("Kernel DA (SVM-RBF)", "Maximum Margin (Linear SVM)") &&
-                       requireNamespace("kernlab", quietly = TRUE))
+                       .ensure_pkg("kernlab", quietly = TRUE))
                 kernlab::ksvm(fml, data = tr,
                               kernel = if (mn == "Kernel DA (SVM-RBF)") "rbfdot" else "vanilladot")
-              else if (mn == "Locally Linear DA" && requireNamespace("klaR", quietly = TRUE)) {
+              else if (mn == "Locally Linear DA" && .ensure_pkg("klaR", quietly = TRUE)) {
                 tr_j <- tr
                 for (p in pvars) if (is.numeric(tr_j[[p]])) tr_j[[p]] <- jitter(tr_j[[p]], amount = 0.0001)
                 klaR::loclda(fml, data = tr_j, k = 5)
@@ -710,14 +727,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$download_da_lda_plot <- downloadHandler(
-      filename = function() { paste0("da_diagnostic_", Sys.Date(), ".png") },
-      content = function(file) {
-        if (isTruthy(input$lda_view_mode) && input$lda_view_mode == "Single Plot") {
-          png(file, width = 800, height = 600); plot_lda_single(model_obj(), input$lda_single_plot_choice); dev.off()
-        } else { png(file, width = 600, height = 400); show_placeholder("Please switch to 'Single Plot' mode to download."); dev.off() }
-      }
-    )
+    
 
     # ---- The dynamic canvas (assumption checks vs run model) ----
     output$dynamic_content <- renderUI({
@@ -726,7 +736,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       if (mode == "1. Assumption Checks") {
         view <- input$view
         if (!isTruthy(view)) return(div(style = "padding:20px;", h4("Loading diagnostic views...", class = "text-muted")))
-        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title, downloadButton(ns("download_da_assumption_plot"), "Download Plot", class = "btn-sm btn-outline-success"))
+        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title)
         if (view == "1. Covariance Ellipses") card(make_header("Covariance Ellipses"), plotOutput(ns("plot_ellipses"), height = "500px"))
         else if (view == "2. Equal Variance (Boxplots)") card(make_header("Equal Variance Check"), plotOutput(ns("plot_box"), height = "500px"))
         else if (view == "3. Normality (Q-Q Plots)") card(make_header("Multivariate Normality (Q-Q)"), plotOutput(ns("plot_qq"), height = "500px"))
@@ -738,8 +748,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
             card_header(class = "d-flex justify-content-between align-items-center bg-light", "Discriminant Diagnostics",
                         div(class = "d-flex align-items-center gap-2 header-controls",
                             radioGroupButtons(ns("lda_view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                            uiOutput(ns("lda_single_selector")),
-                            downloadButton(ns("download_da_lda_plot"), "Download Plot", class = "btn-sm btn-outline-success"))),
+                            uiOutput(ns("lda_single_selector")))),
             div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_lda_plot_ui")))
           ),
           layout_columns(

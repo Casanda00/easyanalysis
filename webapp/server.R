@@ -19,6 +19,10 @@ server <- function(input, output, session) {
   # Currently-active dataset (set by clicking the left rail, or newest upload).
   active_ds <- reactiveVal(NULL)
   observeEvent(input$active_dataset, { active_ds(input$active_dataset) })
+  # Bumped whenever a dataset is deleted, to force datasets_list to re-render:
+  # reactiveValuesToList() reliably reacts to key ADDS but not always to key
+  # REMOVALS in this webR build, so a deleted item's name lingered in the list.
+  ds_refresh <- reactiveVal(0)
 
   # Programmatic view navigation (used by upload handler; same effect as menubar click).
   .switch_view <- function(v) {
@@ -67,6 +71,17 @@ server <- function(input, output, session) {
       # Skip companion shapefile parts (handled via the .shp entry below)
       if (ext %in% c("shx","dbf","prj","cpg")) next
 
+      # Guard: in the browser build an upload must have reached webR's virtual
+      # filesystem as a real, non-empty file before terra/lidR/sf can read it.
+      fsize <- tryCatch(file.info(fpath)$size, error = function(e) NA)
+      if (isTRUE(is.na(fsize)) || isTRUE(fsize == 0)) {
+        showNotification(
+          paste0("Could not read '", fname, "' — the uploaded file is empty or unreadable ",
+                 "(0 bytes at ", fpath, "). For large .laz/.tif this can be a browser upload limit."),
+          type = "error", duration = NULL)
+        next
+      }
+
       tryCatch({
         if (ext %in% c("csv","xlsx","xls","txt")) {
           # ---- Tabular ----
@@ -89,10 +104,15 @@ server <- function(input, output, session) {
           showNotification(paste0("Raster '", nm, "' loaded — switching to Spatial Analysis."), type = "message")
 
         } else if (ext %in% c("las","laz")) {
-          # ---- LiDAR (decimate at read time to cap RAM on shinyapps.io) ----
+          # ---- LiDAR ----
+          # Read the FULL cloud so the user can access all points; only decimate
+          # at read for very large files, as a browser-memory safety net (each
+          # point carries several attributes; ~5M pts is already several hundred
+          # MB in the wasm heap). Display decimation (the snap_pts slider) is
+          # separate and handles 3D-viewer performance.
           hdr       <- lidR::readLASheader(fpath)
           total_pts <- hdr@PHB[["Number of point records"]]
-          cap       <- 500000L
+          cap       <- 5000000L   # was 500k; raised so full plot-level clouds load
           filt      <- if (!is.na(total_pts) && total_pts > cap)
             paste("-keep_random_fraction", round(cap / total_pts, 6)) else ""
           las <- lidR::readLAS(fpath, filter = filt)
@@ -101,8 +121,10 @@ server <- function(input, output, session) {
           .switch_view("pointcloud")
           msg <- if (!is.na(total_pts) && total_pts > cap)
             paste0("LAS '", fname, "': ", format(loaded, big.mark=","), " of ",
-                   format(total_pts, big.mark=","), " pts loaded (sampled to 500k cap).")
-          else paste0("LAS '", fname, "' loaded (", format(loaded, big.mark=","), " pts).")
+                   format(total_pts, big.mark=","), " pts loaded (sampled to a ",
+                   format(cap, big.mark=","), "-pt memory cap).")
+          else paste0("LAS '", fname, "' loaded — full cloud, ",
+                      format(loaded, big.mark=","), " pts.")
           showNotification(msg, type = "message")
 
         } else if (ext %in% c("gpkg","geojson","json")) {
@@ -128,7 +150,11 @@ server <- function(input, output, session) {
           showNotification(paste("Skipped unsupported file:", fname), type = "warning")
         }
       }, error = function(e) {
-        showNotification(paste("Error loading", fname, ":", e$message), type = "error")
+        # Persistent (duration=NULL) so the real cause stays on screen for
+        # spatial files — these are the hard ones to diagnose remotely.
+        showNotification(
+          HTML(paste0("<b>Error loading ", fname, "</b><br>", htmltools::htmlEscape(e$message))),
+          type = "error", duration = NULL)
       })
     }
   })
@@ -243,13 +269,18 @@ server <- function(input, output, session) {
   }
 
   output$datasets_list <- renderUI({
+    ds_refresh()  # re-render on delete (reactiveValuesToList misses key removals here)
     tryCatch({
       # Build a flat list with per-item metadata (label, onclick target view).
       .pool_icon <- function(fa, color)
         sprintf('<i class="fa fa-%s" style="font-size:11px;color:%s;flex-shrink:0;margin-right:4px;"></i>', fa, color)
       make_items <- function(pool, icon_html, view) {
-        nms <- tryCatch(names(reactiveValuesToList(pool)), error = function(e) character(0))
-        nms <- if (is.null(nms) || length(nms) == 0) character(0) else as.character(nms)
+        lst <- tryCatch(reactiveValuesToList(pool), error = function(e) list())
+        nms <- names(lst); nms <- if (is.null(nms)) character(0) else as.character(nms)
+        # Drop keys whose value is NULL: a deleted dataset can linger as a
+        # NULL-valued key in this webR build (`pool[[k]] <- NULL` doesn't always
+        # drop the name), which made deleted datasets reappear in the rail.
+        if (length(nms)) nms <- nms[vapply(nms, function(n) !is.null(lst[[n]]), logical(1))]
         lapply(nms, function(nm) list(val = nm, lbl = paste0(icon_html, nm), view = view))
       }
       all_items <- c(
@@ -308,6 +339,10 @@ server <- function(input, output, session) {
     } else if (val %in% names(reactiveValuesToList(vector_pool))) {
       vector_pool[[val]] <- NULL
     }
+    ds_refresh(ds_refresh() + 1)  # force datasets_list to drop the removed name
+    # Clear the file-upload widget's leftover filename text (it keeps showing the
+    # last uploaded name even after the dataset is removed).
+    session$sendCustomMessage("ea-reset-upload", list())
     showNotification(paste0("'", val, "' removed."), type = "message", duration = 2)
   })
 
@@ -390,6 +425,7 @@ server <- function(input, output, session) {
   climate_ctx    <- climateTrendServer("climate_trend", raster_pool)
   wind_ctx       <- windServer("wind", dataset_pool, active_dataset)
   gam_ctx        <- gamServer("gam", dataset_pool, active_dataset)
+  rconsole_ctx   <- rconsoleServer("rconsole", dataset_pool, active_dataset)
 
   module_ctx <- list(
     data = data_ctx,
@@ -406,7 +442,8 @@ server <- function(input, output, session) {
     suitability = suit_ctx, land_classify = land_cls_ctx,
     recommend = rec_ctx,
     ntl = ntl_ctx,
-    climate_trend = climate_ctx, wind = wind_ctx, gam = gam_ctx
+    climate_trend = climate_ctx, wind = wind_ctx, gam = gam_ctx,
+    rconsole = rconsole_ctx
   )
 
   chatServer("chat", dataset_pool, active_dataset, reactive(input$current_view), module_ctx)

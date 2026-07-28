@@ -87,7 +87,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    if (!requireNamespace("e1071", quietly = TRUE)) {
+    if (!.ensure_pkg("e1071", quietly = TRUE)) {
       msg <- "Package 'e1071' required.\nRun: install.packages('e1071')"
       output$pred_plot <- renderPlot(show_placeholder(msg))
       output$perf_out  <- renderPrint(cat(msg, "\n"))
@@ -132,7 +132,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
       if (gamma_val <= 0) gamma_val <- 1 / length(xv)
 
       result <- tryCatch({
-        fml <- as.formula(paste(yv, "~", paste(xv, collapse = " + ")))
+        fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = " + ")))
         cross_k <- if (isTRUE(input$cross_val)) 5L else 0L
 
         fit <- e1071::svm(fml, data = sub_df,
@@ -187,7 +187,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
       if (grepl("regression", res$svm_type)) return(NULL)
       tryCatch({
         df_cv <- res$df; yv <- res$yv; xv <- res$xv
-        fml <- as.formula(paste(yv, "~", paste(xv, collapse = "+")))
+        fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = "+")))
         n <- nrow(df_cv); k <- .cv_k(input, df_cv); lbl <- .cv_label(k, n)
         set.seed(42); folds <- sample(rep_len(seq_len(k), n))
         all_p <- c(); all_a <- c()
@@ -244,7 +244,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
           train_m <- list(RMSE = sqrt(mean(e^2)), MAE = mean(abs(e)),
                           R2 = 1 - sum(e^2) / sum((y_num - mean(y_num))^2))
           df_cv <- res$df; yv <- res$yv; xv <- res$xv
-          fml <- as.formula(paste(yv, "~", paste(xv, collapse = "+")))
+          fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = "+")))
           n <- nrow(df_cv); k <- .cv_k(input, df_cv); lbl <- .cv_label(k, n)
           set.seed(42); folds <- sample(rep_len(seq_len(k), n))
           all_p <- c(); all_a <- c()

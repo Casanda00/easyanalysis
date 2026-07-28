@@ -51,8 +51,7 @@ lmeCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics",
-                  downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics"),
       div(style = "overflow-y: auto; height: 400px; padding: 5px;", plotOutput(ns("diagnostics_plot")))
     ),
     layout_columns(
@@ -242,10 +241,7 @@ lmeServer <- function(id, dataset_pool, active_dataset) {
 
     output$diagnostics_plot <- renderPlot({ diag_fn() })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("lme_diagnostics_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 900, height = 450); diag_fn(); dev.off() }
-    )
+    
 
     output$dl_fixed_effects <- downloadHandler(
       filename = function() paste0("lme_fixed_effects_", Sys.Date(), ".csv"),

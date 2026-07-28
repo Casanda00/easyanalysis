@@ -47,8 +47,7 @@ classificationCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Classification Performance (F1 Score by Class)",
-                  downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Classification Performance (F1 Score by Class)"),
       div(style = "height: 450px; padding: 10px;", plotOutput(ns("f1_plot"), height = "430px"))
     ),
     layout_columns(
@@ -294,13 +293,7 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
       print(.plot_conf_matrix(cm, title = paste(cv$lbl, "— Validation Confusion Matrix")))
     })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("classification_f1_", Sys.Date(), ".png") },
-      content = function(file) {
-        res <- clf_results(); if (is.null(res)) return()
-        png(file, width = 900, height = 600); f1_plot_fn(); dev.off()
-      }
-    )
+    
 
     # Context (+ plot) for the AI Co-Pilot.
     list(

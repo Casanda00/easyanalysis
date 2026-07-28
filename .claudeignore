@@ -1,0 +1,38 @@
+# Files Claude Code should not read/scan.
+# Keeps context focused on the live app (ui.R, server.R, global.R, mod_*.R).
+
+# --- Deployment / generated ---
+rsconnect/
+.Rhistory
+.RData
+.Rproj.user/
+
+# --- Secrets / env ---
+.Renviron
+
+# --- Large data & binaries (never needed for code work) ---
+*.xlsx
+*.xls
+*.csv
+*.las
+*.laz
+*.shp
+*.shx
+*.dbf
+*.prj
+*.tif
+*.tiff
+
+# --- Legacy snapshots: the pre-rebuild monolith, kept only for porting logic.
+#     Ignored by default so searches don't match stale duplicates. Read these
+#     explicitly (by path) when porting a component back. ---
+ui_legacy.R
+server_legacy.R
+global_legacy.R
+
+# --- Standalone analysis scripts (not part of the Shiny app) ---
+001 Data cleaning.R
+002 RF Modeling.R
+003 LME Modeling.R
+lidr_template-Casanda.r
+sandbox.R

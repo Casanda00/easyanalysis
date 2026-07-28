@@ -1,12 +1,12 @@
-# TerraTrack (R Shiny Application)
+# SimpleAnalysis (R Shiny Application)
 
-TerraTrack is an integrated, modular R Shiny application designed as a comprehensive analytics, modeling, and spatial data processing platform. Developed to support environmental and forestry research—such as tree growth, trafficability modeling, and National Forest Inventory (NFI) analysis—it provides a powerful "GeoLibre-inspired" graphical interface. 
+SimpleAnalysis is an integrated, modular R Shiny application designed as a comprehensive analytics, modeling, and spatial data processing platform. Developed to support environmental and forestry research—such as tree growth, trafficability modeling, and National Forest Inventory (NFI) analysis—it provides a powerful "GeoLibre-inspired" graphical interface. 
 
 Users can upload diverse datasets, perform rich data engineering and exploratory data analysis (EDA), and seamlessly flow into statistical modeling, machine learning, and specialized LiDAR/Spatial analyses—all within a single, persistent workspace.
 
 ## Key Features & Architecture
 
-TerraTrack operates on a persistent, single-frame shell. Instead of entirely separate full-screen tabs, the interface utilizes a top menubar, a unified left-rail dataset manager, a dynamic center canvas, and a contextual right-side tools panel that update in lockstep based on the active module.
+SimpleAnalysis operates on a persistent, single-frame shell. Instead of entirely separate full-screen tabs, the interface utilizes a top menubar, a unified left-rail dataset manager, a dynamic center canvas, and a contextual right-side tools panel that update in lockstep based on the active module.
 
 ### 1. Data Engineering & EDA (`mod_data.R`)
 * **Global Dataset Pool:** Upload standard files (.csv, .xlsx, .txt) which are loaded into a shared memory pool accessible by all modules.

@@ -19,13 +19,15 @@ lidarPointcloudToolsUI <- function(id) {
     tags$hr(class = "my-2"),
     markdown("**Plot Shapefile**"),
     uiOutput(ns("shp_source_ui")),
+    actionButton(ns("clip_shp"), tagList(icon("scissors"), " Clip LAS to this shapefile"),
+      class = "btn-warning w-100 mt-1"),
     hr(),
-    markdown("**Sub-setting & Memory Limits**"),
+    markdown("**Sub-setting by coordinates** *(alternative to the shapefile clip above)*"),
     numericInput(ns("clip_xmin"), "X Min:", value = NA),
     numericInput(ns("clip_xmax"), "X Max:", value = NA),
     numericInput(ns("clip_ymin"), "Y Min:", value = NA),
     numericInput(ns("clip_ymax"), "Y Max:", value = NA),
-    actionButton(ns("clip_las"), "Clip LAS File", class = "btn-warning", width = "100%"),
+    actionButton(ns("clip_las"), "Clip LAS by coordinates", class = "btn-outline-warning", width = "100%"),
     hr(),
     markdown("**Height Normalization (DTM)**"),
     sliderInput(ns("dtm_res"), "DTM Resolution:", min = 0.5, max = 5, value = 1, step = 0.5),
@@ -66,17 +68,15 @@ lidarPointcloudCanvasUI <- function(id) {
     # Headless static render: works on shinyapps.io (no WebGL screenshot needed),
     # is downloadable, and is the image the AI Co-Pilot can actually see.
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Static 3D Snapshot (download / AI view)",
-                  downloadButton(ns("download_3d"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Static 3D Snapshot (download / AI view)"),
       div(class = "d-flex align-items-center gap-2 px-2",
-          sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):", min = 10000, max = 200000, value = 60000, step = 10000, width = "320px")),
+          sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):", min = 10000, max = 5000000, value = 60000, step = 10000, width = "320px")),
       plotOutput(ns("static_3d"), height = "430px")
     ),
     layout_columns(
       col_widths = c(6, 6),
       card(card_header(class = "bg-light", "LAS Summary"), verbatimTextOutput(ns("las_summary"))),
-      card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Elevation & Intensity Distributions",
-                       downloadButton(ns("download_hists"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Elevation & Intensity Distributions"),
            plotOutput(ns("las_hists")))
     )
   )
@@ -102,8 +102,7 @@ lidarChmToolsUI <- function(id) {
 lidarChmCanvasUI <- function(id) {
   ns <- NS(id)
   div(
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "2D CHM & Detected Trees",
-                     downloadButton(ns("download_chm"), "Download Plot", class = "btn-sm btn-outline-success")),
+    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "2D CHM & Detected Trees"),
          plotOutput(ns("chm_plot"), height = "500px")),
     card(card_header(class = "bg-light", "ITD Output Table"), DT::dataTableOutput(ns("itd_table")))
   )
@@ -127,8 +126,7 @@ lidarMetricsCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(card_header(class = "bg-light", "Extracted Plot Predictors"), DT::dataTableOutput(ns("metrics_table"))),
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation (RMSE, Bias)",
-                     downloadButton(ns("download_eval"), "Download Plot", class = "btn-sm btn-outline-success")),
+    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation (RMSE, Bias)"),
          verbatimTextOutput(ns("eval_metrics_out")), plotOutput(ns("eval_plot")))
   )
 }
@@ -145,10 +143,23 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
         if (length(pool) == 0) return()
         latest_nm <- tail(names(pool), 1)
         new_las   <- pool[[latest_nm]]
-        if (!identical(rv_lidar$las, new_las)) {
+        # isolate() the own-state read so this observer depends ONLY on las_pool
+        # and can never re-invalidate itself when it sets rv_lidar$las.
+        if (!identical(isolate(rv_lidar$las), new_las)) {
           rv_lidar$las     <- new_las
           rv_lidar$raw_las <- NULL
-          showNotification(paste0("LiDAR '", latest_nm, "' ready in Point Cloud view."), type = "message")
+          # Let the "Max display points" slider reach the FULL loaded cloud, so
+          # the user can crank it up to every point (default stays 60k for a
+          # responsive 3D viewer). Cap the slider at the actual point count.
+          npts <- tryCatch(nrow(new_las@data), error = function(e) NA_integer_)
+          if (!is.na(npts) && npts > 10000) {
+            updateSliderInput(session, "snap_pts",
+              max = as.integer(min(npts, 5000000L)),
+              value = as.integer(min(isolate(input$snap_pts) %||% 60000L, npts)))
+          }
+          showNotification(paste0("LiDAR '", latest_nm, "' ready (",
+            format(npts, big.mark = ","), " pts). Slider now reaches the full cloud."),
+            type = "message")
         }
       })
     }
@@ -178,6 +189,37 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       withProgress(message = 'Clipping LAS...', value = 0.5, {
         rv_lidar$las <- lidR::clip_rectangle(rv_lidar$las, xmin, ymin, xmax, ymax)
         showNotification("LAS file clipped.", type = "message")
+      })
+    })
+
+    # Clip the point cloud to the selected shapefile polygon (from vector_pool
+    # via the Plot Shapefile picker). Matches CRS, then lidR::clip_roi.
+    observeEvent(input$clip_shp, {
+      req(rv_lidar$las)
+      poly <- rv_lidar$plot_shp
+      if (is.null(poly)) {
+        showNotification("Select a shapefile in 'Plot Shapefile' first (upload one via Add Data).",
+                         type = "warning"); return()
+      }
+      withProgress(message = "Clipping LAS to shapefile...", value = 0.5, {
+        tryCatch({
+          las_crs  <- sf::st_crs(rv_lidar$las)
+          poly_crs <- sf::st_crs(poly)
+          if (!is.na(las_crs) && !is.na(poly_crs) && las_crs != poly_crs)
+            poly <- sf::st_transform(poly, las_crs)
+          poly <- sf::st_zm(poly, drop = TRUE)          # drop any Z/M so clip_roi is happy
+          clipped <- lidR::clip_roi(rv_lidar$las, poly)
+          np <- tryCatch(nrow(clipped@data), error = function(e) 0L)
+          if (is.null(clipped) || is.na(np) || np == 0) {
+            showNotification(paste("Clip produced no points — check the shapefile overlaps",
+              "the cloud and that both have a matching CRS."), type = "warning", duration = NULL)
+            return()
+          }
+          rv_lidar$las <- clipped
+          showNotification(paste0("LAS clipped to shapefile (", format(np, big.mark = ","), " pts)."),
+                           type = "message")
+        }, error = function(e)
+          showNotification(paste("Shapefile clip failed:", e$message), type = "error", duration = NULL))
       })
     })
 
@@ -430,10 +472,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
         xlab = "X", ylab = "Y", zlab = "Z (height)", main = paste0("Point cloud (", length(idx), " pts, decimated)"))
     }
     output$static_3d <- renderPlot({ static3d_fn() })
-    output$download_3d <- downloadHandler(
-      filename = function() { paste0("pointcloud_3d_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 900, height = 800); static3d_fn(); dev.off() }
-    )
+    
 
     output$las_summary <- renderPrint({ req(rv_lidar$las); print(summary(rv_lidar$las)) })
 
@@ -444,10 +483,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       hist(rv_lidar$las$Intensity, main = "Intensity", col = "lightgreen", xlab = "Intensity")
     }
     output$las_hists <- renderPlot({ hists_fn() })
-    output$download_hists <- downloadHandler(
-      filename = function() { paste0("las_distributions_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 900, height = 450); hists_fn(); dev.off() }
-    )
+    
 
     chm_fn <- function() {
       req(rv_lidar$chm)
@@ -456,10 +492,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       if (!is.null(rv_lidar$tops)) plot(sf::st_geometry(rv_lidar$tops), add = TRUE, col = "red", pch = 16, cex = 0.5)
     }
     output$chm_plot <- renderPlot({ chm_fn() })
-    output$download_chm <- downloadHandler(
-      filename = function() { paste0("chm_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 800, height = 800); chm_fn(); dev.off() }
-    )
+    
 
     output$itd_table <- DT::renderDataTable({
       req(rv_lidar$tops)
@@ -509,10 +542,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       abline(0, 1, col = "red", lwd = 2)
     }
     output$eval_plot <- renderPlot({ eval_plot_fn() })
-    output$download_eval <- downloadHandler(
-      filename = function() { paste0("model_evaluation_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 700, height = 600); eval_plot_fn(); dev.off() }
-    )
+    
 
     # Context (+ plot) for the AI Co-Pilot (shared across the 3 LiDAR views).
     list(

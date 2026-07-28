@@ -32,8 +32,7 @@ survivalToolsUI <- function(id) {
         downloadButton(ns("dl_km"),  "KM Table CSV",  class = "btn-sm btn-success w-100"),
         tags$br(), tags$br(),
         downloadButton(ns("dl_cox"), "Cox Summary CSV", class = "btn-sm btn-outline-success w-100"),
-        tags$br(), tags$br(),
-        downloadButton(ns("dl_plot"), "Plot PNG", class = "btn-sm btn-outline-success w-100")
+        tags$br(), tags$br()
       )
     ),
     actionButton(ns("run_surv"), "Run Analysis",
@@ -73,7 +72,7 @@ survivalServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    if (!requireNamespace("survival", quietly = TRUE)) {
+    if (!.ensure_pkg("survival", quietly = TRUE)) {
       output$km_plot <- renderPlot(show_placeholder("Package 'survival' required.\nRun: install.packages('survival')"))
       return(list(context = reactive("Survival: 'survival' package missing."), plot = function() invisible()))
     }
@@ -305,18 +304,7 @@ survivalServer <- function(id, dataset_pool, active_dataset) {
       }
     )
 
-    output$dl_plot <- downloadHandler(
-      filename = function() "kaplan_meier.png",
-      content  = function(f) {
-        res <- result_r(); req(!is.null(res))
-        png(f, width = 1800, height = 1400, res = 200)
-        n_grp <- max(length(res$km$strata), 1)
-        cols  <- .km_cols(n_grp)
-        plot(res$km, col = cols, lwd = 2, main = "Kaplan-Meier",
-             xlab = input$time_var %||% "Time", ylab = "Survival Probability", ylim = c(0, 1))
-        dev.off()
-      }
-    )
+    
 
     list(
       context = reactive({

@@ -276,20 +276,32 @@ rasterServer <- function(id, dataset_pool, active_dataset,
 
       if (ly$type == "raster") {
         bi <- max(1L, min(as.integer(ly$band %||% 1L), terra::nlyr(ly$data)))
-        r1 <- tryCatch(.to_wgs84(ly$data[[bi]]), error = function(e) NULL)
+        r1 <- tryCatch(.to_wgs84(ly$data[[bi]]),
+                       error = function(e) { showNotification(
+                         paste("Raster reproject failed:", e$message),
+                         type = "error", duration = NULL); NULL })
         if (is.null(r1)) return()
-        # leafem::addGeoRaster needs a stars object (not SpatRaster directly)
-        r1_st <- tryCatch(stars::st_as_stars(r1), error = function(e) NULL)
-        if (is.null(r1_st)) return()
         pal <- .pal_colors(ly$palette %||% "viridis")
-        leafletProxy("map", session = session) %>%
-          clearGroup(nm) %>%
-          leafem::addGeoRaster(
-            x            = r1_st,
-            group        = nm,
-            opacity      = ly$opacity %||% 0.8,
-            colorOptions = leafem::colorOptions(palette = pal, na.color = "transparent")
-          )
+        # Primary renderer: leafem::addGeoRaster (client-side). It relies on a JS
+        # plugin + COG streaming that is fragile in the wasm build, so fall back
+        # to leaflet::addRasterImage (server-side PNG overlay via the — now
+        # working — cairo device), which is far more reliable here. Errors used
+        # to be swallowed silently ("feels like it doesn't load"); now surfaced.
+        ok <- tryCatch({
+          r1_st <- stars::st_as_stars(r1)
+          leafletProxy("map", session = session) %>% clearGroup(nm) %>%
+            leafem::addGeoRaster(x = r1_st, group = nm, opacity = ly$opacity %||% 0.8,
+              colorOptions = leafem::colorOptions(palette = pal, na.color = "transparent"))
+          TRUE
+        }, error = function(e) FALSE)
+        if (!isTRUE(ok)) {
+          tryCatch({
+            leafletProxy("map", session = session) %>% clearGroup(nm) %>%
+              addRasterImage(r1, group = nm, opacity = ly$opacity %||% 0.8,
+                             colors = pal, project = FALSE)
+          }, error = function(e) showNotification(
+            paste("Raster display failed:", e$message), type = "error", duration = NULL))
+        }
       } else {
         v  <- tryCatch(sf::st_transform(ly$data, 4326), error = function(e) NULL)
         if (is.null(v)) return()
@@ -862,7 +874,7 @@ rasterServer <- function(id, dataset_pool, active_dataset,
 
           zonal = {
             req(input$zonal_layer)
-            if (!requireNamespace("exactextractr", quietly = TRUE))
+            if (!.ensure_pkg("exactextractr", quietly = TRUE))
               stop("Install 'exactextractr' for zonal statistics.")
             zones <- rv$layers[[input$zonal_layer]]$data; req(zones)
             zones <- sf::st_transform(zones, terra::crs(r))

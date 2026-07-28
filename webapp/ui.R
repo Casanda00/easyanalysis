@@ -79,6 +79,27 @@ ui <- page_fillable(
   gap     = 0,
 
   tags$head(
+    # Browser tab title. shinylive runs the app in an iframe and sets the parent
+    # tab title from the app's own <title> (falling back to "Shiny App"). Set our
+    # <title> so shinylive picks it up, AND force the parent tab title directly
+    # (same-origin) so it wins even if shinylive re-applies its default.
+    tags$title("EasyAnalysis"),
+    tags$script(HTML(paste0(
+      "(function(){function setT(){try{window.parent.document.title='EasyAnalysis';}catch(e){}}",
+      "setT();document.addEventListener('DOMContentLoaded',setT);setInterval(setT,2000);",
+      # Tell the loading splash (in the parent shell) that the app UI is up so it
+      # can fade out. This script runs only after webR has rendered the ui, so a
+      # short delay for layout is enough; also fire on shiny:connected.
+      "function ready(){try{window.parent.postMessage('ea-app-ready','*');}catch(e){}}",
+      "if(window.jQuery){jQuery(document).on('shiny:connected',ready);}",
+      "setTimeout(ready,1200);",
+      # Clear the file-upload widget's shown filename after a dataset is deleted.
+      "if(window.Shiny){Shiny.addCustomMessageHandler('ea-reset-upload',function(m){",
+      "var el=document.getElementById('upload_files'); if(el){el.value='';",
+      "var g=el.closest('.shiny-input-container,.input-group,.form-group');",
+      "if(g){var t=g.querySelector('input[type=text].form-control'); if(t)t.value='';",
+      "var pb=g.querySelector('.progress-bar'); if(pb){pb.style.width='0%';pb.textContent='';}}}});}",
+      "})();"))),
     tags$style(HTML("
     html, body { height: 100%; }
     .app-shell { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
@@ -455,6 +476,40 @@ ui <- page_fillable(
         });
         $w.append($btn);
       });
+
+      /* ===== GLOBAL RUNNING INDICATOR — honest elapsed count-up, no fake ETA ===== */
+      (function(){
+        var css='#ea-run{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);z-index:12000;display:none;align-items:center;gap:9px;padding:8px 15px;border-radius:22px;background:rgba(27,94,32,.96);color:#fff;font:600 13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;box-shadow:0 8px 26px rgba(0,0,0,.32);opacity:0;transition:opacity .25s,transform .25s;}#ea-run.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0);}#ea-run .s{width:14px;height:14px;border:2.4px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:earun .8s linear infinite;}#ea-run b{color:#c8e6c9;font-variant-numeric:tabular-nums;}@keyframes earun{to{transform:rotate(360deg);}}';
+        var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+        var el=document.createElement('div'); el.id='ea-run';
+        el.innerHTML='<span class=\"s\"></span><span>Running… <b id=\"ea-run-t\">0:00</b></span>';
+        document.body.appendChild(el);
+        var t0,iv,showT;
+        function fmt(s){return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
+        document.addEventListener('shiny:busy', function(){
+          t0=Date.now(); clearTimeout(showT);
+          showT=setTimeout(function(){
+            el.classList.add('on'); clearInterval(iv);
+            iv=setInterval(function(){var t=document.getElementById('ea-run-t'); if(t) t.textContent=fmt(Math.floor((Date.now()-t0)/1000));},1000);
+          },500);
+        });
+        document.addEventListener('shiny:idle', function(){
+          clearTimeout(showT); clearInterval(iv); el.classList.remove('on');
+        });
+      })();
+
+      /* ===== ROBUST DOWNLOAD — webR downloadHandler is unreliable; R sends content, JS saves it ===== */
+      Shiny.addCustomMessageHandler('ea-download', function(m){
+        try{
+          var doc = document;
+          try { if (window.top && window.top.document && window.top.document.body) doc = window.top.document; } catch(e){}
+          var blob = new Blob([m.content], {type: m.mime || 'text/plain;charset=utf-8'});
+          var url = URL.createObjectURL(blob);
+          var a = doc.createElement('a'); a.href = url; a.download = m.name || 'download';
+          a.style.display = 'none'; doc.body.appendChild(a); a.click();
+          setTimeout(function(){ try{ doc.body.removeChild(a); }catch(e){} URL.revokeObjectURL(url); }, 2000);
+        }catch(e){ console.error('ea-download failed', e); }
+      });
     "))
   ),
 
@@ -466,7 +521,7 @@ ui <- page_fillable(
       # Brand
       tags$span(class = "brand",
         tags$span(class = "brand-dot"),
-        "SimpleAnalysis"
+        "EasyAnalysis"
       ),
 
       # Main navigation
@@ -511,7 +566,10 @@ ui <- page_fillable(
           list(value = "pointcloud",     label = "Point Cloud & 3D Viewer"),
           list(value = "chm_itd",        label = "CHM & Individual Tree Detection"),
           list(value = "metrics",        label = "Metric Extraction & Evaluation")
-        ))
+        )),
+        .topItem("R Console", "rconsole"),
+        .topItem("Documentation", "docs"),
+        .topItem("References", "references")
       ),
 
       # Right-side quick actions (pushed to far right via margin-left:auto)
@@ -619,7 +677,10 @@ ui <- page_fillable(
           .viewPanel("gam",            gamCanvasUI("gam")),
           .viewPanel("pointcloud",     lidarPointcloudCanvasUI("lidar")),
           .viewPanel("chm_itd",        lidarChmCanvasUI("lidar")),
-          .viewPanel("metrics",        lidarMetricsCanvasUI("lidar"))
+          .viewPanel("metrics",        lidarMetricsCanvasUI("lidar")),
+          .viewPanel("rconsole",       rconsoleCanvasUI("rconsole")),
+          .viewPanel("docs",           docsCanvasUI("docs")),
+          .viewPanel("references",     referencesCanvasUI("references"))
         )
       ),
 
@@ -671,7 +732,10 @@ ui <- page_fillable(
             .viewPanel("gam",            gamToolsUI("gam")),
             .viewPanel("pointcloud",     lidarPointcloudToolsUI("lidar")),
             .viewPanel("chm_itd",        lidarChmToolsUI("lidar")),
-            .viewPanel("metrics",        lidarMetricsToolsUI("lidar"))
+            .viewPanel("metrics",        lidarMetricsToolsUI("lidar")),
+            .viewPanel("rconsole",       rconsoleToolsUI("rconsole")),
+            .viewPanel("docs",           docsToolsUI("docs")),
+            .viewPanel("references",     referencesToolsUI("references"))
           )
         )
       )
@@ -682,7 +746,9 @@ ui <- page_fillable(
       tags$span("Active: "),
       tags$strong(textOutput("status_active", inline = TRUE)),
       tags$span(class = "sep", "|"),
-      textOutput("status_dims", inline = TRUE)
+      textOutput("status_dims", inline = TRUE),
+      tags$span(style = "margin-left:auto;color:#6c757d;",
+        paste0("EasyAnalysis v", APP_VERSION))
     )
   ),
 
@@ -787,15 +853,19 @@ ui <- page_fillable(
       # --- Section: About ---
       tags$div(class = "settings-section",
         tags$p(class = "settings-section-title", "About"),
-        tags$div(class = "about-logo-mark", "SA"),
+        tags$div(class = "about-logo-mark", "EA"),
         tags$div(
-          tags$span(class = "about-name", "SimpleAnalysis"),
-          tags$span(class = "about-version", "v0.9.0")
+          tags$span(class = "about-name", "EasyAnalysis"),
+          tags$span(class = "about-version", paste0("v", APP_VERSION))
         ),
         tags$p(class = "about-tagline",
-          "Forest Trafficability & Tree Growth Modeling"),
-        tags$p(style = "font-size:12px; color:#6c757d; margin:0;",
-          "University of Eastern Finland"),
+          "A universal scientific analysis platform"),
+        tags$p(style = "font-size:12.5px; color:#495057; margin:6px 0 4px; line-height:1.5;",
+          "EasyAnalysis is a platform for conducting analyses without writing complex ",
+          "code — upload your data and run rigorous statistical, machine-learning, ",
+          "spatial/remote-sensing and time-series methods point-and-click, with ",
+          "plain-English results and an AI Co-Pilot that can run them for you. It runs ",
+          "entirely in your browser: your data never leaves your machine."),
         tags$div(class = "about-tech",
           tags$span("R 4.5.3"),
           tags$span("Shiny 1.13.0"),
@@ -803,6 +873,14 @@ ui <- page_fillable(
           tags$span("terra 1.9"),
           tags$span("lidR 4.x")
         )
+      ),
+
+      # --- Section: Acknowledgements ---
+      tags$div(class = "settings-section",
+        tags$p(class = "settings-section-title", "Acknowledgements"),
+        tags$p(style = "font-size:12.5px; color:#495057; margin:6px 0 0; line-height:1.5;",
+          tags$b("University of Eastern Finland"),
+          " — code contributions, and data for analyses and testing.")
       )
     )
   ),

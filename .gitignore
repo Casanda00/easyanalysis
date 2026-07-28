@@ -8,5 +8,22 @@
 .Soil-growth-prediction.dcf
 .growthsoil.dcf
 shinylive_poc_site/
+
+# --- secrets / local junk that must NEVER be pushed to a public host ---
+do not push/
+*.log
+rsconnect/
+.Renviron
+*.xlsx
+supervisor_comments.csv
+
+# Research-paper PDFs are copyrighted — keep them local, don't redistribute.
+# The methods catalog (papers/METHODS.md) is our own summary and IS tracked.
+papers/*.pdf
+
+# webapp_site/ is the generated static deploy bundle (~286 MB). It is IGNORED by
+# default so it doesn't bloat this research repo. For a git-based Vercel deploy
+# you must commit it (or, cleaner, use a dedicated deploy repo) — see the deploy
+# notes. To include it in THIS repo, delete the next line.
 webapp_site/
 

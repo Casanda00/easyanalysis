@@ -53,8 +53,7 @@ timeseriesToolsUI <- function(id) {
       ),
       accordion_panel("Export", value = "ts_exp", icon = icon("download"),
         downloadButton(ns("dl_forecast"), "Forecast CSV", class = "btn-sm btn-success w-100"),
-        tags$br(), tags$br(),
-        downloadButton(ns("dl_plot"), "Plot PNG", class = "btn-sm btn-outline-success w-100")
+        tags$br(), tags$br()
       )
     ),
     actionButton(ns("run_ts"), "Run Analysis",
@@ -286,7 +285,7 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
       y_vec <- as.numeric(y_ts)
 
       # ADF test via tseries (optional)
-      if (requireNamespace("tseries", quietly = TRUE)) {
+      if (.ensure_pkg("tseries", quietly = TRUE)) {
         adf <- tryCatch(tseries::adf.test(y_vec), error = function(e) NULL)
         if (!is.null(adf)) {
           cat(sprintf("Augmented Dickey-Fuller Test\n  Statistic: %.4f\n  p-value:   %.4f\n  %s\n\n",
@@ -325,15 +324,7 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
       }
     )
 
-    output$dl_plot <- downloadHandler(
-      filename = function() paste0("timeseries_", input$y_var %||% "ts", ".png"),
-      content  = function(f) {
-        y_ts <- tryCatch(ts_data(), error = function(e) NULL); req(!is.null(y_ts))
-        png(f, width = 2000, height = 1200, res = 200)
-        plot(y_ts, main = input$y_var %||% "Time Series", col = "#2e7d32", lwd = 2)
-        dev.off()
-      }
-    )
+    
 
     list(
       context = reactive({

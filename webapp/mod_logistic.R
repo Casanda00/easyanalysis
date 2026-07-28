@@ -23,7 +23,10 @@ logisticToolsUI <- function(id) {
         actionButton(ns("btn_clear"), "Clear Formula", class = "btn-outline-danger btn-sm", width = "100%")
     ),
     hr(),
-    .cv_ui(ns)
+    .cv_ui(ns),
+    hr(style = "margin:10px 0;"),
+    actionButton(ns("run_model"), "Run Model",
+      class = "btn-success w-100", icon = icon("play"))
   )
 }
 
@@ -31,8 +34,7 @@ logisticCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation Plot",
-                  downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation Plot"),
       div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_plot_ui")))
     ),
     layout_columns(
@@ -117,7 +119,9 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
 
     output$formula_display <- renderText({ formula_str() })
 
-    model_obj <- reactive({
+    # Button-triggered: every fit runs on the user's own machine in the browser
+    # build, so never refit on an incidental input change (UX rule #14).
+    model_obj <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       df <- active_data()
       if (is.null(df)) return("Awaiting dataset...")
       form_str <- formula_str()
@@ -219,14 +223,7 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
 
     output$diag_plot <- renderPlot({ plot_log_diagnostics(model_obj(), input$y) })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("logistic_evaluation_", Sys.Date(), ".png") },
-      content = function(file) {
-        png(file, width = 800, height = 600)
-        plot_log_diagnostics(model_obj(), input$y)
-        dev.off()
-      }
-    )
+    
 
     # Context (+ plot) for the AI Co-Pilot.
     list(

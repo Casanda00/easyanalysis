@@ -346,7 +346,7 @@ rsSearchServer <- function(id, dataset_pool, active_dataset, raster_pool) {
     observeEvent(input$run_search, {
       s <- .SENSORS[[input$sensor %||% ""]]
       req(s)
-      if (!requireNamespace("rstac", quietly = TRUE)) {
+      if (!.ensure_pkg("rstac", quietly = TRUE)) {
         showNotification("Install the 'rstac' package to use satellite search.", type = "error")
         return()
       }
@@ -534,9 +534,9 @@ rsSearchServer <- function(id, dataset_pool, active_dataset, raster_pool) {
           return()
         }
 
-        if (!requireNamespace("ggspatial", quietly = TRUE))
+        if (!.ensure_pkg("ggspatial", quietly = TRUE))
           stop("Install 'ggspatial' for map export.")
-        if (!requireNamespace("stars", quietly = TRUE))
+        if (!.ensure_pkg("stars", quietly = TRUE))
           stop("Install 'stars' for map export.")
 
         # Project to WGS84 for display

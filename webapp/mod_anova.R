@@ -10,7 +10,10 @@ anovaToolsUI <- function(id) {
     tags$h6(class = "text-uppercase text-muted small", "ANOVA Parameters"),
     markdown("*Tests continuous differences across categorical groups.*"),
     selectInput(ns("y"), "Continuous Target (Y):", choices = NULL),
-    selectInput(ns("x"), "Categorical Group (X):", choices = NULL)
+    selectInput(ns("x"), "Categorical Group (X):", choices = NULL),
+    hr(style = "margin:10px 0;"),
+    actionButton(ns("run_model"), "Run Model",
+      class = "btn-success w-100", icon = icon("play"))
   )
 }
 
@@ -21,8 +24,7 @@ anovaCanvasUI <- function(id) {
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Diagnostics",
                   div(class = "d-flex align-items-center gap-2 header-controls",
                       radioGroupButtons(ns("view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                      uiOutput(ns("single_selector")),
-                      downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success"))
+                      uiOutput(ns("single_selector")))
       ),
       div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_plot_ui")))
     ),
@@ -75,7 +77,9 @@ anovaServer <- function(id, dataset_pool, active_dataset) {
       updateSelectInput(session, "x", choices = cat_cols, selected = curr_x)
     })
 
-    aov_model <- reactive({
+    # Button-triggered: every fit runs on the user's own machine in the browser
+    # build, so never refit on an incidental input change (UX rule #14).
+    aov_model <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       df <- active_data()
       if (is.null(df)) return("Awaiting dataset...")
       if (!isTruthy(input$y) || !isTruthy(input$x)) return("Awaiting Predictors: Select a Continuous Y and Categorical X.")
@@ -117,14 +121,6 @@ anovaServer <- function(id, dataset_pool, active_dataset) {
       plot_aov_diagnostics(aov_model(), input$view_mode, input$zoom_target)
     })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("anova_diagnostic_", Sys.Date(), ".png") },
-      content = function(file) {
-        png(file, width = 800, height = 600)
-        plot_aov_diagnostics(aov_model(), input$view_mode, input$zoom_target)
-        dev.off()
-      }
-    )
 
     output$interp_ui <- renderUI({
       m <- aov_model(); req(!is.character(m))

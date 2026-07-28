@@ -41,6 +41,8 @@ lmeToolsUI <- function(id) {
         "Scaling centres and standardises predictors before fitting. Coefficients become SD units.")
     ),
     hr(),
+    .cv_ui(ns),
+    hr(),
     actionButton(ns("run"), "Fit LME Model", class = "btn-primary", width = "100%")
   )
 }
@@ -49,8 +51,7 @@ lmeCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics",
-                  downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics"),
       div(style = "overflow-y: auto; height: 400px; padding: 5px;", plotOutput(ns("diagnostics_plot")))
     ),
     layout_columns(
@@ -65,6 +66,10 @@ lmeCanvasUI <- function(id) {
       card(
         card_header(class = "bg-light", "Performance Metrics (Nakagawa R²) & VIF"),
         div(style = "overflow-y: auto; height: 400px; padding: 5px;", verbatimTextOutput(ns("performance")))
+      ),
+      card(
+        card_header(class = "bg-light", "Cross-Validation"),
+        div(style = "padding: 5px;", verbatimTextOutput(ns("cv_out")))
       )
     )
   )
@@ -185,6 +190,42 @@ lmeServer <- function(id, dataset_pool, active_dataset) {
       }, error = function(e) cat("Metrics error:", e$message, "\n"))
     })
 
+    output$cv_out <- renderPrint({
+      obj <- model_obj()
+      if (is.null(obj)) { cat("Fit a model first.\n"); return() }
+      tryCatch({
+        fml    <- formula(obj$model)
+        rnd    <- as.character(obj$model$call$random)[[2]]
+        grp    <- as.character(obj$model$call$random)[[3]]
+        df_cv  <- obj$data
+        n      <- nrow(df_cv)
+        k      <- .cv_k(input, df_cv)
+        lbl    <- .cv_label(k, n)
+        if (k >= n) cat("NOTE: LOOCV fits", n, "separate models — may be slow.\n\n")
+        set.seed(42)
+        folds  <- sample(rep_len(seq_len(k), n))
+        preds  <- numeric(n)
+        for (fold in seq_len(k)) {
+          tr <- df_cv[folds != fold, , drop=FALSE]
+          te <- df_cv[folds == fold, , drop=FALSE]
+          m  <- tryCatch(
+            nlme::lme(fml, data=tr, random=obj$model$call$random,
+                      control=nlme::lmeControl(opt="optim", msMaxIter=200, returnObject=TRUE)),
+            error=function(e) NULL)
+          if (is.null(m)) { preds[folds==fold] <- NA; next }
+          preds[folds==fold] <- tryCatch(predict(m, newdata=te, level=0), error=function(e) NA_real_)
+        }
+        obs <- df_cv[[obj$target]]
+        keep <- !is.na(preds) & !is.na(obs)
+        if (sum(keep) < 5) { cat("CV failed (too many fold errors).\n"); return() }
+        e   <- obs[keep] - preds[keep]
+        r2  <- 1 - sum(e^2) / sum((obs[keep]-mean(obs[keep]))^2)
+        cat(sprintf("%s RMSE : %.4f\n%s MAE  : %.4f\n%s R²   : %.4f\n",
+                    lbl, sqrt(mean(e^2)), lbl, mean(abs(e)), lbl, r2))
+        cat(sprintf("(Population-level predictions; %d/%d rows used)\n", sum(keep), n))
+      }, error=function(e) cat("CV error:", e$message, "\n"))
+    })
+
     diag_fn <- function() {
       obj <- model_obj()
       if (is.null(obj)) { show_placeholder("Fit a model to see diagnostics."); return() }
@@ -200,10 +241,7 @@ lmeServer <- function(id, dataset_pool, active_dataset) {
 
     output$diagnostics_plot <- renderPlot({ diag_fn() })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("lme_diagnostics_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 900, height = 450); diag_fn(); dev.off() }
-    )
+    
 
     output$dl_fixed_effects <- downloadHandler(
       filename = function() paste0("lme_fixed_effects_", Sys.Date(), ".csv"),

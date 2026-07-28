@@ -10,7 +10,10 @@ anovaToolsUI <- function(id) {
     tags$h6(class = "text-uppercase text-muted small", "ANOVA Parameters"),
     markdown("*Tests continuous differences across categorical groups.*"),
     selectInput(ns("y"), "Continuous Target (Y):", choices = NULL),
-    selectInput(ns("x"), "Categorical Group (X):", choices = NULL)
+    selectInput(ns("x"), "Categorical Group (X):", choices = NULL),
+    hr(style = "margin:10px 0;"),
+    actionButton(ns("run_model"), "Run Model",
+      class = "btn-success w-100", icon = icon("play"))
   )
 }
 
@@ -21,8 +24,7 @@ anovaCanvasUI <- function(id) {
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Diagnostics",
                   div(class = "d-flex align-items-center gap-2 header-controls",
                       radioGroupButtons(ns("view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                      uiOutput(ns("single_selector")),
-                      downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success"))
+                      uiOutput(ns("single_selector")))
       ),
       div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_plot_ui")))
     ),
@@ -38,6 +40,17 @@ anovaCanvasUI <- function(id) {
       card(
         card_header(class = "bg-light", "Tukey HSD (Post-Hoc)"),
         div(style = "overflow-y: auto; height: 300px; padding: 5px;", verbatimTextOutput(ns("tukey")))
+      )
+    ),
+    layout_columns(
+      col_widths = c(6, 6),
+      card(
+        card_header(class = "bg-light", "Effect Size (η² / Cohen's f)"),
+        div(style = "padding: 5px;", verbatimTextOutput(ns("effect_size")))
+      ),
+      card(
+        card_header(class = "bg-light", "LOOCV"),
+        div(style = "padding: 5px;", verbatimTextOutput(ns("loocv_out")))
       )
     )
   )
@@ -64,7 +77,9 @@ anovaServer <- function(id, dataset_pool, active_dataset) {
       updateSelectInput(session, "x", choices = cat_cols, selected = curr_x)
     })
 
-    aov_model <- reactive({
+    # Button-triggered: every fit runs on the user's own machine in the browser
+    # build, so never refit on an incidental input change (UX rule #14).
+    aov_model <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       df <- active_data()
       if (is.null(df)) return("Awaiting dataset...")
       if (!isTruthy(input$y) || !isTruthy(input$x)) return("Awaiting Predictors: Select a Continuous Y and Categorical X.")
@@ -106,14 +121,6 @@ anovaServer <- function(id, dataset_pool, active_dataset) {
       plot_aov_diagnostics(aov_model(), input$view_mode, input$zoom_target)
     })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("anova_diagnostic_", Sys.Date(), ".png") },
-      content = function(file) {
-        png(file, width = 800, height = 600)
-        plot_aov_diagnostics(aov_model(), input$view_mode, input$zoom_target)
-        dev.off()
-      }
-    )
 
     output$interp_ui <- renderUI({
       m <- aov_model(); req(!is.character(m))
@@ -134,6 +141,34 @@ anovaServer <- function(id, dataset_pool, active_dataset) {
         "."
       )
       card(tags$div(class = "p-3 small", HTML(sent)))
+    })
+
+    output$effect_size <- renderPrint({
+      m <- aov_model(); req(!is.character(m))
+      tryCatch({
+        sm   <- summary(m)[[1]]
+        ss_b <- sm[["Sum Sq"]][[1]]
+        ss_e <- sm[["Sum Sq"]][[2]]
+        ss_t <- ss_b + ss_e
+        eta2 <- ss_b / ss_t
+        f2   <- eta2 / (1 - eta2)
+        cat(sprintf("η² (eta-squared)  : %.4f\n", eta2))
+        cat(sprintf("Cohen's f         : %.4f\n", sqrt(f2)))
+        cat("\nConventional thresholds:\n")
+        cat("  small: η²≥0.01, medium: η²≥0.06, large: η²≥0.14\n")
+        size <- if (eta2 >= 0.14) "LARGE" else if (eta2 >= 0.06) "MEDIUM" else if (eta2 >= 0.01) "small" else "negligible"
+        cat(sprintf("\nEffect: %s\n", size))
+      }, error=function(e) cat("Effect size error:", e$message, "\n"))
+    })
+
+    output$loocv_out <- renderPrint({
+      m <- aov_model(); req(!is.character(m))
+      tryCatch({
+        cv <- .loocv_lm(m)
+        cat(sprintf("LOOCV RMSE : %.4f\nLOOCV MAE  : %.4f\nLOOCV R²   : %.4f\n",
+                    cv$LOOCV_RMSE, cv$LOOCV_MAE, cv$LOOCV_R2))
+        cat("\n(Exact hat-matrix shortcut — no model refits.)\n")
+      }, error=function(e) cat("LOOCV error:", e$message, "\n"))
     })
 
     output$dl_summary <- downloadHandler(

@@ -29,7 +29,7 @@
 # VIF: uses car if available, otherwise auxiliary-regression approach
 .lm_vif <- function(model) {
   tryCatch({
-    if (requireNamespace("car", quietly = TRUE)) {
+    if (.ensure_pkg("car", quietly = TRUE)) {
       v <- car::vif(model)
       return(if (is.matrix(v)) v[, "GVIF"] else v)
     }
@@ -215,6 +215,21 @@ lmToolsUI <- function(id) {
 
     selectInput(ns("y"), "Response Variable (Y):", choices = NULL, width = "100%"),
 
+    # Dependent-variable transform + bias-corrected back-transform.
+    # Always visible (nothing hidden). Poisson ignores these — its link handles
+    # the response scale — and the caption says so.
+    selectInput(ns("y_trans"), "Transform Y:", width = "100%",
+      choices = c("None"       = "raw",
+                  "log(Y)"     = "log",
+                  "log(1 + Y)" = "log1p",
+                  "sqrt(Y)"    = "sqrt",
+                  "1 / Y"      = "inv")),
+    checkboxInput(ns("y_backtrans"),
+      "Back-transform to original scale (bias-corrected)", value = TRUE),
+    tags$small(class = "text-muted d-block mb-2",
+      "When Y is transformed, metrics are reported on the original Y scale using the",
+      "Kalliovirta & Tokola (2005) bias correction. (Ignored for Poisson.)"),
+
     # ---- Multiple Linear + Poisson: formula builder ----
     conditionalPanel(
       "input.reg_type == 'lm' || input.reg_type == 'poisson'", ns = ns,
@@ -317,9 +332,7 @@ lmCanvasUI <- function(id) {
           "Diagnostic Plots",
           div(class = "d-flex align-items-center gap-2",
             uiOutput(ns("diag_mode_ui")),
-            uiOutput(ns("single_selector")),
-            downloadButton(ns("download_plot"), "Download",
-              class = "btn-sm btn-outline-success")
+            uiOutput(ns("single_selector"))
           )
         ),
         plotOutput(ns("diag_plot"), height = "480px")
@@ -348,6 +361,46 @@ lmServer <- function(id, dataset_pool, active_dataset) {
       if (is.null(ds)) return(NULL)
       dataset_pool[[ds]]
     })
+
+    # --- dependent-variable transforms -------------------------------------
+    # Wrap the response term in a formula (for lm/poly/poisson), or transform a
+    # numeric response vector (for glmnet, which bypasses the formula). Both use
+    # the same input$y_trans so what you see in the formula is what is fitted.
+    .y_term <- function(safe_y, trans) switch(trans %||% "raw",
+      raw = safe_y, log = paste0("log(", safe_y, ")"),
+      log1p = paste0("log1p(", safe_y, ")"), sqrt = paste0("sqrt(", safe_y, ")"),
+      inv = paste0("I(1/", safe_y, ")"), safe_y)
+    .y_vec <- function(y, trans) switch(trans %||% "raw",
+      raw = y, log = log(y), log1p = log1p(y), sqrt = sqrt(y), inv = 1 / y, y)
+    # Exact inverse of a Y-transform — recovers OBSERVED values on the original
+    # scale (no bias term; it just undoes the transform).
+    .y_invert <- function(v, trans) switch(trans %||% "raw",
+      raw = v, log = exp(v), log1p = expm1(v), sqrt = v^2, inv = 1 / v, v)
+    # Bias-corrected back-transform of PREDICTIONS (Kalliovirta & Tokola 2005).
+    # s2 = residual variance on the fit (transformed) scale.
+    #   log / log1p : lognormal correction  E[Y] = exp(mu + s2/2)
+    #   sqrt        : d = f^2 + var(eps)     (paper eq. for diameter)
+    #   inverse     : naive 1/fit only — the 2nd-order Taylor correction for
+    #                 E[1/X] is numerically unstable near small fitted values,
+    #                 and the paper does not use an inverse transform.
+    .y_backpred <- function(fit, trans, s2) switch(trans %||% "raw",
+      raw   = fit,
+      log   = exp(fit) * exp(s2 / 2),
+      log1p = expm1(fit + s2 / 2),
+      sqrt  = fit^2 + s2,
+      inv   = 1 / fit,
+      fit)
+    # Returns an error string if the transform is invalid for the data, else NULL.
+    .y_trans_problem <- function(y, trans) {
+      trans <- trans %||% "raw"
+      if (trans %in% c("log", "sqrt") && any(y <= 0, na.rm = TRUE))
+        return(sprintf("Cannot apply %s to a response with values ≤ 0. Use log(1 + Y), or shift the variable first.", trans))
+      if (trans == "inv" && any(y == 0, na.rm = TRUE))
+        return("Cannot apply 1 / Y when the response contains zeros.")
+      if (trans == "log1p" && any(y <= -1, na.rm = TRUE))
+        return("Cannot apply log(1 + Y) when the response has values ≤ -1.")
+      NULL
+    }
 
     # Populate selectors on dataset change
     observe({
@@ -397,8 +450,11 @@ lmServer <- function(id, dataset_pool, active_dataset) {
 
     formula_str <- reactive({
       req(input$y)
-      safe_y <- paste0("`", input$y, "`")
       type   <- input$reg_type %||% "lm"
+      # Poisson keeps the raw response (its link handles the scale); everything
+      # else honours the Transform Y selector.
+      safe_y <- paste0("`", input$y, "`")
+      if (type != "poisson") safe_y <- .y_term(safe_y, input$y_trans)
       if (type == "poly") {
         x <- input$poly_x %||% names(active_data())[2]
         d <- input$poly_deg %||% 2
@@ -422,6 +478,8 @@ lmServer <- function(id, dataset_pool, active_dataset) {
       if (type %in% c("lm", "poly")) {
         fs <- formula_str()
         if (grepl("\\.\\.\\.", fs)) return("Add predictors to the formula first.")
+        prob <- .y_trans_problem(df[[y_nm]], input$y_trans)
+        if (!is.null(prob)) return(prob)
         m <- tryCatch(lm(as.formula(fs), data = df),
                       error = function(e) paste("Formula error:", e$message))
         if (is.character(m)) return(m)
@@ -438,11 +496,13 @@ lmServer <- function(id, dataset_pool, active_dataset) {
         list(model = m, type = "poisson", y_var = y_nm)
 
       } else {
-        if (!requireNamespace("glmnet", quietly = TRUE))
+        if (!.ensure_pkg("glmnet", quietly = TRUE))
           return("Package 'glmnet' is not installed.\nRun: install.packages('glmnet')")
         x_nms <- input$glmnet_x
         if (!length(x_nms)) return("Select at least one predictor (X).")
-        y_vec <- df[[y_nm]]
+        prob <- .y_trans_problem(df[[y_nm]], input$y_trans)
+        if (!is.null(prob)) return(prob)
+        y_vec <- .y_vec(df[[y_nm]], input$y_trans)
         x_mat <- tryCatch(
           model.matrix(~ . - 1, data = df[, x_nms, drop = FALSE]),
           error = function(e) NULL)
@@ -503,15 +563,33 @@ lmServer <- function(id, dataset_pool, active_dataset) {
       res <- fitted_model_r()
       if (is.character(res)) { cat("Awaiting valid model.\n"); return() }
       tryCatch({
-        if (res$type == "glmnet") {
-          pred <- res$pred; obs <- res$y
+        if (res$type == "glmnet") { pred_t <- res$pred; obs_t <- res$y }
+        else { pred_t <- fitted(res$model); obs_t <- res$model$model[[1]] }
+
+        trans <- input$y_trans %||% "raw"
+        backt <- isTRUE(input$y_backtrans) && trans != "raw" &&
+                 res$type %in% c("lm", "poly", "glmnet")
+        if (backt) {
+          s2   <- if (res$type == "glmnet") mean((obs_t - pred_t)^2)
+                  else summary(res$model)$sigma^2
+          pred <- .y_backpred(pred_t, trans, s2)
+          obs  <- .y_invert(obs_t, trans)
+          scale_lbl <- "original Y (bias-corrected)"
         } else {
-          pred <- fitted(res$model); obs <- res$model$model[[1]]
+          pred <- pred_t; obs <- obs_t
+          scale_lbl <- if (trans != "raw") sprintf("%s(Y) — fit scale", trans) else "original Y"
         }
+
         m <- uef_evaluation(pred, obs)
+        cat(sprintf("Scale    : %s\n", scale_lbl))
         cat(sprintf(
           "RMSE     : %.4f\nR²       : %.4f\nBias     : %.4f\nRelBias  : %.4f\nRRMSE    : %.4f\n",
           m$RMSE, m$R2, m$Bias, m$RelBias, m$RRMSE))
+        if (backt) {
+          corr <- switch(trans, log = , log1p = "× exp(s²/2)", sqrt = "+ s²",
+                         inv = "none (naive 1/fit — unstable to correct)", "")
+          cat(sprintf("\nBias correction: %s   (s² = %.5f on fit scale)\n", corr, s2))
+        }
       }, error = function(e) cat("Metrics error:", e$message, "\n"))
     })
 
@@ -572,25 +650,7 @@ lmServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    output$download_plot <- downloadHandler(
-      filename = function() paste0("regression_diagnostics_", Sys.Date(), ".png"),
-      content  = function(file) {
-        res <- fitted_model_r()
-        req(!is.character(res), !is.null(res))
-        png(file, width = 900, height = 660, res = 110)
-        if (res$type == "glmnet") {
-          par(mfrow = c(1, if (!is.null(res$cv_fit)) 2L else 1L))
-          if (!is.null(res$cv_fit)) plot(res$cv_fit)
-          plot(res$glmnet_fit, xvar = "lambda")
-          par(mfrow = c(1, 1))
-        } else {
-          plot_lm_diagnostics(res$model, active_data(), res$y_var,
-            input$view_mode %||% "Grid View",
-            input$zoom_target %||% "Fitted vs Actual")
-        }
-        dev.off()
-      }
-    )
+    
 
     # Assumptions tab --------------------------------------------------------
 

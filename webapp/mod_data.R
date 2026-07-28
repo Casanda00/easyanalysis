@@ -119,17 +119,22 @@ dataCanvasUI <- function(id) {
         nav_panel("Dataset Overview",
           uiOutput(ns("overview_stats")),
           card(
-            card_header(class = "d-flex justify-content-between align-items-center bg-light",
-              "Dataset Structure",
-              downloadButton(ns("download_data"), "Download CSV", class = "btn-sm btn-outline-success")),
+            card_header(class = "bg-light", "Dataset Structure"),
+            div(style = "padding: 8px 10px 0;",
+              layout_columns(col_widths = c(4, 5, 3),
+                selectInput(ns("dl_format"), "Export format",
+                            choices = c("CSV" = "csv", "TSV (opens in Excel)" = "tsv")),
+                textInput(ns("dl_name"), "File name (optional)", placeholder = "dataset"),
+                tags$div(style = "margin-top:32px;",
+                  actionButton(ns("do_download"), "Download", icon = icon("download"),
+                               class = "btn-sm btn-outline-success")))),
             div(style = "padding: 5px;", uiOutput(ns("eng_str")))
           )
         ),
         nav_panel("Column Distributions",
           card(
             card_header(class = "d-flex justify-content-between align-items-center bg-light",
-              "Active Column Distributions",
-              downloadButton(ns("download_dist_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+              "Active Column Distributions"),
             div(style = "padding: 5px;",
               selectInput(ns("eng_view_col"), "View Frequency/Summary of:", choices = NULL),
               layout_columns(col_widths = c(6, 6),
@@ -147,8 +152,7 @@ dataCanvasUI <- function(id) {
             div(style = "min-width: 150px;", selectInput(ns("eda_category"), "Group (colour)", choices = NULL, width = "100%")),
             div(class = "ms-auto d-flex align-items-end gap-2",
               radioGroupButtons(ns("eda_view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-              uiOutput(ns("eda_single_selector")),
-              downloadButton(ns("download_eda_plot"), "Download Plot", class = "btn-sm btn-outline-success")
+              uiOutput(ns("eda_single_selector"))
             )
           ),
           div(style = "padding: 5px; overflow-x: hidden; overflow-y: auto; height: 600px;", uiOutput(ns("dynamic_eda_plot_ui")))
@@ -243,10 +247,31 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       updateSelectInput(session, "join_target", choices = dataset_names())
     })
 
-    output$download_data <- downloadHandler(
-      filename = function() { paste0("cleaned_", active_dataset(), "_", Sys.Date(), ".csv") },
-      content = function(file) { write.csv(rv$working_data, file, row.names = FALSE) }
-    )
+    # Download via a custom message (R builds the text, JS saves a Blob) — the
+    # standard downloadHandler does not reliably trigger a download under webR.
+    observeEvent(input$do_download, {
+      df <- rv$working_data
+      if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
+        showNotification("No data to download.", type = "warning"); return()
+      }
+      base <- if (isTruthy(input$dl_name)) input$dl_name else {
+        nm <- tryCatch(active_dataset(), error = function(e) NULL)
+        if (isTruthy(nm)) paste0(nm, "_cleaned") else "dataset"
+      }
+      base <- gsub("[^A-Za-z0-9._-]+", "_", base)
+      fmt  <- input$dl_format %||% "csv"
+      tc <- textConnection("dl_txt", "w", local = TRUE)
+      if (fmt == "tsv") { write.table(df, tc, sep = "\t", row.names = FALSE, quote = FALSE)
+                          ext <- ".tsv"; mime <- "text/tab-separated-values" }
+      else             { write.csv(df, tc, row.names = FALSE)
+                          ext <- ".csv"; mime <- "text/csv" }
+      close(tc)
+      session$sendCustomMessage("ea-download", list(
+        name    = paste0(base, "_", Sys.Date(), ext),
+        content = paste(dl_txt, collapse = "\n"),
+        mime    = paste0(mime, ";charset=utf-8")))
+      showNotification("Download started.", type = "message", duration = 2)
+    })
 
     # ---- Column ops ----
     observeEvent(input$apply_subset, {
@@ -650,22 +675,86 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       n_complete  <- sum(complete.cases(df))
       pct_complete <- round(100 * n_complete / nrow(df))
       n_na_total  <- sum(is.na(df))
+      # Each tile is clickable -> opens a detail modal (see tile_click observer).
+      clk <- function(key, vb) tags$div(
+        style = "cursor:pointer;", title = "Click to see details",
+        onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'})",
+                          session$ns("tile_click"), key), vb)
       layout_columns(col_widths = c(2, 2, 2, 2, 2, 2),
-        value_box("Rows",        format(nrow(df), big.mark=","),
-                  showcase=icon("rows"),          theme="success"),
-        value_box("Columns",     ncol(df),
-                  showcase=icon("table-columns"), theme="secondary"),
-        value_box("Numeric",     sum(sapply(df, is.numeric)),
-                  showcase=icon("hashtag"),       theme="secondary"),
-        value_box("Categorical", sum(sapply(df, function(x) is.factor(x)||is.character(x))),
-                  showcase=icon("tag"),           theme="secondary"),
-        value_box("Total NA",    format(n_na_total, big.mark=","),
+        clk("rows", value_box("Rows", format(nrow(df), big.mark=","),
+                  showcase=icon("bars"), theme="success")),
+        clk("cols", value_box("Columns", ncol(df),
+                  showcase=icon("table-columns"), theme="secondary")),
+        clk("num", value_box("Numeric", sum(sapply(df, is.numeric)),
+                  showcase=icon("hashtag"), theme="secondary")),
+        clk("cat", value_box("Categorical", sum(sapply(df, function(x) is.factor(x)||is.character(x))),
+                  showcase=icon("tag"), theme="secondary")),
+        clk("na", value_box("Total NA", format(n_na_total, big.mark=","),
                   showcase=icon("circle-question"),
-                  theme=if(n_na_total > 0) "warning" else "secondary"),
-        value_box("Complete rows", paste0(pct_complete, "%"),
+                  theme=if(n_na_total > 0) "warning" else "secondary")),
+        clk("complete", value_box("Complete rows", paste0(pct_complete, "%"),
                   showcase=icon("circle-check"),
-                  theme=if(pct_complete == 100) "success" else "secondary")
+                  theme=if(pct_complete == 100) "success" else "secondary"))
       )
+    })
+
+    # ---- Tile drill-down: click an overview tile to inspect the underlying data ----
+    tile_dd <- reactiveValues(df = NULL, summary = NULL)
+    observeEvent(input$tile_click, {
+      df <- rv$working_data
+      req(is.data.frame(df), nrow(df) > 0)
+      key <- input$tile_click
+      tile_dd$df <- NULL; tile_dd$summary <- NULL
+      title <- "Detail"; note <- NULL
+      if (key == "rows") {
+        title <- paste0("All rows (", format(nrow(df), big.mark=","), ")"); tile_dd$df <- df
+      } else if (key == "cols") {
+        title <- paste0("Columns (", ncol(df), ")")
+        tile_dd$df <- data.frame(Column = names(df),
+          Type    = vapply(df, function(x) class(x)[1], character(1)),
+          Missing = vapply(df, function(x) sum(is.na(x)), integer(1)),
+          Unique  = vapply(df, function(x) length(unique(x)), integer(1)),
+          row.names = NULL, check.names = FALSE)
+      } else if (key == "num") {
+        nm <- names(df)[vapply(df, is.numeric, logical(1))]
+        title <- paste0("Numeric columns (", length(nm), ")")
+        if (length(nm)) tile_dd$df <- df[, nm, drop = FALSE] else note <- "No numeric columns."
+      } else if (key == "cat") {
+        nm <- names(df)[vapply(df, function(x) is.factor(x)||is.character(x), logical(1))]
+        title <- paste0("Categorical columns (", length(nm), ")")
+        if (length(nm)) tile_dd$df <- df[, nm, drop = FALSE] else note <- "No categorical columns."
+      } else if (key == "na") {
+        title <- "Missing values"
+        na_by <- vapply(df, function(x) sum(is.na(x)), integer(1))
+        tile_dd$summary <- data.frame(Column = names(df), `NA count` = as.integer(na_by),
+          `% NA` = round(100 * na_by / nrow(df), 1), row.names = NULL, check.names = FALSE)
+        inc <- df[!complete.cases(df), , drop = FALSE]
+        if (nrow(inc)) tile_dd$df <- inc else note <- "No missing values — every row is complete."
+      } else if (key == "complete") {
+        inc <- df[!complete.cases(df), , drop = FALSE]
+        title <- paste0("Incomplete rows (", nrow(inc), ")")
+        if (nrow(inc)) tile_dd$df <- inc else note <- "All rows are complete — no missing values."
+      }
+      body <- tagList(
+        if (!is.null(note)) tags$p(class = "text-muted", note),
+        if (!is.null(tile_dd$summary)) tagList(
+          tags$b("Missing per column:"),
+          DT::dataTableOutput(session$ns("tile_summary")), tags$hr()),
+        if (!is.null(tile_dd$df)) tagList(
+          if (!is.null(tile_dd$summary))
+            tags$b(paste0("Rows containing missing values (", nrow(tile_dd$df), "):")),
+          DT::dataTableOutput(session$ns("tile_detail")))
+      )
+      showModal(modalDialog(title = title, size = "xl", easyClose = TRUE,
+                            footer = modalButton("Close"), body))
+    })
+    output$tile_detail <- DT::renderDataTable({
+      req(tile_dd$df)
+      DT::datatable(tile_dd$df, options = list(scrollX = TRUE, pageLength = 8), rownames = TRUE)
+    })
+    output$tile_summary <- DT::renderDataTable({
+      req(tile_dd$summary)
+      DT::datatable(tile_dd$summary, options = list(dom = "t", pageLength = 500), rownames = FALSE)
     })
 
     output$eng_str <- renderUI({
@@ -767,10 +856,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     output$eng_plot <- renderPlot({ eng_plot_fn() })
 
-    output$download_dist_plot <- downloadHandler(
-      filename = function() { paste0("distribution_", input$eng_view_col, "_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 800, height = 600); eng_plot_fn(); dev.off() }
-    )
+    
 
     # ---- Exploratory plots (EDA) ----
     observe({
@@ -823,24 +909,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
                          view_mode = input$eda_view_mode, target = input$eda_zoom_target)
     })
 
-    output$download_eda_plot <- downloadHandler(
-      filename = function() { paste0("eda_relationships_", Sys.Date(), ".png") },
-      content = function(file) {
-        df <- rv$working_data
-        if (isTruthy(input$eda_category) && input$eda_category %in% names(df)) {
-          fac <- as.factor(df[[input$eda_category]])
-          num_lvls <- length(unique(na.omit(fac)))
-          rows <- if (num_lvls > 0) 1 + ceiling(num_lvls / 3) else 1
-        } else {
-          rows <- 1
-        }
-        png_height <- if (input$eda_view_mode == "Grid View") max(600, rows * 400) else 600
-        png(file, width = 1000, height = png_height)
-        plot_relationships(df, input$eda_num1, input$eda_num2, input$eda_category,
-                           view_mode = input$eda_view_mode, target = input$eda_zoom_target)
-        dev.off()
-      }
-    )
+    
 
     # Context (+ the current EDA plot) for the AI Co-Pilot.
     list(

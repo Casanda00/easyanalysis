@@ -35,7 +35,10 @@ clusteringToolsUI <- function(id) {
       condition = "input.view == '4. Custom Scatter Plot'", ns = ns,
       selectInput(ns("scatter_x"), "X-Axis Variable:", choices = NULL),
       selectInput(ns("scatter_y"), "Y-Axis Variable:", choices = NULL)
-    )
+    ),
+    hr(style = "margin:10px 0;"),
+    actionButton(ns("run_model"), "Run Clustering",
+      class = "btn-success w-100", icon = icon("play"))
   )
 }
 
@@ -43,8 +46,7 @@ clusteringCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Visual Diagnostics",
-                  downloadButton(ns("download_plot"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Visual Diagnostics"),
       div(style = "padding: 10px;", uiOutput(ns("explanation"))),
       div(style = "height: 500px; padding: 10px;", plotOutput(ns("main_plot"), height = "480px"))
     ),
@@ -108,7 +110,9 @@ clusteringServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    get_clusters <- reactive({
+    # Button-triggered: clustering (esp. Gower/PAM) is expensive and runs on the
+    # user's own machine in the browser build (UX rule #14).
+    get_clusters <- eventReactive(input$run_model, ignoreNULL = FALSE, {
       req(input$k)
       df <- prepared_data()
       req(df)
@@ -201,10 +205,7 @@ clusteringServer <- function(id, dataset_pool, active_dataset) {
 
     output$main_plot <- renderPlot({ main_plot_fn() })
 
-    output$download_plot <- downloadHandler(
-      filename = function() { paste0("clustering_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 800, height = 600); main_plot_fn(); dev.off() }
-    )
+    
 
     output$summary <- renderPrint({
       if (is.null(active_data())) return(cat("Awaiting dataset..."))

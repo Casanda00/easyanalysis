@@ -6,9 +6,9 @@
       "runtimeExecutable": "C:\\Program Files\\R\\R-4.5.3\\bin\\Rscript.exe",
       "runtimeArgs": [
         "-e",
-        "httpuv::runStaticServer('C:/Users/gibso/OneDrive - University of Eastern Finland/Research papers/Tree growth and Trafficability/Modeling/All modeling/2. NFI/Shiny_app/webapp_site', port=8899)"
+        "httpuv::runStaticServer('C:/Users/gibso/OneDrive - University of Eastern Finland/Research papers/Tree growth and Trafficability/Modeling/All modeling/2. NFI/Shiny_app/webapp_site', port=8901)"
       ],
-      "port": 8899
+      "port": 8901
     }
   ]
 }

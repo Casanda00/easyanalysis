@@ -60,8 +60,6 @@ gamToolsUI <- function(id) {
     accordion_panel("Export",
       downloadButton(ns("dl_comp"), tagList(icon("table"),    " Comparison CSV"),
                      class="btn-sm btn-outline-secondary w-100"),
-      downloadButton(ns("dl_plot"), tagList(icon("image"),    " Smooth plots (PNG)"),
-                     class="btn-sm btn-outline-secondary w-100 mt-1"),
       actionButton(ns("to_pool"),   tagList(icon("database"), " Predictions to Data Pool"),
                    class="btn-sm btn-outline-primary w-100 mt-1")
     )
@@ -94,7 +92,7 @@ gamServer <- function(id, dataset_pool, active_dataset) {
 
     # ---- Package check ------------------------------------------------------
     .has_mgcv <- function() {
-      if (!requireNamespace("mgcv", quietly=TRUE)) {
+      if (!.ensure_pkg("mgcv", quietly=TRUE)) {
         showNotification("Package 'mgcv' not installed. Run: install.packages('mgcv')",
                          type="error", duration=8)
         return(FALSE)
@@ -137,14 +135,14 @@ gamServer <- function(id, dataset_pool, active_dataset) {
       withProgress(message="Fitting GAM…", value=0.2, {
 
         # Linear model for comparison
-        lm_fml <- as.formula(paste(resp, "~", paste(preds, collapse="+")))
+        lm_fml <- as.formula(paste0("`", resp, "` ~ ", paste0("`", preds, "`", collapse="+")))
         lm_mdl <- tryCatch(lm(lm_fml, data=df_m), error=function(e) NULL)
         rv$lm_model <- lm_mdl
         lm_adj_r2 <- if (!is.null(lm_mdl)) summary(lm_mdl)$adj.r.squared else NA_real_
 
-        # GAM with s() for each predictor
-        s_terms <- paste0("mgcv::s(", preds, ", k=", k, ", bs='", bs, "')", collapse=" + ")
-        gam_fml <- as.formula(paste(resp, "~", s_terms))
+        # GAM with s() for each predictor (backtick names for odd column names)
+        s_terms <- paste0("mgcv::s(`", preds, "`, k=", k, ", bs='", bs, "')", collapse=" + ")
+        gam_fml <- as.formula(paste0("`", resp, "` ~ ", s_terms))
         gam_mdl <- tryCatch(
           mgcv::gam(gam_fml, data=df_m, method=mth),
           error=function(e) { showNotification(e$message, type="error"); NULL }
@@ -337,16 +335,7 @@ gamServer <- function(id, dataset_pool, active_dataset) {
       }
     )
 
-    output$dl_plot <- downloadHandler(
-      filename = function() paste0("gam_smooths_", Sys.Date(), ".png"),
-      content  = function(f) {
-        gam_mdl <- rv$gam_model
-        if (is.null(gam_mdl)) { writeLines("No model fitted.", f); return() }
-        grDevices::png(f, width=1200, height=800, res=120)
-        mgcv::plot.gam(gam_mdl, pages=1, residuals=TRUE, shade=TRUE, shade.col="#2e7d3233")
-        grDevices::dev.off()
-      }
-    )
+    
 
     observeEvent(input$to_pool, {
       req(!is.null(rv$pred_df))

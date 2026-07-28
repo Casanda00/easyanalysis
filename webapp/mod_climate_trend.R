@@ -91,7 +91,7 @@ climateTrendServer <- function(id, raster_pool) {
       r_in <- raster_pool[[nm]]
       req(!is.null(r_in))
 
-      if (!requireNamespace("trend", quietly=TRUE)) {
+      if (!.ensure_pkg("trend", quietly=TRUE)) {
         showNotification(
           "Package 'trend' is not installed. Run: install.packages('trend')",
           type="error", duration=8)

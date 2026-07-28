@@ -68,7 +68,7 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    if (!requireNamespace("rpart", quietly = TRUE)) {
+    if (!.ensure_pkg("rpart", quietly = TRUE)) {
       msg <- "Package 'rpart' required.\nRun: install.packages('rpart')"
       output$tree_plot <- renderPlot(show_placeholder(msg))
       return(list(context = reactive("Decision Trees: rpart missing."), plot = function() invisible()))
@@ -85,8 +85,11 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
 
     output$x_ui <- renderUI({
       df <- active_data(); req(!is.null(df))
-      selectInput(ns("x_vars"), "Predictor variables (X)", choices = names(df),
-                  selected = names(df), multiple = TRUE, width = "100%")
+      # Chip multi-select with search + select-all, matching the other model
+      # screens (e.g. Random Forest) instead of a plain selectInput.
+      pickerInput(ns("x_vars"), "Predictor variables (X)", choices = names(df),
+                  selected = names(df), multiple = TRUE, width = "100%",
+                  options = list(`actions-box` = TRUE, `live-search` = TRUE))
     })
 
     result_r <- reactiveVal(NULL)
@@ -114,7 +117,7 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
       )
 
       result <- tryCatch({
-        fml <- as.formula(paste(yv, "~", paste(xv, collapse = " + ")))
+        fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = " + ")))
         fit  <- rpart::rpart(fml, data = sub_df, method = method, control = ctrl)
 
         # Prune to best cp if CV was used
@@ -215,7 +218,7 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
       res <- result_r(); if (is.null(res) || res$method != "class") return(NULL)
       tryCatch({
         df_cv <- res$df; yv <- res$yv; xv <- res$xv
-        fml <- as.formula(paste(yv, "~", paste(xv, collapse = "+")))
+        fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = "+")))
         n <- nrow(df_cv); k <- .cv_k(input, df_cv); lbl <- .cv_label(k, n)
         set.seed(42); folds <- sample(rep_len(seq_len(k), n))
         all_p <- c(); all_a <- c()
@@ -268,7 +271,7 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
           train_m <- list(RMSE = sqrt(mean(e^2)), MAE = mean(abs(e)),
                           R2 = 1 - sum(e^2) / sum((as.numeric(res$y) - mean(as.numeric(res$y)))^2))
           df_cv <- res$df; yv <- res$yv; xv <- res$xv
-          fml <- as.formula(paste(yv, "~", paste(xv, collapse = "+")))
+          fml <- as.formula(paste0("`", yv, "` ~ ", paste0("`", xv, "`", collapse = "+")))
           n <- nrow(df_cv); k <- .cv_k(input, df_cv); lbl <- .cv_label(k, n)
           set.seed(42); folds <- sample(rep_len(seq_len(k), n))
           all_p <- c(); all_a <- c()

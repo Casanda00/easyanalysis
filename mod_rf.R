@@ -28,13 +28,23 @@ rfCanvasUI <- function(id) {
     card(
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Variable Importance",
                   div(class = "d-flex gap-2",
-                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary"),
-                    downloadButton(ns("download_varimp"), "Download Plot", class = "btn-sm btn-outline-success"))),
+                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary"))),
       div(style = "padding: 5px;", plotOutput(ns("varimp"), height = "460px"))
     ),
+    layout_columns(
+      col_widths = c(6, 6),
+      card(
+        card_header(class = "bg-light", "Precision / Recall / F1 (OOB)"),
+        div(style = "padding: 5px;", DTOutput(ns("prf_dt")))
+      ),
+      card(
+        card_header(class = "bg-light", "OOB Validation Confusion Matrix"),
+        div(style = "height: 260px; padding: 5px;", plotOutput(ns("oob_conf_plot"), height = "240px")),
+        div(style = "padding: 5px 10px;", tags$b(textOutput(ns("oob_val_acc"))))
+      )
+    ),
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Partial Dependence Plots (PDP)",
-                  downloadButton(ns("download_pdp"), "Download Plot", class = "btn-sm btn-outline-success")),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Partial Dependence Plots (PDP)"),
       div(class = "d-flex align-items-end gap-2",
           selectInput(ns("pdp_var"), "Select Predictor for PDP:", choices = NULL),
           div(style = "margin-bottom: 16px;", actionButton(ns("run_pdp"), "Generate PDP", class = "btn-info"))
@@ -74,7 +84,10 @@ rfServer <- function(id, dataset_pool, active_dataset) {
         showNotification("Not enough complete rows to train Random Forest.", type = "error")
         return()
       }
-      form_str <- paste(input$target, "~", paste(input$predictors, collapse = " + "))
+      # Backtick-quote every name so columns with digits/dots/spaces (e.g. VMI
+      # codes) don't break formula parsing ("unexpected input" error).
+      form_str <- paste0("`", input$target, "` ~ ",
+                         paste(sprintf("`%s`", input$predictors), collapse = " + "))
       withProgress(message = 'Training Random Forest...', value = 0, {
         tryCatch({
           incProgress(0.5, detail = paste(input$ntree, "trees"))
@@ -121,6 +134,54 @@ rfServer <- function(id, dataset_pool, active_dataset) {
       }, error = function(e) cat("Metrics error:", e$message, "\n"))
     })
 
+    output$prf_dt <- renderDT({
+      obj <- rf_model_obj()
+      if (is.null(obj)) return(DT::datatable(data.frame(Message = "Train a model first.")))
+      tryCatch({
+        mdl <- obj$model
+        if (mdl$type == "regression") {
+          oob_pred <- mdl$predicted
+          obs      <- obj$data[[obj$target]]
+          keep     <- !is.na(oob_pred)
+          m <- uef_evaluation(oob_pred[keep], obs[keep])
+          .reg_metrics_dt(list(`OOB (≈LOOCV)` = list(
+            RMSE = m$RMSE, MAE = round(mean(abs(obs[keep] - oob_pred[keep])), 4),
+            R2 = m$R2, RRMSE = m$RRMSE, Bias = m$Bias, RelBias = m$RelBias
+          )))
+        } else {
+          actual    <- obj$data[[obj$target]]
+          oob_preds <- mdl$predicted
+          keep      <- !is.na(oob_preds)
+          acc       <- 1 - mdl$err.rate[mdl$ntree, "OOB"]
+          .prf_dt(.clf_prf(as.character(actual[keep]),
+                           as.character(oob_preds[keep])), acc)
+        }
+      }, error = function(e) DT::datatable(data.frame(Error = e$message)))
+    })
+
+    output$oob_conf_plot <- renderPlot({
+      obj <- rf_model_obj()
+      if (is.null(obj)) { show_placeholder("Train a model first."); return() }
+      mdl <- obj$model
+      if (mdl$type != "classification") {
+        show_placeholder("OOB Validation CM only available for classification targets.")
+        return()
+      }
+      oob_preds <- mdl$predicted
+      actual    <- obj$data[[obj$target]]
+      keep      <- !is.na(oob_preds)
+      cm <- table(Predicted = as.character(oob_preds[keep]),
+                  Actual    = as.character(actual[keep]))
+      print(.plot_conf_matrix(cm, title = "OOB Validation Confusion Matrix"))
+    })
+
+    output$oob_val_acc <- renderText({
+      obj <- rf_model_obj()
+      if (is.null(obj) || obj$model$type != "classification") return("")
+      acc <- (1 - obj$model$err.rate[obj$model$ntree, "OOB"]) * 100
+      paste("OOB Accuracy:", round(acc, 2), "%")
+    })
+
     varimp_fn <- function() {
       obj <- rf_model_obj()
       if (is.null(obj)) { show_placeholder("Train a model to see variable importance."); return() }
@@ -136,10 +197,7 @@ rfServer <- function(id, dataset_pool, active_dataset) {
         write.csv(imp, file, row.names = FALSE)
       }
     )
-    output$download_varimp <- downloadHandler(
-      filename = function() { paste0("rf_variable_importance_", Sys.Date(), ".png") },
-      content = function(file) { png(file, width = 1000, height = 700); varimp_fn(); dev.off() }
-    )
+    
 
     pdp_plot_obj <- reactiveVal(NULL)
 
@@ -166,15 +224,7 @@ rfServer <- function(id, dataset_pool, active_dataset) {
       if (is.null(p)) { show_placeholder("Select a predictor and click 'Generate PDP'."); return() }
       print(p)
     })
-    output$download_pdp <- downloadHandler(
-      filename = function() { paste0("rf_pdp_", Sys.Date(), ".png") },
-      content = function(file) {
-        p <- pdp_plot_obj()
-        png(file, width = 900, height = 600)
-        if (is.null(p)) show_placeholder("Generate a PDP first.") else print(p)
-        dev.off()
-      }
-    )
+    
 
     # Context (+ plot) for the AI Co-Pilot.
     list(

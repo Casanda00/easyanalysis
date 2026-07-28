@@ -118,7 +118,7 @@ ntlServer <- function(id, dataset_pool, active_dataset, vector_pool = NULL) {
 
     # ---- Correlation helper (Hmisc or base) --------------------------------
     .rcorr <- function(mat) {
-      if (requireNamespace("Hmisc", quietly = TRUE))
+      if (.ensure_pkg("Hmisc", quietly = TRUE))
         return(Hmisc::rcorr(mat, type = "pearson"))
       n <- ncol(mat)
       r <- cor(mat, use = "pairwise.complete.obs")

@@ -7,6 +7,214 @@
 # Null-coalescing: return a if non-null and non-empty, else b.
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
+# ==========================================================================
+# Cross-validation and classification metric helpers
+# ==========================================================================
+
+# Exact LOO for any lm/lm-derived model via hat-matrix shortcut (O(n), no refits).
+.loocv_lm <- function(model) {
+  h     <- hatvalues(model)
+  e     <- residuals(model)
+  e_loo <- e / (1 - h)
+  obs   <- model$model[[1]]
+  ss_tot <- sum((obs - mean(obs))^2)
+  list(
+    LOOCV_RMSE = round(sqrt(mean(e_loo^2)), 4),
+    LOOCV_MAE  = round(mean(abs(e_loo)), 4),
+    LOOCV_R2   = round(1 - sum(e_loo^2) / ss_tot, 4)
+  )
+}
+
+# Generic k-fold CV for lm / glm (returns regression or accuracy metrics).
+.kfold_cv <- function(formula, data, k = 5, type = "regression", family = gaussian()) {
+  set.seed(42)
+  n     <- nrow(data)
+  folds <- sample(rep_len(seq_len(k), n))
+  preds <- actual <- c()
+  for (fold in seq_len(k)) {
+    tr <- data[folds != fold, , drop = FALSE]
+    te <- data[folds == fold, , drop = FALSE]
+    m <- tryCatch(
+      if (type == "regression") lm(formula, data = tr)
+      else glm(formula, data = tr, family = family),
+      error = function(e) NULL)
+    if (is.null(m)) next
+    p <- tryCatch(predict(m, newdata = te), error = function(e) NULL)
+    if (is.null(p)) next
+    preds  <- c(preds,  as.numeric(p))
+    actual <- c(actual, as.numeric(te[[all.vars(formula)[1]]]))
+  }
+  if (!length(preds)) return(NULL)
+  if (type == "regression") {
+    e <- actual - preds
+    list(CV_RMSE = round(sqrt(mean(e^2)), 4),
+         CV_MAE  = round(mean(abs(e)), 4),
+         CV_R2   = round(1 - sum(e^2) / sum((actual - mean(actual))^2), 4))
+  } else {
+    list(CV_Accuracy = round(mean(round(preds) == actual, na.rm = TRUE), 4))
+  }
+}
+
+# Per-class + macro-average Precision / Recall / F1 from two character vectors.
+.clf_prf <- function(actual, predicted) {
+  actual    <- as.character(actual)
+  predicted <- as.character(predicted)
+  classes   <- sort(unique(c(actual, predicted)))
+  rows <- lapply(classes, function(cls) {
+    tp  <- sum(actual == cls & predicted == cls)
+    fp  <- sum(actual != cls & predicted == cls)
+    fn  <- sum(actual == cls & predicted != cls)
+    prec  <- if (tp + fp > 0) tp / (tp + fp) else NA_real_
+    rec   <- if (tp + fn > 0) tp / (tp + fn) else NA_real_
+    f1    <- if (!is.na(prec) && !is.na(rec) && prec + rec > 0)
+              2 * prec * rec / (prec + rec) else NA_real_
+    data.frame(Class = cls, Precision = round(prec, 3),
+               Recall = round(rec, 3), F1 = round(f1, 3),
+               Support = as.integer(sum(actual == cls)),
+               stringsAsFactors = FALSE)
+  })
+  df <- do.call(rbind, rows)
+  macro <- data.frame(
+    Class     = "— Macro avg",
+    Precision = round(mean(df$Precision, na.rm = TRUE), 3),
+    Recall    = round(mean(df$Recall,    na.rm = TRUE), 3),
+    F1        = round(mean(df$F1,        na.rm = TRUE), 3),
+    Support   = as.integer(length(actual)),
+    stringsAsFactors = FALSE)
+  rbind(df, macro)
+}
+
+# Render a .clf_prf() result as a compact DT datatable.
+# prf_or_list: a single data.frame OR a named list of them (one per stage/source).
+# acc_or_list: a single accuracy OR a matching named list of accuracies.
+.prf_dt <- function(prf_or_list, acc_or_list = NULL) {
+  fmt3 <- function(x) ifelse(is.na(x), "—", sprintf("%.3f", x))
+  if (is.data.frame(prf_or_list)) {
+    df  <- prf_or_list
+    df$Precision <- fmt3(df$Precision)
+    df$Recall    <- fmt3(df$Recall)
+    df$F1        <- fmt3(df$F1)
+    cap <- if (!is.null(acc_or_list) && length(acc_or_list) == 1 && !is.na(acc_or_list))
+      sprintf("Accuracy: %.1f%%", acc_or_list * 100) else NULL
+    tbl <- DT::datatable(df, rownames = FALSE, caption = cap,
+      options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
+      class = "compact stripe")
+  } else {
+    parts <- lapply(names(prf_or_list), function(nm) {
+      prf <- prf_or_list[[nm]]
+      acc <- if (is.list(acc_or_list)) acc_or_list[[nm]] else NULL
+      src <- if (!is.null(acc) && length(acc) == 1 && !is.na(acc))
+        sprintf("%s  (Acc %.1f%%)", nm, acc * 100) else nm
+      cbind(Source = src, prf)
+    })
+    df <- do.call(rbind, parts)
+    df$Precision <- fmt3(df$Precision)
+    df$Recall    <- fmt3(df$Recall)
+    df$F1        <- fmt3(df$F1)
+    tbl <- DT::datatable(df, rownames = FALSE,
+      options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
+      class = "compact stripe")
+  }
+  tbl |>
+    DT::formatStyle("Class", target = "row",
+      fontWeight      = DT::styleEqual("— Macro avg", "bold"),
+      backgroundColor = DT::styleEqual("— Macro avg", "#eef2f7"))
+}
+
+# Render regression metrics as a compact DT: Metric | stage1 | stage2 …
+# metrics_list: named list of stages; each stage is a named list of metric values.
+# Keys may carry LOOCV_ or CV_ prefixes — they are stripped automatically.
+.reg_metrics_dt <- function(metrics_list) {
+  norm <- function(k) sub("^(LOOCV|CV)_", "", k)
+  ml   <- lapply(metrics_list, function(m) setNames(m, norm(names(m))))
+  key_ord <- c("RMSE", "MAE", "R2", "RRMSE", "Bias", "RelBias", "Accuracy")
+  all_k   <- unique(unlist(lapply(ml, names)))
+  all_k   <- c(intersect(key_ord, all_k), setdiff(all_k, key_ord))
+  lbl_map <- c(RMSE = "RMSE", MAE = "MAE", R2 = "R²", RRMSE = "RRMSE",
+               Bias = "Bias", RelBias = "Rel. Bias", Accuracy = "Accuracy")
+  stages  <- names(metrics_list)
+  rows <- lapply(all_k, function(k) {
+    vals <- vapply(stages, function(nm) {
+      v <- ml[[nm]][[k]]
+      if (is.null(v) || (length(v) == 1 && is.na(v))) "—"
+      else if (k == "Accuracy") sprintf("%.1f%%", as.numeric(v) * 100)
+      else sprintf("%.4f", as.numeric(v))
+    }, character(1))
+    setNames(c(lbl_map[k] %||% k, vals), c("Metric", stages))
+  })
+  df <- as.data.frame(do.call(rbind, rows), stringsAsFactors = FALSE)
+  DT::datatable(df, rownames = FALSE,
+    options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
+    class = "compact stripe") |>
+    DT::formatStyle("Metric", fontWeight = "bold")
+}
+
+# Pretty-print .clf_prf() result to console.
+.print_prf <- function(prf_df, acc = NULL) {
+  if (!is.null(acc))
+    cat(sprintf("Overall accuracy : %.1f%%\n\n", acc * 100))
+  cat(sprintf("%-20s %9s %9s %9s %9s\n",
+              "Class", "Precision", "Recall", "F1", "Support"))
+  cat(strrep("-", 60), "\n")
+  for (i in seq_len(nrow(prf_df))) {
+    r <- prf_df[i, ]
+    cat(sprintf("%-20s %9s %9s %9s %9d\n",
+                r$Class,
+                ifelse(is.na(r$Precision), "   —", sprintf("%.3f", r$Precision)),
+                ifelse(is.na(r$Recall),    "   —", sprintf("%.3f", r$Recall)),
+                ifelse(is.na(r$F1),        "   —", sprintf("%.3f", r$F1)),
+                r$Support))
+  }
+}
+
+# Shared UI widget for cross-validation method selection.
+# Drop into any module's tools panel; read input$cv_method and input$cv_k in the server.
+.cv_ui <- function(ns) {
+  tagList(
+    tags$h6(class = "text-uppercase text-muted small mt-2", "Cross-Validation"),
+    radioButtons(ns("cv_method"), NULL,
+                 choices  = c("LOOCV (Leave-One-Out)" = "loocv", "K-Fold" = "kfold"),
+                 selected = "kfold", inline = TRUE),
+    conditionalPanel(
+      condition = sprintf("input['%s'] === 'kfold'", ns("cv_method")),
+      numericInput(ns("cv_k"), "Number of Folds (k):",
+                   value = 5, min = 2, max = 20, step = 1, width = "100%")
+    )
+  )
+}
+
+# Helper: resolve k from CV inputs (returns nrow(data) for LOOCV).
+.cv_k <- function(input, data) {
+  if (!is.null(input$cv_method) && input$cv_method == "loocv") nrow(data)
+  else max(2L, as.integer(input$cv_k %||% 5L))
+}
+
+# Helper: short label for cv method used in output text.
+.cv_label <- function(k, n) {
+  if (k >= n) "LOOCV" else paste0(k, "-Fold CV")
+}
+
+# ggplot2 confusion matrix heatmap (tile + count text, recall-normalised colour).
+# cm_table: a table() with dims [Predicted, Actual].
+.plot_conf_matrix <- function(cm_table, title = "Confusion Matrix") {
+  df_cm <- as.data.frame(cm_table)
+  names(df_cm) <- c("Predicted", "Actual", "Count")
+  totals <- tapply(df_cm$Count, df_cm$Actual, sum)
+  df_cm$Recall <- df_cm$Count / totals[as.character(df_cm$Actual)]
+  df_cm$Recall[is.nan(df_cm$Recall) | is.na(df_cm$Recall)] <- 0
+  ggplot(df_cm, aes(x = Actual, y = Predicted, fill = Recall)) +
+    geom_tile(color = "white", linewidth = 0.8) +
+    geom_text(aes(label = Count), size = 4.5, fontface = "bold") +
+    scale_fill_gradient2(low = "#f8d7da", mid = "#fff3cd", high = "#d1e7dd",
+                         midpoint = 0.5, limits = c(0, 1), guide = "none") +
+    labs(title = title, x = "Actual", y = "Predicted") +
+    theme_minimal(base_size = 13) +
+    theme(panel.grid = element_blank(),
+          axis.text  = element_text(size = 11),
+          plot.title = element_text(face = "bold", size = 14),
+          axis.title = element_text(face = "bold"))
+}
+
 # Render a plotting function to an off-screen PNG and return base64 (for AI vision).
 # Returns NULL if there is nothing to draw or the plot errors.
 capture_plot_as_base64 <- function(plot_fn) {
@@ -168,11 +376,18 @@ plot_aov_diagnostics <- function(model, view_mode, target) {
 
 .quality_check <- function(df) {
   msgs <- character(0)
-  pct_missing <- 100 * mean(is.na(df))
-  if (pct_missing > 20)
-    msgs <- c(msgs, sprintf("<b>%.1f%%</b> of values are missing — consider imputation or column removal.", pct_missing))
-  else if (pct_missing > 5)
-    msgs <- c(msgs, sprintf("<b>%.1f%%</b> of values are missing.", pct_missing))
+  # Some sources (e.g. rhandsontable hot_to_r on empty cells) yield list-columns,
+  # which break duplicated()/sapply below. Flatten any list-column to a vector.
+  for (j in seq_along(df)) if (is.list(df[[j]]))
+    df[[j]] <- vapply(df[[j]], function(v)
+      if (length(v)) as.character(v[[1]]) else NA_character_, character(1))
+  col_miss <- 100 * sapply(df, function(x) mean(is.na(x)))
+  high_miss <- names(col_miss[col_miss > 20])
+  mod_miss  <- names(col_miss[col_miss >  5 & col_miss <= 20])
+  if (length(high_miss) > 0)
+    msgs <- c(msgs, sprintf("High missing (&gt;20%%): <b>%s</b> — consider imputation or removal.", paste(high_miss, collapse = ", ")))
+  if (length(mod_miss) > 0)
+    msgs <- c(msgs, sprintf("Moderate missing (5–20%%): <b>%s</b>", paste(mod_miss, collapse = ", ")))
   n_dup <- sum(duplicated(df))
   if (n_dup > 0)
     msgs <- c(msgs, sprintf("<b>%d duplicate row(s)</b> detected.", n_dup))
@@ -183,13 +398,13 @@ plot_aov_diagnostics <- function(model, view_mode, target) {
   if (length(near_const) > 0)
     msgs <- c(msgs, sprintf("Near-constant column(s): <b>%s</b>", paste(near_const, collapse = ", ")))
   num_nms <- names(df)[sapply(df, is.numeric)]
-  skewed <- sum(sapply(num_nms, function(v) {
+  skewed_cols <- num_nms[sapply(num_nms, function(v) {
     x <- na.omit(df[[v]])
     if (length(x) < 5 || sd(x) == 0) return(FALSE)
     abs(mean((x - mean(x))^3) / sd(x)^3) > 2
-  }))
-  if (skewed > 0)
-    msgs <- c(msgs, sprintf("<b>%d numeric column(s)</b> are highly skewed — log transform may help.", skewed))
+  })]
+  if (length(skewed_cols) > 0)
+    msgs <- c(msgs, sprintf("Highly skewed — log transform may help: <b>%s</b>", paste(skewed_cols, collapse = ", ")))
   msgs
 }
 
@@ -222,3 +437,26 @@ plot_lm_diagnostics <- function(model, dataset, y_var, view_mode, target) {
     }
   }
 }
+
+# ==========================================================================
+# Native OS file/folder dialogs (LOCAL desktop build).
+# Confirmed on the target machine (2026-07-25): tcltk folder AND file dialogs
+# (tk_choose.dir / tkgetOpenFile / tkgetSaveFile) all open. So tcltk is the
+# PRIMARY for all three — it shares the Tk that global.R pre-warms at boot, so
+# there is NO per-click process spawn and dialogs open fast. PowerShell is kept
+# only as a fallback when tcltk itself is unavailable/errors (NOT on cancel).
+# utils::choose.dir and PowerShell's FolderBrowserDialog were dropped (they did
+# not reliably appear from an Rscript-launched app). All dialogs BLOCK the single
+# R thread while open (fine for a one-user local app). Browser/wasm build has no
+# OS dialogs -> everything returns NULL and callers fall back to a default.
+#
+# tcltk semantics that make the no-double-dialog logic work: the tk* functions
+# return "" when the user CANCELS (a normal outcome) and only throw on a real
+# failure. So: a character result (even "") = tcltk handled it, do NOT fall back;
+# an error = try PowerShell.
+# ==========================================================================
+
+# NOTE: the native OS file/folder dialog helpers (.ps_* / .native_*) were
+# removed 2026-07-27. They were abandoned in favour of the browser file
+# picker + downloadHandler, were referenced nowhere, and shelling out to
+# PowerShell was an unnecessary code-execution surface.

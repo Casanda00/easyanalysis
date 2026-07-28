@@ -70,7 +70,7 @@ xgboostServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    if (!requireNamespace("xgboost", quietly = TRUE)) {
+    if (!.ensure_pkg("xgboost", quietly = TRUE)) {
       msg <- "Package 'xgboost' is required.\nRun: install.packages('xgboost')"
       output$cv_plot  <- renderPlot(show_placeholder(msg))
       output$imp_plot <- renderPlot(show_placeholder(msg))
