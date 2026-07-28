@@ -528,6 +528,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       DT::datatable(ip, options = list(pageLength = 12, scrollX = TRUE), rownames = FALSE)
     }, server = TRUE)
 
+    # Panels here are renderUI-built, so ANY dependency change (render mode, a
+    # new layer, a different table) rebuilds them from scratch and the user's
+    # picks would silently snap back to the defaults. Carry them over instead:
+    # keep the current value when it still exists among the new choices, and
+    # fall back to the default only when it genuinely went away.
+    .keep_sel <- function(id, choices, default, multi = FALSE) {
+      cur <- isolate(input[[id]])
+      if (is.null(cur)) return(default)
+      hit <- cur[nzchar(cur) & cur %in% choices]
+      if (!length(hit)) return(default)
+      if (multi) hit else hit[1]
+    }
+
     # Pane bodies, shared by the single views AND the split view.
     .data_ui <- function() {
       # (A tool taking the centre is handled by the canvas router above; this is
@@ -535,13 +548,18 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       cols <- .cols()
       if (!length(cols)) return(div(class = "ea-hint",
         "No table active. Select a table layer in the Layers panel."))
+      geoms <- c("scatter","histogram","boxplot","line","bars")
       tagList(
         div(class = "ea-wsx-chartbar",
           tags$label("Plot"),
-          selectInput(ns("cgeom"), NULL, c("scatter","histogram","boxplot","line","bars"), width = "130px"),
-          tags$label("X"), selectInput(ns("cx"), NULL, cols, width = "140px"),
+          selectInput(ns("cgeom"), NULL, geoms,
+                      selected = .keep_sel("cgeom", geoms, "scatter"), width = "130px"),
+          tags$label("X"), selectInput(ns("cx"), NULL, cols,
+                      selected = .keep_sel("cx", cols, cols[1]), width = "140px"),
           tags$label("Y"), selectInput(ns("cy"), NULL, cols,
-                      selected = if (length(cols) > 1) cols[2] else cols[1], width = "140px"),
+                      selected = .keep_sel("cy", cols,
+                                           if (length(cols) > 1) cols[2] else cols[1]),
+                      width = "140px"),
           # static (ggplot) <-> interactive (plotly: hover, zoom, pan, select)
           div(class = "ea-wsx-cmode",
             tags$button(class = paste("ea-wsx-cmb", if (!identical(input$cmode %||% "static", "interactive")) "on" else ""),
@@ -992,15 +1010,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(strong(spec$nm), div(class = "ea-wsx-toolg", spec$grp)))
       if (identical(spec$kind, "model")) {
         body <- tagList(
-          selectInput(ns("resp"), "Response", choices = cols),
+          selectInput(ns("resp"), "Response", choices = cols,
+                      selected = .keep_sel("resp", cols, cols[1])),
           selectizeInput(ns("preds"), "Predictors", choices = cols, multiple = TRUE,
+                         selected = .keep_sel("preds", cols, character(0), multi = TRUE),
                          options = list(plugins = list("remove_button"))))
       } else {
         rl <- .names(raster_pool); vl <- .names(vector_pool)
         body <- tagList(
-          selectInput(ns("in_layer"), "Input raster", choices = if (length(rl)) rl else "(no raster loaded)"),
+          selectInput(ns("in_layer"), "Input raster",
+                      choices  = if (length(rl)) rl else "(no raster loaded)",
+                      selected = .keep_sel("in_layer", rl, NULL)),
           selectInput(ns("clip_to"), if (identical(t, "clip")) "Clip to" else "Sample at",
-                      choices = if (length(vl)) vl else "(no vector loaded)"))
+                      choices  = if (length(vl)) vl else "(no vector loaded)",
+                      selected = .keep_sel("clip_to", vl, NULL)))
       }
       tagList(head, body,
         actionButton(ns("ws_run"), "Run", class = "btn-success w-100", icon = icon("play")))

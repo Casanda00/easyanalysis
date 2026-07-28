@@ -253,3 +253,46 @@ fix it:
 layer that points at the user's own file is never deleted. Verified with a test
 covering: copied raster removed, shapefile sidecars removed, a path outside the
 project refused, and orphan pruning that keeps referenced files.
+
+### Colour sets: bslib bakes the DEFAULT palette in (fixed 2026-07-28)
+
+`ea_theme()` compiles Bootstrap ONCE from `ea_palette` (the dark forest set), so
+Bootstrap's own variables (`--bs-body-bg`, `--bs-table-bg`, `--bs-accordion-bg`,
+`--bs-card-bg`, ...) hold dark hex values that `html[data-ea-theme]` never touches.
+Switching to a light set re-skinned only the hand-written `.ea-*` chrome; anything
+Bootstrap rendered stayed near-black — DT tables and the Co-Analyst accordions were
+the visible cases (`#0F1310` cells on a `#F7F8F4` page).
+
+The earlier legibility block fixed **text colour** only. `ui.R` now also carries a
+**surfaces** block that restates those variables from the tokens. Two rules:
+
+- Bootstrap declares component vars **on the component class**, not on `:root`, so a
+  `:root` override never reaches them — restate per component (`.table`, `.accordion`,
+  `.card`, `.modal`, `.dropdown-menu`, `.nav-tabs`).
+- Inputs (`.form-control`, `.form-select`, `.selectize-input`) compile to literal hex
+  with no variable at all — set those properties outright.
+
+Verified: 0 mismatched surfaces across all six sets (dark surface on a light page or
+vice versa). **When measuring after `eaSetTheme()`, force a reflow first** — otherwise
+`getComputedStyle` returns the previous set's values.
+
+### renderUI panels must carry the user's selections (fixed 2026-07-28)
+
+Workspace panels are `renderUI`-built, so any dependency change rebuilds them and every
+`selectInput` reverts to its default. Flipping the chart's Static/Interactive toggle
+rebuilt the whole chart bar and silently reset X and Y; adding a layer wiped the model
+tool's Response/Predictors the same way.
+
+`.keep_sel(id, choices, default, multi = FALSE)` in `mod_workspace.R` returns the
+current value when it still exists among the new choices, and the default only when it
+genuinely went away. Used by `cgeom`/`cx`/`cy`, `resp`/`preds`, `in_layer`/`clip_to`.
+**Any new selector inside a renderUI panel should use it.**
+
+### The guided tour lives in the workspace (moved 2026-07-28)
+
+It used to run on the welcome/project screens — pointing at the one place that already
+explains itself. The six steps now target the workspace: Layers panel, the menus, the
+view tabs, the tool panel, the results dock, the Co-Analyst. `start()` switches to the
+workspace and polls for `.ea-wsx-grid` before rendering (view panes are hidden and their
+outputs suspended until Shiny switches them); a step whose anchor is missing is skipped.
+Single entry point: **Help > Take the tour** in the workspace menubar.

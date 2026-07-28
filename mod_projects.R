@@ -45,8 +45,6 @@ projectsToolsUI <- function(id) {
     ),
     div(class = "ea-tools-block",
       h6("Help"),
-      actionButton(ns("tour"), "Take the tour", class = "btn-outline-success btn-sm w-100 mb-1",
-                   icon = icon("compass")),
       actionButton(ns("go_docs"), "Documentation", class = "btn-outline-secondary btn-sm w-100 mb-1",
                    icon = icon("book")),
       actionButton(ns("go_cite"), "How to cite", class = "btn-outline-secondary btn-sm w-100",
@@ -275,7 +273,6 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
       observeEvent(input$go_docs, switch_view("docs"))
       observeEvent(input$go_cite, switch_view("docs"))
     }
-    observeEvent(input$tour, session$sendCustomMessage("ea-tour", "start"))
 
     list(context = reactive({
       ps <- projects()
@@ -338,7 +335,6 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
         tags$span(class = "ea-hidden-file",
           fileInput(ns("import_file"), NULL, accept = c(".eap", ".zip"),
                     width = "1px"))),
-      actionButton(ns("tour"), "Take the tour", class = "ea-barbtn"),
       if (show_new)
         actionButton(ns("new_project"), "+ New project", class = "ea-barbtn go")
     )

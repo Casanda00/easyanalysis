@@ -37,8 +37,6 @@ projectToolsUI <- function(id) {
                   icon("book", style = "color:var(--canopy)"), " Documentation"),
       tags$button(type = "button", class = "ea-help-btn", onclick = fire("version"),
                   icon("code-branch", style = "color:var(--forest)"), " Version & release"),
-      tags$button(type = "button", class = "ea-help-btn", onclick = fire("tour"),
-                  icon("compass", style = "color:var(--earth)"), " Guided tour"),
       tags$button(type = "button", class = "ea-help-btn", onclick = fire("cite"),
                   icon("quote-right", style = "color:var(--sky)"), " How to cite")
     )
@@ -107,7 +105,6 @@ projectServer <- function(id, meta, counts, on_files, on_sample, on_rename, on_d
         p(style = "font-size:12px; color:var(--bark); margin-top:8px;",
           strong("University of Eastern Finland"), " — code contributions and data for testing.")))
     })
-    observeEvent(input$tour, session$sendCustomMessage("ea-tour", "start"))
     observeEvent(input$version, {
       showModal(modalDialog(title = "EasyAnalysis", easyClose = TRUE, footer = modalButton("Close"),
         div(class = "ea-hint", HTML(paste0("Version <b>", APP_VERSION, "</b> — local-first release."))),

@@ -188,6 +188,76 @@ page_fillable(
     .ea-proj-body .when, .ea-proj-body .chip, .ea-proj-open a.muted { color: var(--bark) !important; }
     .ea-ws-head h3, .ea-firstrun h3 { color: var(--ink) !important; }
 
+    /* ---- Surfaces across ALL colour sets ----
+       Same root cause as the block above, one level deeper: bslib bakes the
+       DEFAULT (dark) palette into Bootstrap's own component variables, so a
+       DT table or an accordion stays near-black on the light sets. Bootstrap
+       declares those vars ON the component class, so a :root override never
+       reaches them -- each component has to be restated. */
+    :root, html[data-ea-theme] {
+      --bs-body-bg: var(--paper);
+      --bs-body-color: var(--ink);
+      --bs-emphasis-color: var(--ink);
+      --bs-heading-color: var(--ink);
+      --bs-secondary-bg: var(--sunk);
+      --bs-tertiary-bg: var(--sunk);
+      --bs-secondary-color: var(--bark);
+      --bs-tertiary-color: var(--bark);
+      --bs-border-color: var(--line);
+    }
+    .table, table.dataTable {
+      --bs-table-bg: transparent;
+      --bs-table-color: var(--ink);
+      --bs-table-border-color: var(--line);
+      --bs-table-accent-bg: transparent;
+      --bs-table-striped-bg: rgba(128,128,128,.07);
+      --bs-table-striped-color: var(--ink);
+      --bs-table-hover-bg: rgba(128,128,128,.14);
+      --bs-table-hover-color: var(--ink);
+      color: var(--ink);
+    }
+    table.dataTable th, table.dataTable td,
+    .table > :not(caption) > * > * {
+      background-color: transparent; color: var(--ink); border-color: var(--line);
+    }
+    .dataTables_wrapper, .dt-container, .dataTables_info, .dt-info,
+    .dataTables_length, .dt-length, .dataTables_filter, .dt-search,
+    .dataTables_paginate, .dt-paging { color: var(--ink); }
+    .dataTables_paginate .paginate_button, .dt-paging .page-link {
+      color: var(--ink) !important; background: transparent; border-color: var(--line);
+    }
+    .accordion {
+      --bs-accordion-bg: var(--panel);
+      --bs-accordion-color: var(--ink);
+      --bs-accordion-btn-bg: var(--panel);
+      --bs-accordion-btn-color: var(--ink);
+      --bs-accordion-active-bg: var(--sunk);
+      --bs-accordion-active-color: var(--ink);
+      --bs-accordion-border-color: var(--line);
+    }
+    .card, .bslib-card {
+      --bs-card-bg: var(--panel);
+      --bs-card-color: var(--ink);
+      --bs-card-border-color: var(--line);
+      --bs-card-cap-bg: var(--sunk);
+      --bs-card-cap-color: var(--ink);
+    }
+    .modal { --bs-modal-bg: var(--panel); --bs-modal-color: var(--ink);
+             --bs-modal-border-color: var(--line); }
+    .dropdown-menu { --bs-dropdown-bg: var(--panel); --bs-dropdown-color: var(--ink);
+             --bs-dropdown-link-color: var(--ink); --bs-dropdown-link-hover-bg: var(--sunk);
+             --bs-dropdown-link-hover-color: var(--ink); --bs-dropdown-border-color: var(--line); }
+    .nav-tabs { --bs-nav-tabs-link-active-bg: var(--panel);
+             --bs-nav-tabs-link-active-color: var(--ink);
+             --bs-nav-tabs-border-color: var(--line); }
+    /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
+    .form-control, .form-select, textarea.form-control,
+    .selectize-input, .selectize-dropdown {
+      background-color: var(--panel); color: var(--ink); border-color: var(--line);
+    }
+    .selectize-dropdown .active { background: var(--sunk); color: var(--ink); }
+    .form-control::placeholder { color: var(--bark); }
+
     /* Boot overlay — one calm screen instead of a dimming, half-drawn app. */
     #ea-boot { position: fixed; inset: 0; z-index: 4000; background: var(--paper);
                display: flex; align-items: center; justify-content: center;
@@ -2040,16 +2110,22 @@ page_fillable(
   ),
   tags$script(HTML("
     (function(){
-      // Steps point at anchors that may not all exist on a given screen; the
-      // engine skips any whose target is missing. A step with target:null is a
-      // centered card (intro / outro).
+      // The tour runs INSIDE the workspace, pointing at the parts the user
+      // actually works in — a tour of the welcome screen taught nothing, since
+      // the welcome screen is the one place that explains itself. start()
+      // switches to the workspace first and waits for it to exist.
+      // A step whose target is missing is skipped; target:null = centered card.
       var STEPS = [
-        { target:null, title:'Welcome to EasyAnalysis',
-          body:'A quick 4-step tour. You can skip anytime, and restart it later from a Take the tour button.' },
-        { target:'[data-tour=menu]', title:'Everything in one place',
-          body:'Statistics, machine learning, spatial analysis and LiDAR all live in these menus — no exporting to another program.' },
-        { target:'.ea-firstrun-card, .ea-page-bar .go', title:'Start with a project',
-          body:'A project keeps your data, analyses and results together — and remembers them when you come back.' },
+        { target:'.ea-wsx-left', title:'Your data lives here',
+          body:'Every table, raster, point cloud and vector layer in the project. Click one to make it active; the toggle controls what the map draws.' },
+        { target:'[data-tour=menu]', title:'Every tool is in these menus',
+          body:'Statistics, machine learning, spatial analysis and LiDAR — all of it under Processing and its neighbours. Nothing is exported to another program.' },
+        { target:'.ea-wsx-tabs', title:'Map, data, or both',
+          body:'Spatial layers open on the map; tables open in the data view. Split shows them side by side so a model and its map stay in view together.' },
+        { target:'.ea-wsx-right', title:'Tool settings appear here',
+          body:'Pick a tool from the menus and its settings open in this panel. Set them, then press Run.' },
+        { target:'.ea-wsx-dock, .ea-wsx-canvas', title:'Results collect in the dock',
+          body:'Each run is kept with its numbers and plot, so you can compare runs instead of losing the last one. Click a result to pop it out.' },
         { target:'[data-tour=copilot]', title:'Ask the Co-Analyst',
           body:'Stuck? It can run an analysis or explain a result for you, in plain language.' }
       ];
@@ -2062,6 +2138,10 @@ page_fillable(
       function render(){
         var s = STEPS[i]; if(!s){ stop(); return; }
         var t = firstMatch(s.target);
+        if(s.target && !t){                    // anchor absent here — skip it
+          if(i >= STEPS.length-1){ stop(); return; }
+          i++; render(); return;
+        }
         el('ea-tour-step').textContent = 'Step ' + (i+1) + ' of ' + STEPS.length;
         el('ea-tour-title').textContent = s.title;
         el('ea-tour-body').textContent = s.body;
@@ -2083,8 +2163,22 @@ page_fillable(
           tip.style.top  = (window.innerHeight/2 - 90)+'px';
         }
       }
+      function inWorkspace(){ var g = document.querySelector('.ea-wsx-grid');
+        return !!(g && g.getClientRects().length); }
       function start(){ ov=el('ea-tour'); spot=el('ea-tour-spot'); tip=el('ea-tour-tip');
-        if(!ov) return; i=0; ov.classList.add('on'); render(); }
+        if(!ov) return;
+        // Every step describes the workspace, so go there first. View panes are
+        // hidden (and their outputs suspended) until Shiny switches them, so
+        // poll for the grid instead of assuming it is up.
+        if(!inWorkspace() && window.Shiny){
+          try{ Shiny.setInputValue('current_view','workspace',{priority:'event'}); }catch(e){}
+        }
+        var tries = 0;
+        (function wait(){
+          if(inWorkspace() || tries++ > 40){ i=0; ov.classList.add('on'); render(); return; }
+          setTimeout(wait, 100);
+        })();
+      }
       function next(){ if(i>=STEPS.length-1){ stop(); return; } i++; render(); }
       function stop(){ if(ov) ov.classList.remove('on');
         try{ localStorage.setItem('ea-tour-seen','1'); }catch(e){} }
