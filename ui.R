@@ -1237,6 +1237,19 @@ page_fillable(
                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ea-fcard-ty { font: 400 9.5px var(--mono); color: var(--bark);
                    text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
+    /* remove-file button: quiet until you hover the card, red on hover */
+    .ea-fcard-x { margin-left: auto; flex: none; border: 1px solid transparent;
+                  background: transparent; color: var(--bark); cursor: pointer;
+                  font: 600 15px var(--mono); line-height: 1; padding: 1px 7px;
+                  border-radius: 6px; opacity: 0; transition: opacity .12s, color .12s; }
+    .ea-fcard:hover .ea-fcard-x, .ea-fcard-x:focus { opacity: 1; }
+    .ea-fcard-x:hover { color: var(--danger); border-color: var(--danger); }
+    /* same, in the workspace layers panel */
+    .ea-wsx-del { flex: none; cursor: pointer; color: var(--bark); font: 600 14px var(--mono);
+                  line-height: 1; padding: 0 4px; border-radius: 5px; opacity: 0;
+                  transition: opacity .12s, color .12s; }
+    .ea-wsx-lyr2:hover .ea-wsx-del { opacity: 1; }
+    .ea-wsx-del:hover { color: var(--danger); }
     .ea-rename { background: var(--panel) !important; border-color: var(--line) !important;
                  color: var(--bark) !important; }
     .ea-rename:hover { border-color: var(--canopy) !important; color: var(--ink) !important; }

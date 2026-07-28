@@ -277,11 +277,20 @@ projectServer <- function(id, meta, counts, on_files, on_sample, on_rename, on_d
 .project_loaded <- function(ns, m, cn) {
   # One small card per file in the project (no category headers here — the
   # categorised view is the left rail).
+  # Each file card carries its own remove button. `delete_dataset` is the
+  # APP-level handler in server.R (it finds the right pool), and eaSetInput
+  # queues the click if the socket is not up yet.
   fcard <- function(nm, type_label, colour) div(class = "ea-fcard",
     span(class = "ea-fcard-dot", style = paste0("background:", colour, ";")),
     div(class = "ea-fcard-body",
       div(class = "ea-fcard-nm", title = nm, nm),
-      div(class = "ea-fcard-ty", type_label)))
+      div(class = "ea-fcard-ty", type_label)),
+    tags$button(class = "ea-fcard-x", type = "button",
+      title = paste0("Remove '", nm, "' from this project"),
+      onclick = sprintf(
+        "event.stopPropagation(); if(confirm('Remove \\'%s\\' from this project?\\n\\nYour original file on disk is not deleted.')) eaSetInput('delete_dataset', %s);",
+        gsub("'", "", nm), jsonlite::toJSON(nm, auto_unbox = TRUE)),
+      HTML("&times;")))
   cards <- c(
     lapply(cn$tables,  function(n) fcard(n, "Table",       "var(--sky)")),
     lapply(cn$rasters, function(n) fcard(n, "Raster",      "var(--forest)")),

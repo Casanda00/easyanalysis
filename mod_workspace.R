@@ -157,6 +157,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             tags$span(class = "ea-wsx-sw", style = paste0("background:", l$col, ";")),
             tags$span(class = "ea-wsx-nm", title = l$nm, onclick = .fire("ws_active", l$nm), l$nm),
             tags$span(class = "ea-wsx-ty", l$type),
+            # remove the layer from the project (app-level handler in server.R)
+            tags$span(class = "ea-wsx-del", title = paste0("Remove '", l$nm, "'"),
+              onclick = sprintf(
+                "event.stopPropagation(); if(confirm('Remove \\'%s\\' from this project?\\n\\nYour original file on disk is not deleted.')) eaSetInput('delete_dataset', %s);",
+                gsub("'", "", l$nm), jsonlite::toJSON(l$nm, auto_unbox = TRUE)),
+              HTML("&times;")),
             tags$span(class = "ea-wsx-chev", onclick = .fire("ws_exp", l$nm), "▶")),
           div(class = "ea-wsx-leg", .legend(l)))
       }))
