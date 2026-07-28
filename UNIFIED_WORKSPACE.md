@@ -333,3 +333,35 @@ basemap z-index 0 / data z-index 1.
 **Measuring leaflet in a non-compositing browser pane:** every tile reads
 `opacity: 0`, basemap included, because Leaflet's fade-in runs on `requestAnimationFrame`.
 Do not read that as a broken layer — check `_tiles` and the canvas pixel data instead.
+
+### Multi-band rasters: true-colour composites (added 2026-07-29)
+
+Rasters used to be drawn as **band 1 through a viridis ramp**, so a drone orthomosaic
+showed up as a purple-green heatmap instead of a photograph.
+
+`leaflet::addRasterImage` *can* composite, but only down one specific path:
+
+```r
+if (terra::has.RGB(x))      x <- terra::colorize(x, "col")
+else if (terra::nlyr(x) > 1) x <- x[[1]]   # warns "using the first layer in 'x'"
+```
+
+So the channels must be declared with `terra::RGB(x) <- 1:3`, and the values must be
+**bytes** — an orthomosaic carries float reflectance (this one 0.0004-0.63), which
+`colorize` renders near-black. `.stretch_byte()` therefore applies the standard
+remote-sensing 2-98% per-band percentile stretch to 0-255 first.
+
+**Band order is NOT assumable.** A 3/4-band ortho is normally stored R,G,B, but a 5-band
+multispectral cube is typically B,G,R,(RedEdge,NIR) — so bands 1,2,3 give a cyan
+false-colour image and the true-colour composite is **3,2,1**. The default is a
+documented heuristic (`>= 5 bands -> 3,2,1`, else `1,2,3`) and the layers panel exposes
+a per-layer R/G/B mapping plus a True-colour / Single-band toggle. Picking NIR for the
+red channel gives the usual false-colour infrared composite.
+
+The band pickers are plain `<select>` elements firing one `{nm, ch, b}` event, not
+`selectInput`s: the panel is rebuilt for every layer on every render, so per-layer Shiny
+inputs would mean N observers all fighting that rebuild.
+
+Verified in the browser by sampling canvas pixels: true colour is green-dominant
+(102 G vs 4 B) with natural greens and browns; NIR-in-red flips it to red-dominant
+(126 R vs 29 G); single band returns the viridis purple (165 B).

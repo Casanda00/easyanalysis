@@ -117,15 +117,51 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       "event.stopPropagation();Shiny.setInputValue('%s', %s, {priority:'event'});",
       ns(inp), jsonlite::toJSON(val, auto_unbox = TRUE))
 
+    # One <select> per channel. Deliberately plain HTML rather than selectInput:
+    # these are rebuilt for every layer on every render, and N Shiny inputs per
+    # layer would need N observers and would fight the rebuild. One event
+    # carrying {layer, channel, band} is enough.
+    .band_sel <- function(l, ch, cur, nb) {
+      tags$select(class = "ea-wsx-band", title = paste("Band feeding", toupper(ch)),
+        onchange = sprintf(
+          "event.stopPropagation();Shiny.setInputValue('%s',{nm:%s,ch:'%s',b:parseInt(this.value)},{priority:'event'});",
+          ns("ws_rgb"), jsonlite::toJSON(l$nm, auto_unbox = TRUE), ch),
+        lapply(seq_len(nb), function(i)
+          tags$option(value = i, selected = if (i == cur) "selected", paste("Band", i))))
+    }
+
     .legend <- function(l) {
-      if (identical(l$kind, "raster")) return(tagList(
-        div(class = "ea-wsx-lgh", "Legend · continuous"), div(class = "ea-wsx-ramp"),
-        div(class = "ea-wsx-ends", span("low"), span("high")),
-        div(class = "ea-wsx-lgh", "Colour ramp"),
-        div(class = "ea-wsx-style",
-          span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#2b4a2e,#d99b57)"),
-          span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#08306b,#6baed6)"),
-          span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#404040,#f0f0f0)"))))
+      if (identical(l$kind, "raster")) {
+        nb  <- tryCatch({ r <- raster_pool[[l$nm]]; if (is.null(r)) 0L else terra::nlyr(r) },
+                        error = function(e) 0L)
+        cfg <- .rgb_of(l$nm, nb)
+        rgb_on <- identical(cfg$mode, "rgb") && nb >= 3
+        return(tagList(
+          if (nb >= 3) tagList(
+            div(class = "ea-wsx-lgh", paste0("Render · ", nb, " bands")),
+            div(class = "ea-wsx-rgbrow",
+              tags$span(class = paste("ea-wsx-sw-toggle", if (rgb_on) "on" else ""),
+                        onclick = .fire("ws_rgbmode", l$nm),
+                        title = "Switch between a true-colour composite and a single-band ramp",
+                        tags$span(class = "knob")),
+              tags$span(class = "ea-wsx-rgblab",
+                        if (rgb_on) "True colour (RGB)" else "Single band"))),
+          if (rgb_on) tagList(
+            div(class = "ea-wsx-lgh", "Band mapping"),
+            div(class = "ea-wsx-rgbsel",
+              div(tags$label("R"), .band_sel(l, "r", cfg$r, nb)),
+              div(tags$label("G"), .band_sel(l, "g", cfg$g, nb)),
+              div(tags$label("B"), .band_sel(l, "b", cfg$b, nb))),
+            div(class = "ea-wsx-lgh2", "2-98% stretch per band"))
+          else tagList(
+            div(class = "ea-wsx-lgh", "Legend · continuous"), div(class = "ea-wsx-ramp"),
+            div(class = "ea-wsx-ends", span("low"), span("high")),
+            div(class = "ea-wsx-lgh", "Colour ramp"),
+            div(class = "ea-wsx-style",
+              span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#2b4a2e,#d99b57)"),
+              span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#08306b,#6baed6)"),
+              span(class = "ea-wsx-sc", style = "background:linear-gradient(90deg,#404040,#f0f0f0)")))))
+      }
       if (identical(l$kind, "table")) {
         d <- tryCatch(dataset_pool[[l$nm]], error = function(e) NULL)
         dm <- if (is.data.frame(d)) paste0(nrow(d), " rows × ", ncol(d), " cols") else "table"
@@ -647,21 +683,69 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # extent that differs by ~0.7 m. (2) REUSE: the bounds and the image each
     # built their own copy, so every map build paid that cost TWICE.
     .disp_cache <- new.env(parent = emptyenv())
-    .disp_raster <- function(nm) {
+    .disp_raster <- function(nm, idx = 1L) {
       r <- raster_pool[[nm]]
       if (is.null(r)) return(NULL)
-      key <- paste0(nm, "|", terra::ncell(r), "|",
+      idx <- idx[idx >= 1 & idx <= terra::nlyr(r)]
+      if (!length(idx)) return(NULL)
+      key <- paste0(nm, "|", terra::ncell(r), "|", paste(idx, collapse = "-"), "|",
                     paste(as.vector(terra::ext(r)), collapse = ","))
       if (!is.null(.disp_cache[[key]])) return(.disp_cache[[key]])
       shrink <- function(x) if (terra::ncell(x) > 4e5)
         terra::aggregate(x, fact = ceiling(sqrt(terra::ncell(x) / 4e5)),
                          fun = "mean", na.rm = TRUE) else x
-      out <- shrink(.to_wgs84(shrink(r[[1]])))  # reprojection can re-inflate a little
+      out <- shrink(.to_wgs84(shrink(r[[idx]])))  # reprojection can re-inflate a little
       # Bounded, like the results store: rasters are big and this must not grow.
       if (length(ls(.disp_cache)) > 6L) rm(list = ls(.disp_cache), envir = .disp_cache)
       assign(key, out, envir = .disp_cache)
       out
     }
+
+    # Per-band percentile stretch to 0-255. Orthomosaics carry FLOAT reflectance
+    # (this one is 0.0004-0.63), and terra::colorize — the path leaflet uses for
+    # RGB — expects byte values, so without this the composite is near-black.
+    # Clipping at 2/98% is the usual remote-sensing default: it discards the
+    # few extreme pixels that would otherwise flatten the whole image.
+    .stretch_byte <- function(x, p = c(.02, .98)) {
+      for (i in seq_len(terra::nlyr(x))) {
+        v <- terra::values(x[[i]], mat = FALSE); v <- v[is.finite(v)]
+        if (!length(v)) next
+        q <- stats::quantile(v, p, names = FALSE)
+        if (!all(is.finite(q)) || q[2] <= q[1]) q <- range(v)
+        if (!all(is.finite(q)) || q[2] <= q[1]) next
+        x[[i]] <- round((terra::clamp(x[[i]], q[1], q[2], values = TRUE) - q[1]) /
+                        (q[2] - q[1]) * 255)
+      }
+      x
+    }
+
+    # Which bands feed R, G and B for a raster layer (and whether to composite
+    # at all). The DEFAULT is a heuristic, not a fact: a 3/4-band ortho is
+    # almost always stored R,G,B in order, whereas a 5+ band multispectral cube
+    # is typically B,G,R,(RedEdge,NIR) — so red sits at band 3 and using 1,2,3
+    # renders a cyan false-colour image. The user can override per layer.
+    lrgb <- reactiveValues()
+    .rgb_of <- function(nm, nb) {
+      cur <- lrgb[[nm]]
+      if (!is.null(cur)) return(cur)
+      if (nb < 3) list(mode = "single", r = 1, g = 1, b = 1)
+      else if (nb >= 5) list(mode = "rgb", r = 3, g = 2, b = 1)
+      else              list(mode = "rgb", r = 1, g = 2, b = 3)
+    }
+    observeEvent(input$ws_rgb, {
+      s <- input$ws_rgb; nm <- s$nm
+      r <- raster_pool[[nm]]; if (is.null(r)) return()
+      cfg <- .rgb_of(nm, terra::nlyr(r))
+      cfg[[s$ch]] <- as.integer(s$b)
+      lrgb[[nm]] <- cfg
+    })
+    observeEvent(input$ws_rgbmode, {
+      nm <- input$ws_rgbmode
+      r <- raster_pool[[nm]]; if (is.null(r)) return()
+      cfg <- .rgb_of(nm, terra::nlyr(r))
+      cfg$mode <- if (identical(cfg$mode, "rgb")) "single" else "rgb"
+      lrgb[[nm]] <- cfg
+    })
 
     # LAS/LAZ footprint in WGS84. The pool may hold a full LAS *or* just its
     # header (big clouds are capped at read time), so read whichever it is.
@@ -729,15 +813,30 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                        layers())) {
         m <- tryCatch({
           if (identical(l$kind, "raster")) {
-            r1 <- .disp_raster(l$nm)   # cached, already downsampled + in WGS84
-            if (is.null(r1)) m else {
-              vals <- suppressWarnings(terra::values(r1, mat = FALSE))
-              vals <- vals[is.finite(vals)]
-              if (!length(vals)) m else {
-                pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(vals),
-                                             na.color = "transparent")
-                leaflet::addRasterImage(m, r1, colors = pal, opacity = 0.85,
-                                        group = "ws_layers")
+            src <- raster_pool[[l$nm]]
+            nb  <- if (is.null(src)) 0L else terra::nlyr(src)
+            cfg <- .rgb_of(l$nm, nb)
+            if (identical(cfg$mode, "rgb") && nb >= 3) {
+              # TRUE-COLOUR COMPOSITE. leaflet only takes its RGB path when
+              # terra::has.RGB() is set, so declare the channels; otherwise it
+              # silently keeps band 1 and warns "using the first layer in 'x'".
+              x <- .disp_raster(l$nm, c(cfg$r, cfg$g, cfg$b))
+              if (is.null(x) || terra::nlyr(x) < 3) m else {
+                x <- .stretch_byte(x)
+                terra::RGB(x) <- 1:3
+                leaflet::addRasterImage(m, x, opacity = 0.9, group = "ws_layers")
+              }
+            } else {
+              r1 <- .disp_raster(l$nm, 1L)   # cached, downsampled + in WGS84
+              if (is.null(r1)) m else {
+                vals <- suppressWarnings(terra::values(r1, mat = FALSE))
+                vals <- vals[is.finite(vals)]
+                if (!length(vals)) m else {
+                  pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(vals),
+                                               na.color = "transparent")
+                  leaflet::addRasterImage(m, r1, colors = pal, opacity = 0.85,
+                                          group = "ws_layers")
+                }
               }
             }
           } else if (identical(l$kind, "lidar")) {

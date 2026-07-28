@@ -744,6 +744,16 @@ page_fillable(
                   background: linear-gradient(90deg, #2b4a2e, #5fbf62, #c9c56b, #d99b57); }
     .ea-wsx-ends { display: flex; justify-content: space-between; font: 400 9px var(--mono); color: var(--bark); margin-top: 3px; }
     .ea-wsx-style { display: flex; gap: 6px; margin-top: 6px; }
+    /* raster render mode + RGB band mapping (layers panel) */
+    .ea-wsx-rgbrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .ea-wsx-rgblab { font-size: 11px; color: var(--ink); }
+    .ea-wsx-rgbsel { display: flex; gap: 6px; margin-top: 6px; }
+    .ea-wsx-rgbsel > div { flex: 1 1 0; min-width: 0; }
+    .ea-wsx-rgbsel label { display: block; font: 600 8.5px var(--mono); color: var(--bark);
+                           text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+    .ea-wsx-band { width: 100%; max-width: 100%; font-size: 11px; padding: 2px 4px;
+                   background: var(--panel); color: var(--ink);
+                   border: 1px solid var(--line); border-radius: 5px; }
     .ea-wsx-sc { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); cursor: pointer; }
     .ea-wsx-symrow { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--bark); margin-top: 6px; }
     .ea-wsx-sym { width: 13px; height: 13px; border-radius: 50%; flex: none; }
