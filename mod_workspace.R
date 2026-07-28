@@ -639,18 +639,75 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # tiles. (A leafletProxy tile-swap was unreliable here: the canvas uiOutput
     # can re-create the map element, which discards pending proxy calls — the
     # basemap then appeared not to change at all.)
+    # Display-ready copy of a raster: one band, downsampled, in WGS84.
+    #
+    # Two things this fixes. (1) ORDER: projecting first and downsampling after
+    # meant a 33 M-cell orthomosaic was reprojected at FULL resolution just to
+    # throw 99% of it away — 18.1 s, against 3.2 s downsampling first, for an
+    # extent that differs by ~0.7 m. (2) REUSE: the bounds and the image each
+    # built their own copy, so every map build paid that cost TWICE.
+    .disp_cache <- new.env(parent = emptyenv())
+    .disp_raster <- function(nm) {
+      r <- raster_pool[[nm]]
+      if (is.null(r)) return(NULL)
+      key <- paste0(nm, "|", terra::ncell(r), "|",
+                    paste(as.vector(terra::ext(r)), collapse = ","))
+      if (!is.null(.disp_cache[[key]])) return(.disp_cache[[key]])
+      shrink <- function(x) if (terra::ncell(x) > 4e5)
+        terra::aggregate(x, fact = ceiling(sqrt(terra::ncell(x) / 4e5)),
+                         fun = "mean", na.rm = TRUE) else x
+      out <- shrink(.to_wgs84(shrink(r[[1]])))  # reprojection can re-inflate a little
+      # Bounded, like the results store: rasters are big and this must not grow.
+      if (length(ls(.disp_cache)) > 6L) rm(list = ls(.disp_cache), envir = .disp_cache)
+      assign(key, out, envir = .disp_cache)
+      out
+    }
+
+    # LAS/LAZ footprint in WGS84. The pool may hold a full LAS *or* just its
+    # header (big clouds are capped at read time), so read whichever it is.
+    # lidR::extent() is avoided on purpose: it returns a terra::SpatExtent on
+    # some versions and @xmin then fails (CLAUDE.md — LAS CRS/extent gotcha).
+    .las_bbox <- function(x) {
+      if (is.null(x)) return(NULL)
+      e <- tryCatch({
+        if (inherits(x, "LASheader")) {
+          p <- x@PHB
+          c(p[["Min X"]], p[["Min Y"]], p[["Max X"]], p[["Max Y"]])
+        } else {
+          c(min(x@data$X, na.rm = TRUE), min(x@data$Y, na.rm = TRUE),
+            max(x@data$X, na.rm = TRUE), max(x@data$Y, na.rm = TRUE))
+        }
+      }, error = function(e) NULL)
+      if (length(e) != 4 || !all(is.finite(e))) return(NULL)
+      cr <- tryCatch(sf::st_crs(x), error = function(e) NA)
+      if (is.na(cr)) return(NULL)          # unknown CRS — cannot place it on a map
+      tryCatch(as.numeric(sf::st_bbox(sf::st_transform(
+        sf::st_as_sfc(sf::st_bbox(c(xmin = e[1], ymin = e[2], xmax = e[3], ymax = e[4]),
+                                  crs = cr)), 4326))),
+        error = function(e) NULL)
+    }
+
     # Bounds of all visible spatial layers, in WGS84 (lng1, lat1, lng2, lat2).
     .layer_bounds <- function() {
       bb <- NULL
-      for (l in Filter(function(x) x$kind %in% c("raster", "vector") && .vis(x$nm), layers())) {
+      for (l in Filter(function(x) x$kind %in% c("raster", "vector", "lidar") && .vis(x$nm),
+                       layers())) {
         e <- tryCatch({
           if (identical(l$kind, "raster")) {
-            r <- raster_pool[[l$nm]]; if (is.null(r)) return(NULL)
-            v <- as.numeric(as.vector(terra::ext(.to_wgs84(r[[1]]))))   # xmin,xmax,ymin,ymax
-            c(v[1], v[3], v[2], v[4])
+            r1 <- .disp_raster(l$nm)
+            # NOTE: yield NULL, never return() — return() inside this loop exits
+            # .layer_bounds() entirely, so one empty pool entry used to throw
+            # away the bounds of every other layer and the map never zoomed.
+            if (is.null(r1)) NULL else {
+              v <- as.numeric(as.vector(terra::ext(r1)))   # xmin,xmax,ymin,ymax
+              c(v[1], v[3], v[2], v[4])
+            }
+          } else if (identical(l$kind, "lidar")) {
+            .las_bbox(las_pool[[l$nm]])
           } else {
-            vv <- vector_pool[[l$nm]]; if (is.null(vv)) return(NULL)
-            as.numeric(sf::st_bbox(sf::st_transform(sf::st_zm(vv), 4326)))
+            vv <- vector_pool[[l$nm]]
+            if (is.null(vv)) NULL
+            else as.numeric(sf::st_bbox(sf::st_transform(sf::st_zm(vv), 4326)))
           }
         }, error = function(e) NULL)
         if (length(e) == 4 && all(is.finite(e)))
@@ -660,8 +717,63 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       bb
     }
 
+    # Draw the VISIBLE spatial layers straight ONTO THE MAP OBJECT.
+    # Deliberately NOT a leafletProxy: the map element is re-created whenever the
+    # canvas re-renders or the basemap changes, and a proxy message that arrives
+    # around that moment is silently dropped. That is why the raster stayed
+    # invisible while the zoom — already applied at build time — worked fine.
+    # Tiles, view and data are now built in one pass, in that order, so the map
+    # can never end up half-drawn or with data underneath the basemap.
+    .draw_layers <- function(m) {
+      for (l in Filter(function(x) x$kind %in% c("raster", "vector", "lidar") && .vis(x$nm),
+                       layers())) {
+        m <- tryCatch({
+          if (identical(l$kind, "raster")) {
+            r1 <- .disp_raster(l$nm)   # cached, already downsampled + in WGS84
+            if (is.null(r1)) m else {
+              vals <- suppressWarnings(terra::values(r1, mat = FALSE))
+              vals <- vals[is.finite(vals)]
+              if (!length(vals)) m else {
+                pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(vals),
+                                             na.color = "transparent")
+                leaflet::addRasterImage(m, r1, colors = pal, opacity = 0.85,
+                                        group = "ws_layers")
+              }
+            }
+          } else if (identical(l$kind, "lidar")) {
+            # A point cloud is far too heavy to draw as points, and it used to be
+            # skipped entirely — a LAZ-only project opened on a blank world map.
+            # Show its FOOTPRINT so the data is at least locatable; the 3D view
+            # stays in the LiDAR screen.
+            e <- .las_bbox(las_pool[[l$nm]])
+            if (is.null(e)) m else
+              leaflet::addRectangles(m, e[1], e[2], e[3], e[4],
+                color = "#D99B57", weight = 1.5, fillOpacity = .12,
+                label = l$nm, group = "ws_layers")
+          } else {
+            v <- vector_pool[[l$nm]]
+            if (is.null(v)) m else {
+              v1 <- sf::st_transform(sf::st_zm(v), 4326)
+              gt <- as.character(sf::st_geometry_type(v1, by_geometry = FALSE))
+              if (grepl("POINT", gt))
+                leaflet::addCircleMarkers(m, data = v1, radius = 5, color = "#7ED481",
+                  fillOpacity = .85, stroke = TRUE, weight = 1, group = "ws_layers")
+              else if (grepl("LINE", gt))
+                leaflet::addPolylines(m, data = v1, color = "#7ED481", weight = 2,
+                  group = "ws_layers")
+              else
+                leaflet::addPolygons(m, data = v1, color = "#5FBF62", weight = 1.5,
+                  fillOpacity = .25, group = "ws_layers")
+            }
+          }
+        }, error = function(e) m)   # one bad layer must not blank the whole map
+      }
+      m
+    }
+
     output$map <- leaflet::renderLeaflet({
       bm <- basemap(); map_rebuild()   # rebuild when new layers arrive
+      wsview()                         # re-entering Map view re-creates the element
       # PRESERVE THE VIEW across a rebuild: reuse wherever the user currently is
       # (leaflet reports it as input$map_center / input$map_zoom) instead of
       # snapping back to the default. Changing the basemap must not move the map.
@@ -685,70 +797,25 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       } else {
         m <- leaflet::setView(m, lng = 27, lat = 63, zoom = 5)
       }
-      if (nzchar(bm)) m <- leaflet::addProviderTiles(m, bm, layerId = "ws_base")
-      m
+      # Tiles FIRST, then the data on top of them — one atomic build.
+      # zIndex = 0 pins the basemap BELOW everything else: addRasterImage builds
+      # a canvas tile layer that also lives in the tilePane, and at equal z-index
+      # the two are separated only by DOM order. Making the basemap explicitly
+      # the bottom layer is what guarantees a raster can never hide under it.
+      if (nzchar(bm)) m <- leaflet::addProviderTiles(m, bm, layerId = "ws_base",
+                             options = leaflet::providerTileOptions(zIndex = 0))
+      .draw_layers(m)
     })
-    # New layers (or "Zoom to layers") must rebuild the map so the fit applies.
-    observeEvent(list(layers(), fitAll()), {
+    # New layers must rebuild the map so the fit applies.
+    observeEvent(layers(), {
       sig <- tryCatch(paste(vapply(
-               Filter(function(x) x$kind %in% c("raster","vector") && .vis(x$nm), layers()),
+               Filter(function(x) x$kind %in% c("raster","vector","lidar") && .vis(x$nm), layers()),
                function(l) l$nm, character(1)), collapse = "|"), error = function(e) "")
       if (!identical(sig, fit_sig())) map_rebuild(map_rebuild() + 1)
     }, ignoreInit = FALSE)
+    # "Zoom to layers" must re-fit even when the layer set has not changed.
+    observeEvent(fitAll(), { fit_sig(""); map_rebuild(map_rebuild() + 1) }, ignoreInit = TRUE)
 
-    # Draw the VISIBLE spatial layers on the map (rasters + vectors), reusing the
-    # app's existing helpers. Re-runs whenever the pools or visibility change.
-    observe({
-      fitAll()     # "Zoom to layers" re-runs this
-      basemap()    # a basemap change rebuilds the map -> redraw the layers on it
-      wsview()     # entering Map view re-creates the element -> redraw too
-      ls <- layers()
-      spatial <- Filter(function(l) l$kind %in% c("raster", "vector") && .vis(l$nm), ls)
-      p <- leaflet::leafletProxy(ns("map"), session)
-      leaflet::clearGroup(p, "ws_layers")
-      bb <- NULL
-      for (l in spatial) {
-        tryCatch({
-          if (identical(l$kind, "raster")) {
-            r <- raster_pool[[l$nm]]
-            if (is.null(r)) next          # NOTE: never req() inside this loop —
-            r1 <- .to_wgs84(r[[1]])       # it aborts the whole observer silently
-            # keep the browser payload small
-            if (terra::ncell(r1) > 4e5) r1 <- terra::aggregate(
-              r1, fact = ceiling(sqrt(terra::ncell(r1) / 4e5)), fun = "mean", na.rm = TRUE)
-            vals <- suppressWarnings(terra::values(r1, mat = FALSE))
-            vals <- vals[is.finite(vals)]
-            if (length(vals)) {
-              pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(vals), na.color = "transparent")
-              p <- leaflet::addRasterImage(p, r1, colors = pal, opacity = 0.85, group = "ws_layers")
-            }
-            # ALWAYS record the extent, even for a values-less raster, so the map
-            # still zooms to it. as.vector(ext) is xmin,xmax,ymin,ymax.
-            ev <- as.numeric(as.vector(terra::ext(r1)))
-            if (length(ev) == 4) bb <- c(ev[1], ev[3], ev[2], ev[4])
-          } else {
-            v <- vector_pool[[l$nm]]
-            if (is.null(v)) next
-            v1 <- sf::st_transform(sf::st_zm(v), 4326)
-            gt <- as.character(sf::st_geometry_type(v1, by_geometry = FALSE))
-            if (grepl("POINT", gt)) {
-              p <- leaflet::addCircleMarkers(p, data = v1, radius = 5, color = "#7ED481",
-                                             fillOpacity = .85, stroke = TRUE, weight = 1,
-                                             group = "ws_layers")
-            } else if (grepl("LINE", gt)) {
-              p <- leaflet::addPolylines(p, data = v1, color = "#7ED481", weight = 2, group = "ws_layers")
-            } else {
-              p <- leaflet::addPolygons(p, data = v1, color = "#5FBF62", weight = 1.5,
-                                        fillOpacity = .25, group = "ws_layers")
-            }
-            e <- as.numeric(sf::st_bbox(v1)); bb <- e
-          }
-        }, error = function(e) NULL)
-      }
-      # NOTE: zooming is NOT done here. fitBounds is applied when the map is
-      # BUILT (see output$map) because proxy calls are lost if the canvas
-      # re-creates the map element — that was the raster-never-zoomed bug.
-    })
     output$attr <- renderUI({
       act <- activeLayer(); req(act)
       lay <- Filter(function(l) identical(l$nm, act), layers()); lay <- if (length(lay)) lay[[1]] else NULL

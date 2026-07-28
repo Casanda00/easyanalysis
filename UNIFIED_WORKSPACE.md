@@ -296,3 +296,40 @@ view tabs, the tool panel, the results dock, the Co-Analyst. `start()` switches 
 workspace and polls for `.ea-wsx-grid` before rendering (view panes are hidden and their
 outputs suspended until Shiny switches them); a step whose anchor is missing is skipped.
 Single entry point: **Help > Take the tour** in the workspace menubar.
+
+### Map layers: build them WITH the map, never through a proxy (fixed 2026-07-29)
+
+**Symptom:** the map zoomed to the raster but drew nothing.
+
+The zoom already ran at map-build time (that was the earlier fix); the layers were
+still added afterwards through `leafletProxy`. The map element is re-created whenever
+the canvas re-renders or the basemap changes, and a proxy message arriving around that
+moment is dropped — so the fit survived and the data did not. Tiles, view and layers
+are now built in ONE pass inside `renderLeaflet` via `.draw_layers(m)`; there is no
+proxy left in the workspace map.
+
+Three further defects found while verifying, each independently able to hide a raster:
+
+- **Full-res reprojection failed.** `.to_wgs84(r[[1]])` was called on the ORIGINAL
+  raster and downsampled only afterwards, so a 33 M-cell orthomosaic was warped at full
+  resolution — 18.1 s, and under memory pressure it died outright with
+  `[project] warp failure`, which `tryCatch` swallowed into an empty map. Downsampling
+  first (cheap, in the native CRS) takes **6.4 s**, keeps the same 56.9 % valid cells,
+  and moves the extent by ~0.7 m. `.disp_raster()` also **memoises** the result, because
+  the bounds and the image each used to build their own copy — the cost was paid twice
+  per map build. The cache is bounded (6 entries) like the results store.
+- **`return()` inside `.layer_bounds()`'s loop.** It returns from the whole function,
+  so one empty pool entry discarded the bounds of every other layer. Yield `NULL`.
+- **Point clouds were never drawn** — `lidar` was missing from the layer filter, so a
+  LAZ-only project opened on a blank world map with nothing to zoom to. LAS/LAZ now
+  contributes its footprint (`.las_bbox()`, which reads a `LASheader` or a full `LAS`)
+  and draws as a rectangle. Points themselves stay in the LiDAR screen.
+
+**Stacking:** `addRasterImage` builds a *canvas tile layer* that lives in the **tilePane**
+— the same pane as the basemap — so at equal z-index only DOM order separated them. The
+basemap is now pinned with `providerTileOptions(zIndex = 0)`; verified in the browser as
+basemap z-index 0 / data z-index 1.
+
+**Measuring leaflet in a non-compositing browser pane:** every tile reads
+`opacity: 0`, basemap included, because Leaflet's fade-in runs on `requestAnimationFrame`.
+Do not read that as a broken layer — check `_tiles` and the canvas pixel data instead.
