@@ -1,28 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-
-  "//": [
-    "This is the APP project -> easyanalysis.vercel.app",
-    "Its only job is to serve the two install one-liners:",
-    "   https://easyanalysis.vercel.app/install.ps1",
-    "   https://easyanalysis.vercel.app/install.sh",
-    "",
-    "It does NOT host an app zip any more. install.ps1/install.sh download the",
-    "app straight from GitHub's archive of main, which always exists and is",
-    "always current — the old /easyanalysis-app.zip URL 404'd because nothing",
-    "ever produced that file.",
-    "",
-    "The LANDING page is a SEPARATE Vercel project (easyanalysis-landing-page)",
-    "whose Root Directory is set to `landing` — see landing/vercel.json.",
-    "",
-    "The old COOP/COEP headers (needed by the deprecated wasm build) are gone:",
-    "static files do not need cross-origin isolation."
-  ],
-
   "buildCommand": "mkdir -p public && cp install.ps1 install.sh public/",
   "outputDirectory": "public",
-
   "headers": [
     {
       "source": "/install.sh",
@@ -39,8 +19,11 @@
       ]
     }
   ],
-
   "redirects": [
-    { "source": "/", "destination": "https://easyanalysis-landing-page.vercel.app", "permanent": false }
+    {
+      "source": "/",
+      "destination": "https://easyanalysis-landing-page.vercel.app",
+      "permanent": false
+    }
   ]
 }

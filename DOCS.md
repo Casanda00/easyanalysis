@@ -14,6 +14,7 @@ a new session or after a context reset) to find where everything lives.
 | [DESIGN.md](DESIGN.md) | Product & UX: audience, the GeoLibre north star, the **menu-free project → workspace flow**, the non-negotiable UX rules, Co-Analyst UX, visual language (no emojis). |
 | [MEMORY.md](MEMORY.md) | Decision log, project timeline, and hard-won gotchas (quotes-in-`HTML()`, LAS/CRS traps, etc.). Human-facing — distinct from Claude's private per-session memory. |
 | [UNIFIED_WORKSPACE.md](UNIFIED_WORKSPACE.md) | **Build spec for the one-workspace rebuild** — the two views (Map view + Data view), tool-as-panel contract, and the staged build plan. Read before building the unified workspace. |
+| [DEPLOY.md](DEPLOY.md) | **Hosting**: the two Vercel projects, why there is no app zip, and how to verify a deploy. |
 
 ## Reference docs
 | Doc | What it is |

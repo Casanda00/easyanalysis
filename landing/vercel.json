@@ -1,21 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-
-  "//": [
-    "This is the LANDING project -> easyanalysis-landing-page.vercel.app",
-    "In the Vercel dashboard set this project's Root Directory to `landing`,",
-    "so this file is the one Vercel reads. The site is plain static HTML/CSS —",
-    "no build step, no dependencies, no CDN.",
-    "",
-    "The install one-liners shown on the site point at easyanalysis.vercel.app",
-    "(the APP project), which serves install.ps1 / install.sh."
-  ],
-
   "buildCommand": null,
   "outputDirectory": ".",
   "cleanUrls": true,
-
   "headers": [
     {
       "source": "/assets/(.*)",
