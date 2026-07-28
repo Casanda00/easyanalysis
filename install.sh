@@ -134,7 +134,13 @@ need_deps=0
 
 if [ "$need_deps" = "1" ]; then
   say "Checking / installing R packages (first run can take several minutes)..."
-  warn "On macOS/Linux some spatial packages compile from source, so be patient."
+  if [ "$OS" = "Darwin" ]; then
+    say "macOS: installing CRAN binaries - no Xcode tools or compiler needed."
+  else
+    warn "Linux has no CRAN binaries, so packages compile from source. If a"
+    warn "spatial package fails, install the system libraries first, e.g."
+    warn "  sudo apt install libgdal-dev libproj-dev libgeos-dev libudunits2-dev gfortran"
+  fi
   "$RSCRIPT" "$DEPS" "$LIB_DIR" || die "Package installation failed (see messages above)."
   date > "$MARKER"
 else

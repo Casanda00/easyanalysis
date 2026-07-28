@@ -64,3 +64,31 @@ curl -sI https://easyanalysis.vercel.app/install.sh | head -3     # expect 200
 curl -sI https://easyanalysis.vercel.app/install.ps1 | head -3    # expect 200
 curl -sIL https://github.com/Casanda00/easyanalysis/archive/refs/heads/main.zip | tail -3
 ```
+
+## macOS: install CRAN binaries, never compile (fixed 2026-07-28)
+
+**Symptom:** first run on a Mac died with `make: *** [classInt.ts] Error 1`, after
+downloading `.tar.gz` sources (`lavaan_0.7-2.tar.gz`, ...). classInt is a hard
+dependency of `sf`, so the CORE set failed and the app never launched.
+
+**Cause:** `launcher/deps.R` picked `getOption("pkgType")` on non-Windows. On macOS
+that is `"both"`, which silently prefers **source** whenever CRAN's source version is
+newer than the published binary — so a Mac with no Xcode tools and no gfortran tried
+to compile the whole spatial stack. (The `.ts` target in the error is R's parallel
+install timestamp file, i.e. proof it was a source build.)
+
+**Fix:** binaries are requested explicitly wherever CRAN publishes them.
+
+- `type = "binary"` on **Windows and macOS**; `"source"` on Linux (CRAN has no Linux
+  binaries — the installer now prints the `apt` line for the GDAL/PROJ/GEOS headers).
+- `install.packages.compile.from.source = "never"` on those platforms, so R cannot
+  quietly fall back to compiling.
+- Third pass: anything with no binary for this R version/arch is retried from source,
+  and is *allowed* to fail — the report names the package.
+- **Presence is not proof it works.** A binary built for a different R build installs
+  cleanly and then fails to load, which used to surface as a crash at boot. Core
+  packages are now `requireNamespace()`-checked after install and reinstalled from
+  source if they do not load. (`rgl.useNULL` is set first — CLAUDE.md gotcha 6.)
+
+CRAN's macOS binaries cover arm64 and x86_64 and bundle their own GDAL/PROJ/GEOS, so
+the "no toolchain, no admin" promise now holds on macOS as it already did on Windows.
