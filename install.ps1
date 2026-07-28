@@ -40,10 +40,13 @@ $LibDir  = Join-Path $AppHome "library"
 $AppDir  = Join-Path $AppHome "app"
 New-Item -ItemType Directory -Force -Path $AppHome, $LibDir | Out-Null
 
-# Default download source: the lean app bundle served from the same Vercel
-# host as the browser build. ~0.3 MB - the R packages install locally, once.
+# Default download source: GitHub's auto-generated archive of main. It always
+# exists and is always current, so there is no separate zip to build/upload
+# (the old vercel-hosted zip URL 404'd because nothing ever produced it).
+# The archive nests everything in "easyanalysis-main/" - Resolve-AppDir already
+# handles that by locating global.R inside the extracted tree.
 # Override with -AppSource <folder|url> or $env:EASYANALYSIS_SRC.
-$DefaultZip = "https://easyanalysis.vercel.app/easyanalysis-app.zip"
+$DefaultZip = "https://github.com/Casanda00/easyanalysis/archive/refs/heads/main.zip"
 
 # --- 1. Ensure R -----------------------------------------------------------
 function Get-Rscript {

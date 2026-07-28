@@ -43,7 +43,9 @@ LIB_DIR="$APP_HOME/library"
 APP_DIR="$APP_HOME/app"
 mkdir -p "$APP_HOME" "$LIB_DIR"
 
-DEFAULT_ZIP="https://easyanalysis.vercel.app/easyanalysis-app.zip"
+# GitHub's archive of main: always present, always current, and it nests the
+# app in "easyanalysis-main/" - resolve_app_dir finds global.R inside it.
+DEFAULT_ZIP="https://github.com/Casanda00/easyanalysis/archive/refs/heads/main.zip"
 APP_SOURCE="${EASYANALYSIS_SRC:-}"
 
 # --- 1. Ensure R -----------------------------------------------------------
