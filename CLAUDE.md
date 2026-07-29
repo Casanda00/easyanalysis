@@ -52,6 +52,8 @@ adding features — prefer general-purpose capability over forestry-specific ass
 | `server.R` | Shared reactive state (4 pools + `active_ds`) + wires each module server once. |
 | `mod_*.R` | One self-contained Shiny module per screen (~35 modules). |
 | `agent_tools.R` | AI Co-Pilot agent: OpenAI tool registry + dispatcher (runs the app's models). |
+| `algorithms.R` | **Processing algorithm registry** — one spec per operation (QGIS Processing style). |
+| `mod_algo.R` | Generic runner for any `algorithms.R` entry: pick layer → set params → Run → layer. |
 | `helpers.R`, `evaluation_function.R` | Shared plot engines + `uef_evaluation()`. |
 | `webapp/` | Browser-build source (clean, secrets-free copy of the app). |
 | `webapp_export.R` | Builds `webapp/` → `webapp_site/` with the wasm-specific patches. |
@@ -333,6 +335,32 @@ a menu item, call `geeServer("gee")` in server.R — and build the canvas in the
   they're general ML, RF has its own screen). Singular-matrix fits return a friendly hint.
 - Classification screen = one-vs-all binary `glm(binomial)` per class (F1/precision/recall);
   distinct from the Logistic screen's single multinomial model.
+
+## PROCESSING ALGORITHMS — one searchable tool per operation
+Operations are **plugin-like**, in the QGIS Processing sense: you search for the thing you
+want to make ("DTM"), fill in a couple of parameters, press Run, and the result lands in the
+project as a layer on the map. They are **not** bundled behind a radio button inside a
+screen — "Surface models" used to hide DTM/DSM/CHM/nDSM that way, so you had to already know
+which screen a DTM lived in before you could make one, and CHM existed there *and* in the
+LiDAR screen with the same `lidR` call in both.
+
+- **`algorithms.R`** is the registry: `ea_algorithms()` returns one spec per operation with
+  `id, label, group, summary, inputs, params, output, run`. Inputs are declared with
+  `ea_in(key, label, pool)`; parameters with `ea_num()` / `ea_txt()` / `ea_sel()`; the result
+  with `ea_out(pool, default)`. `run(inp, p)` returns the object — **throw to fail**, the
+  runner reports the message.
+- **`mod_algo.R`** renders and runs any spec. Input pickers are `renderUI` (so gotcha 18
+  never applies), the output name auto-suffixes rather than overwriting (`DTM`, `DTM_2`), and
+  every entry reports a one-line context to the Co-Analyst.
+- **`mod_workspace.R`** registers each entry as tool key `algo_<id>`, always `map_based`
+  (they produce a layer, so the map keeps the centre). **`server.R`** binds one `algoServer`
+  per entry from the same registry.
+- **Adding an operation is a list in `algorithms.R` and nothing else.** Do NOT write a new
+  module for an operation that fits the spec.
+- Done so far: **DTM, DSM, CHM, nDSM, ITD**. Still bundled behind dropdowns and due for the
+  same treatment: raster ops in `mod_raster.R` (crop / clip / mosaic / reproject / resample /
+  band calc / zonal stats), `mod_terrain.R` (slope / aspect / hillshade / …),
+  `mod_hydro.R`, and the vector ops.
 
 ## Wiring a component back (checklist)
 1. Add its plot helper(s) to `helpers.R` if needed (port from server_legacy.R).

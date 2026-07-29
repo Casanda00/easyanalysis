@@ -499,7 +499,7 @@ default choice following the data.
 
 Picking a tool should load its settings panel and leave the current view alone.
 
-### D18. Spatial & LiDAR screens still carry their own views  **LIKELY REGRESSION**
+### D18. Spatial & LiDAR screens still carry their own views — PART 1 DONE 2026-07-29
 > "the point cloud or 3d view opens two views. i thought we dixed that. everything if not
 > all under spatial and lidar still carries their own view. that needs to be fixed. we
 > have the map view and the data view of that."
@@ -507,6 +507,38 @@ Picking a tool should load its settings panel and leave the current view alone.
 Round-1 item 4 fixed the **3D view** only; the LiDAR *screens* still render their own
 map+viewer canvases. The rule wanted: modules never bring their own view — the workspace
 map view and data view are the only ones.
+
+**Diagnosis.** Opening a non-`map_based` tool *replaces* the workspace map with the module's
+canvas ([mod_workspace.R:793](mod_workspace.R:793)), and `lidarPointcloudCanvasUI` contained
+its own leaflet basemap **and** its own 3D viewer — hence "opens two views". Two further
+facts came out of it: the CHM and detected treetops never left the module (never written to
+`raster_pool` / `vector_pool`), so the workspace map *could not* draw them, which is why the
+screen needed a map of its own; and CHM was implemented twice, identically, here and in
+Surface models.
+
+**Decisions taken (user):** results become layers, and the few genuinely non-map outputs move
+into the tool panel. Then, mid-build: *"these ITD should be separate. like qgis plugins does.
+basically, we treat these as plugins-like"*, *"CHM is separate"*, *"DTM is separate and so on.
+if I want to create DTM, I can simply search DTM and run the process and see it on the map"*,
+*"the same is true for many other commands"*.
+
+**Part 1 — the processing-algorithm framework (done).** `algorithms.R` + `mod_algo.R`: one
+searchable tool per operation, output straight into a pool, map keeps the centre. Registered:
+**DTM, DSM, CHM, nDSM, ITD**. Retired: the "Surface models" radio bundle and the
+"CHM & tree detection" screen. See the CLAUDE.md section for the spec format.
+
+Verified: all five specs render; against a synthetic classified point cloud the DTM comes out
+as exactly the ground plane (100.0–101.2 for a 100 + 0.02x surface), nDSM peaks at 21.7 m
+against a planted 22 m tree, and ITD run on the CHM the CHM tool produced finds the 3 planted
+trees — i.e. the chaining through the pool works. `testServer` on the runner: empty pool shows
+a hint instead of a blank picker, a run writes the layer, a second run makes `DTM_2` rather
+than overwriting, an explicit name is honoured.
+
+**Part 2 — still open.** (a) Port the other bundled operations: `mod_raster.R` (crop / clip /
+mosaic / reproject / resample / band calc / zonal stats), `mod_terrain.R`, `mod_hydro.R`, and
+the vector ops. (b) `pointcloud` and `metrics` still dock into the centre; their leftover
+non-map outputs (LAS summary, elevation/intensity histograms, model-evaluation scatter) need
+to move into the tool panel so those two become `map_based` too.
 
 ---
 

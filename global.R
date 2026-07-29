@@ -163,6 +163,14 @@ source("mod_classification.R")
 source("mod_da.R")
 source("mod_lidar.R")
 source("mod_raster.R")
+# Processing algorithms: one searchable tool per operation (QGIS Processing
+# style). algorithms.R is the registry, mod_algo.R renders and runs any entry.
+source("algorithms.R")
+source("mod_algo.R")
+# mod_surface.R is RETIRED: its DTM/DSM/CHM/nDSM now live in algorithms.R as
+# four separate tools, so "Surface models" no longer hides four operations
+# behind a radio button. Left sourced only so nothing that still references
+# surfaceServer breaks; it is no longer registered as a tool.
 source("mod_surface.R")
 source("mod_terrain.R")
 source("mod_suitability.R")

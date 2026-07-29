@@ -883,7 +883,14 @@ server <- function(input, output, session) {
   # Spatial modules
   lidar_ctx      <- lidarServer("lidar", dataset_pool, las_pool, vector_pool)
   raster_ctx     <- rasterServer("raster", dataset_pool, active_dataset, raster_pool, vector_pool)
-  surface_ctx    <- surfaceServer("surface", las_pool, raster_pool)
+
+  # Processing algorithms (algorithms.R): one bound server per entry, namespaced
+  # "algo_<id>" to match the tool key the workspace registers. Retires
+  # surfaceServer — DTM/DSM/CHM/nDSM are four of these entries now.
+  .algo_pools <- list(las = las_pool, raster = raster_pool,
+                      vector = vector_pool, table = dataset_pool)
+  algo_ctx <- lapply(ea_algorithms(), function(a)
+    algoServer(paste0("algo_", a$id), a, .algo_pools))
   terrain_ctx    <- terrainServer("terrain", raster_pool)
   hydro_ctx      <- hydroServer("hydro", raster_pool)
   suit_ctx       <- suitabilityServer("suitability", raster_pool)
@@ -990,8 +997,8 @@ server <- function(input, output, session) {
     nnet_ml = nnet_ctx, svm = svm_ctx,
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
     pca = pca_ctx, timeseries = ts_ctx,
-    pointcloud = lidar_ctx, chm_itd = lidar_ctx, metrics = lidar_ctx,
-    raster = raster_ctx, surface = surface_ctx, rs_search = rs_ctx,
+    pointcloud = lidar_ctx, metrics = lidar_ctx,
+    raster = raster_ctx, rs_search = rs_ctx,
     terrain = terrain_ctx, hydro = hydro_ctx,
     suitability = suit_ctx, land_classify = land_cls_ctx,
     recommend = rec_ctx,
@@ -999,6 +1006,9 @@ server <- function(input, output, session) {
     climate_trend = climate_ctx, wind = wind_ctx, gam = gam_ctx,
     rconsole = rconsole_ctx
   )
+  # Every processing algorithm reports what it produced, keyed by its tool key,
+  # so the Co-Analyst can see it the same way it sees a model screen.
+  module_ctx[paste0("algo_", names(algo_ctx))] <- algo_ctx
 
   chatServer("chat", dataset_pool, active_dataset, reactive(input$current_view), module_ctx)
 

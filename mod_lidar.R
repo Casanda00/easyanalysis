@@ -3,7 +3,6 @@
 # Three menu views (pointcloud / chm_itd / metrics) share ONE rv_lidar state,
 # so this is a single module: six UI fns (3 tools + 3 canvas) + one server.
 #   lidarPointcloudToolsUI / lidarPointcloudCanvasUI
-#   lidarChmToolsUI        / lidarChmCanvasUI
 #   lidarMetricsToolsUI    / lidarMetricsCanvasUI
 #   lidarServer(id, dataset_pool)
 # Wire all six with the SAME id ("lidar"); the server binds once.
@@ -108,32 +107,12 @@ lidar3DOnlyUI <- function(id) {
   )
 }
 
-# ---- CHM & ITD ----
-lidarChmToolsUI <- function(id) {
-  ns <- NS(id)
-  tagList(
-    tags$h6(class = "text-uppercase text-muted small", "Canopy Height Model"),
-    sliderInput(ns("chm_res"), "CHM Resolution:", min = 0.1, max = 2, value = 0.5, step = 0.1),
-    textInput(ns("pitfree_thresh"), "Pitfree Thresholds (comma-sep):", value = "0, 5, 10, 15, 20, 25"),
-    actionButton(ns("run_chm"), "Generate CHM", class = "btn-primary", width = "100%"),
-    hr(),
-    markdown("**Individual Tree Detection (ITD)**"),
-    markdown("*LMF Window Size: `a + b * height^2`*"),
-    numericInput(ns("lmf_a"), "Parameter a:", value = 1.2),
-    numericInput(ns("lmf_b"), "Parameter b:", value = 0.003),
-    actionButton(ns("run_itd"), "Detect Trees", class = "btn-primary", width = "100%")
-  )
-}
-
-lidarChmCanvasUI <- function(id) {
-  ns <- NS(id)
-  div(
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "2D CHM & Detected Trees",
-                     ea_plot_appearance(fields = "title")),   # raster map: palette and axes are fixed
-         plotOutput(ns("chm_plot"), height = "500px")),
-    card(card_header(class = "bg-light", "ITD Output Table"), DT::dataTableOutput(ns("itd_table")))
-  )
-}
+# ---- CHM & ITD: NOT HERE ANY MORE ----
+# Both are processing algorithms now (algorithms.R): "CHM (Canopy Height
+# Model)" and "ITD (Individual Tree Detection)", each its own searchable
+# tool whose result becomes a project layer. CHM was duplicated here and in
+# Surface models with the same lidR call; ITD could not put its treetops on
+# the map at all, which is why this screen carried a map of its own.
 
 # ---- Metric Extraction & Evaluation ----
 lidarMetricsToolsUI <- function(id) {
@@ -272,25 +251,6 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
         tmp <- lidR::filter_poi(tmp, Intensity < input$int_max)
         rv_lidar$las <- tmp
         showNotification("Noise filtered.", type = "message")
-      })
-    })
-
-    observeEvent(input$run_chm, {
-      req(rv_lidar$las)
-      withProgress(message = 'Generating CHM...', value = 0.5, {
-        thresh <- as.numeric(trimws(unlist(strsplit(input$pitfree_thresh, ","))))
-        rv_lidar$chm <- lidR::rasterize_canopy(rv_lidar$las, res = input$chm_res, algorithm = lidR::pitfree(thresholds = thresh))
-        showNotification("CHM Generated.", type = "message")
-      })
-    })
-
-    observeEvent(input$run_itd, {
-      req(rv_lidar$chm)
-      withProgress(message = 'Detecting Trees...', value = 0.5, {
-        f_win <- function(height) { input$lmf_a + input$lmf_b * height^2 }
-        rv_lidar$tops <- lidR::locate_trees(rv_lidar$chm, lidR::lmf(f_win))
-        rv_lidar$tops$h <- 1.2 + rv_lidar$tops$Z * 1.01
-        showNotification("Individual Tree Detection complete.", type = "message")
       })
     })
 
@@ -515,20 +475,6 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
     output$las_hists <- renderPlot({ hists_fn() })
     
 
-    chm_fn <- function() {
-      req(rv_lidar$chm)
-      terra::plot(rv_lidar$chm, main = ea_main("Canopy Height Model (CHM)"))
-      if (!is.null(rv_lidar$plot_shp)) plot(sf::st_geometry(rv_lidar$plot_shp), add = TRUE, border = "white", lwd = 2)
-      if (!is.null(rv_lidar$tops)) plot(sf::st_geometry(rv_lidar$tops), add = TRUE, col = "red", pch = 16, cex = 0.5)
-    }
-    output$chm_plot <- renderPlot({ chm_fn() })
-    
-
-    output$itd_table <- DT::renderDataTable({
-      req(rv_lidar$tops)
-      DT::datatable(sf::st_drop_geometry(rv_lidar$tops), options = list(pageLength = 10, scrollX = TRUE))
-    })
-
     observeEvent(input$extract_metrics, {
       req(rv_lidar$las, rv_lidar$plot_shp)
       withProgress(message = 'Extracting Plot Metrics...', value = 0.5, {
@@ -583,15 +529,12 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
         parts <- c()
         if (!is.null(rv_lidar$las)) parts <- c(parts, "LAS point cloud loaded")
         if (!is.null(rv_lidar$dtm)) parts <- c(parts, "height-normalized (DTM)")
-        if (!is.null(rv_lidar$chm)) parts <- c(parts, "CHM generated")
-        if (!is.null(rv_lidar$tops)) parts <- c(parts, paste(nrow(rv_lidar$tops), "trees detected"))
         if (!is.null(rv_lidar$itd_metrics)) parts <- c(parts, paste(ncol(rv_lidar$itd_metrics), "plot metrics extracted"))
         paste0("Spatial & LiDAR workflow. ",
                if (length(parts)) paste(parts, collapse = "; ") else "No LiDAR data loaded yet.")
       }),
       plot = function() {
         if (!is.null(isolate(eval_data()))) eval_plot_fn()
-        else if (!is.null(rv_lidar$chm)) chm_fn()
         else if (!is.null(rv_lidar$las)) static3d_fn()
         else show_placeholder("No LiDAR data loaded yet.")
       }

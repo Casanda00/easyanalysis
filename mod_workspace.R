@@ -1478,7 +1478,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       pca            = list(nm = "Dimension reduction (PCA)", grp = "Machine Learning", tools = pcaToolsUI, canvas = pcaCanvasUI),
       # --- Spatial & LiDAR ---
       raster         = list(nm = "Raster & vector analysis", grp = "Spatial & LiDAR", tools = rasterToolsUI,  canvas = rasterCanvasUI, map_based = TRUE),
-      surface        = list(nm = "Surface models",      grp = "Spatial & LiDAR", tools = surfaceToolsUI,      canvas = surfaceCanvasUI, map_based = TRUE),
+      # NOTE: "Surface models" is gone. It bundled DTM / DSM / CHM / nDSM behind
+      # a radio button, so you had to already know that a DTM lives inside a
+      # screen called Surface models before you could make one. They are now four
+      # separate searchable tools, added below from algorithms.R.
       terrain        = list(nm = "Terrain analysis",    grp = "Spatial & LiDAR", tools = terrainToolsUI,      canvas = terrainCanvasUI, map_based = TRUE),
       hydro          = list(nm = "Hydrology",           grp = "Spatial & LiDAR", tools = hydroToolsUI,        canvas = hydroCanvasUI, map_based = TRUE),
       suitability    = list(nm = "Suitability modeling",grp = "Spatial & LiDAR", tools = suitabilityToolsUI,  canvas = suitabilityCanvasUI, map_based = TRUE),
@@ -1488,12 +1491,26 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       climate_trend  = list(nm = "Climate trend",       grp = "Spatial & LiDAR", tools = climateTrendToolsUI, canvas = climateTrendCanvasUI, map_based = TRUE),
       wind           = list(nm = "Wind & environment",  grp = "Spatial & LiDAR", tools = windToolsUI,         canvas = windCanvasUI),
       pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = lidarPointcloudCanvasUI),
-      chm_itd        = list(nm = "CHM & tree detection",grp = "Spatial & LiDAR", tools = lidarChmToolsUI,     canvas = lidarChmCanvasUI),
       metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = lidarMetricsCanvasUI),
       # --- Docs (R console is NOT here: it lives in the bottom dock) ---
       docs           = list(nm = "Documentation",       grp = "More", tools = docsToolsUI,       canvas = docsCanvasUI),
       references     = list(nm = "References",          grp = "More", tools = referencesToolsUI, canvas = referencesCanvasUI)
     )
+
+    # ---- Processing algorithms: one searchable tool each (algorithms.R) -----
+    # Registered from data rather than written out here, so adding an operation
+    # is a list in algorithms.R and nothing else. They are all map_based: they
+    # produce a LAYER, so the map keeps the centre and the result simply appears
+    # in the Layers panel (backlog D18).
+    for (a in ea_algorithms()) {
+      local({
+        spec <- a
+        MODUI[[paste0("algo_", spec$id)]] <<- list(
+          nm = spec$label, grp = spec$group,
+          tools = function(nsid) algoToolsUI(nsid, spec),
+          canvas = NULL, map_based = TRUE)
+      })
+    }
     for (k in names(MODUI)) MODUI[[k]]$id <- k   # original namespace = the tool key
     # Built-in scaffold tools (no dedicated module) keep working alongside.
     TOOLS <- list(
