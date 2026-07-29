@@ -1482,8 +1482,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # a radio button, so you had to already know that a DTM lives inside a
       # screen called Surface models before you could make one. They are now four
       # separate searchable tools, added below from algorithms.R.
-      terrain        = list(nm = "Terrain analysis",    grp = "Spatial & LiDAR", tools = terrainToolsUI,      canvas = terrainCanvasUI, map_based = TRUE),
-      hydro          = list(nm = "Hydrology",           grp = "Spatial & LiDAR", tools = hydroToolsUI,        canvas = hydroCanvasUI, map_based = TRUE),
+      # RETIRED: "Terrain analysis" and "Hydrology". Every operation they offered
+      # is now its own searchable tool in algorithms.R (9 terrain + 6 hydrology),
+      # so keeping them would mean two ways to compute the same slope. Nothing
+      # visible is lost: both were map_based, so their preview/info/stats canvas
+      # was already never mounted, and the Raster tool exports any pool layer as
+      # GeoTIFF plus a map image.
       suitability    = list(nm = "Suitability modeling",grp = "Spatial & LiDAR", tools = suitabilityToolsUI,  canvas = suitabilityCanvasUI, map_based = TRUE),
       land_classify  = list(nm = "Land classification", grp = "Spatial & LiDAR", tools = landClassifyToolsUI, canvas = landClassifyCanvasUI, map_based = TRUE),
       rs_search      = list(nm = "Download spatial data", grp = "Spatial & LiDAR", tools = rsSearchToolsUI,   canvas = rsSearchCanvasUI, map_based = TRUE),

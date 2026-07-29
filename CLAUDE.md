@@ -357,10 +357,26 @@ LiDAR screen with the same `lidR` call in both.
   per entry from the same registry.
 - **Adding an operation is a list in `algorithms.R` and nothing else.** Do NOT write a new
   module for an operation that fits the spec.
-- Done so far: **DTM, DSM, CHM, nDSM, ITD**. Still bundled behind dropdowns and due for the
-  same treatment: raster ops in `mod_raster.R` (crop / clip / mosaic / reproject / resample /
-  band calc / zonal stats), `mod_terrain.R` (slope / aspect / hillshade / …),
-  `mod_hydro.R`, and the vector ops.
+- **33 entries in five groups:** Surfaces & LiDAR (DTM, DSM, CHM, nDSM, ITD), Terrain
+  (slope deg/pct, aspect, hillshade, profile/plan curvature, TPI, TRI, roughness), Hydrology
+  (TWI, flow direction, streams, slope x area, whitebox fill + flow accumulation), Raster
+  (clip to vector, mosaic, reproject, resample, band calculator, NDVI, NDWI, NBR, NDRE, zonal
+  stats) and Vector (buffer, dissolve, centroids).
+- **Retired because they only bundled these:** "Surface models", "CHM & tree detection",
+  "Terrain analysis", "Hydrology". Their module files are still sourced but no longer
+  registered or bound. `mod_raster.R` **stays** — it also does layer management, symbology,
+  annotation and the two draw-based operations.
+- **Deliberately NOT ported:** "Crop raster to drawn shape" and "Clip vector to drawn shape".
+  Both read `rv$drawn`, a polygon drawn on the map, so they are map INTERACTIONS with nothing
+  to pick from a pool. They stay in `mod_raster.R`; `clip_vec` / `buffer` are the pool-driven
+  equivalents. `mod_suitability.R` also stays: its criteria list is variable-length, which the
+  static-parameter spec cannot express. `mod_land_classify.R` (k-means on a raster) IS a clean
+  single operation and is the obvious next port.
+- **Curvature is ours, not terra's.** `mod_terrain.R` offered profile/plan curvature as
+  `terra::terrain(dem, "profc"/"planc")`, but terra has no curvature variable — only slope,
+  aspect, TPI, TRI, TRIriley, TRIrmsd, roughness, flowdir — so both options always errored.
+  `.ea_curvature()` computes them via Zevenbergen & Thorne (1987) from focal weight matrices,
+  verified against analytic surfaces (a paraboloid returns exactly -2a / +2a).
 
 ## Wiring a component back (checklist)
 1. Add its plot helper(s) to `helpers.R` if needed (port from server_legacy.R).

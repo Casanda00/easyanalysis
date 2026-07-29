@@ -891,8 +891,8 @@ server <- function(input, output, session) {
                       vector = vector_pool, table = dataset_pool)
   algo_ctx <- lapply(ea_algorithms(), function(a)
     algoServer(paste0("algo_", a$id), a, .algo_pools))
-  terrain_ctx    <- terrainServer("terrain", raster_pool)
-  hydro_ctx      <- hydroServer("hydro", raster_pool)
+  # terrainServer/hydroServer are NOT bound: their operations are algorithms.R
+  # entries now (see .ea_terrain_algs / .ea_hydro_algs).
   suit_ctx       <- suitabilityServer("suitability", raster_pool)
   land_cls_ctx   <- landClassifyServer("land_classify", raster_pool)
   rs_ctx         <- rsSearchServer("rs_search", dataset_pool, active_dataset, raster_pool)
@@ -999,7 +999,6 @@ server <- function(input, output, session) {
     pca = pca_ctx, timeseries = ts_ctx,
     pointcloud = lidar_ctx, metrics = lidar_ctx,
     raster = raster_ctx, rs_search = rs_ctx,
-    terrain = terrain_ctx, hydro = hydro_ctx,
     suitability = suit_ctx, land_classify = land_cls_ctx,
     recommend = rec_ctx,
     ntl = ntl_ctx,

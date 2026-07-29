@@ -551,10 +551,44 @@ Verified with `testServer`: opening `pointcloud`, `metrics` or any `algo_*` tool
 in the centre and shows the "results are drawn on the workspace map" note, both panels carry
 their own outputs, and `lidar3DOnlyUI` is the sole holder of the viewer/snapshot ids.
 
-**Part 3 — still open.** Port the other bundled operations to `algorithms.R`: `mod_raster.R`
-(crop / clip / mosaic / reproject / resample / band calc / zonal stats), `mod_terrain.R`
-(slope / aspect / hillshade / …), `mod_hydro.R`, and the vector ops. This is what *"the same is
-true for many other commands"* refers to.
+**Part 3 — the other bundled operations (done).** 28 more entries, ported by reading each
+module's own `switch()` rather than reimplementing: 9 terrain, 6 hydrology, 10 raster, 3 vector.
+**33 algorithms in five groups.** Also retired "Terrain analysis" and "Hydrology" — every
+operation they had is an entry now, so keeping them would mean two ways to compute the same
+slope. Nothing visible was lost: both were already `map_based`, so their preview/info/stats
+canvas was never mounted, and the Raster tool exports any pool layer as GeoTIFF plus a map
+image. `mod_raster.R` **stays** (layer management, symbology, annotation, draw-based ops).
+
+**Two pre-existing bugs surfaced by porting:**
+
+1. **Profile and plan curvature never worked.** `mod_terrain.R` called
+   `terra::terrain(dem, "profc"/"planc")`, but terra 1.9.11 has no curvature variable at all —
+   only slope, aspect, TPI, TRI, TRIriley, TRIrmsd, roughness, flowdir. Picking either option
+   errored with "unknown terrain variable". Rather than drop two options that had been visible
+   in the UI, `.ea_curvature()` now computes them properly (Zevenbergen & Thorne 1987) from
+   focal weight matrices — one matrix per partial derivative, so nothing depends on the order
+   terra hands window values to a callback. Verified analytically: for `z = a(x^2+y^2)` it
+   returns exactly -2a (profile) and +2a (plan) with sd ~1e-16, a saddle straddles zero, and a
+   plane gives ~0.
+2. **`flowacc_wb` failed once and never again.** The first full-suite run showed
+   "Error running WhiteboxTools (FillDepressions)" and a missing output file. It did not
+   reproduce — not in isolation (twice), not in the same suite afterwards. Recorded as a
+   transient temp-file/WBT race on first invocation, **not** as something that was fixed.
+
+**Not ported, deliberately:** "Crop raster to drawn shape" and "Clip vector to drawn shape"
+both read `rv$drawn`, a polygon drawn on the map, so they are map interactions with nothing to
+pick from a pool — they stay in `mod_raster.R`. `mod_suitability.R` stays too: its criteria list
+is variable-length, which the static-parameter spec cannot express.
+
+Verified: all 33 run against real fixtures (synthetic classified point cloud, a 6-band stack, a
+2-polygon layer) with sane numbers — DTM = the ground plane, mosaic 20x20+20x20 → 20x40, and the
+four spectral indices come out at exactly the values the band multipliers predict (NDVI 0.2174,
+NDWI -0.12, NBR 0.333, NDRE 0.1428). All 33 labels appear in the menu, all four retired bundles
+are gone, and `testServer` confirms band pickers show real band names with the spec's defaults
+preselected, the field picker lists attributes and excludes `geometry`, multi-layer input works,
+and a table-output algorithm lands in the data pool rather than the raster pool.
+
+**Next obvious port:** `mod_land_classify.R` (k-means on a raster) is a clean single operation.
 
 ---
 
