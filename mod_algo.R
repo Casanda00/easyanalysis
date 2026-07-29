@@ -37,8 +37,10 @@ algoToolsUI <- function(id, spec) {
       lapply(static, ctl)),
     tags$h6(class = "text-uppercase text-muted small mt-2", "Output"),
     textInput(ns("out_name"), "Save as layer", placeholder = spec$output$default),
-    actionButton(ns("run"), tagList(icon("play"), " Run"),
-                 class = "btn-success w-100"),
+    # Run and Stop swap places: Stop is only real while something is running, and
+    # it only works because a heavy run happens in another process (compute_worker.R)
+    # -- a Stop button on an in-process run could never be clicked.
+    uiOutput(ns("run_ui")),
     uiOutput(ns("status"))
   )
 }
@@ -123,7 +125,27 @@ algoServer <- function(id, spec, pools) {
 
     last <- reactiveVal(NULL)      # name of the layer this tool last produced
 
+    # Bumped on every poll. The status line has to depend on SOMETHING reactive to
+    # re-render, and the worker's state lives in a plain environment, not a
+    # reactive -- so without this the elapsed counter rendered once when the job
+    # started and then sat there. Observed: 14s frozen on screen while the run was
+    # 38s in, which reads exactly like the app having hung.
+    tick <- reactiveVal(0)
+
     output$status <- renderUI({
+      tick()
+      job <- pending()
+      if (!is.null(job)) {
+        # Real state, not a fake bar: what it is doing and how long it has been
+        # doing it. "Preparing" is the one-time package load in the background
+        # session, which is genuinely slow and worth naming rather than hiding.
+        el <- round(as.numeric(difftime(Sys.time(), job$started, units = "secs")))
+        return(div(class = "ea-hint mt-2",
+          if (identical(ea_worker_state(), "warming"))
+            sprintf("Preparing the background session (first heavy run only)... %ds", el)
+          else sprintf("Running on %.1fM cells in the background... %ds - Stop is safe",
+                       job$cells / 1e6, el)))
+      }
       nm <- last()
       if (is.null(nm)) return(NULL)
       div(class = "ea-hint mt-2",
@@ -167,6 +189,37 @@ algoServer <- function(id, spec, pools) {
       if (!nzchar(nm)) nm <- spec$output$default
       nm <- .free_name(outp, nm)
 
+      # HEAVY runs go to the background session so they can be stopped; light ones
+      # stay in-process because they finish before you could reach a Stop button,
+      # and routing them out would add ~1.6 s each (plus ~13 s the first time) for
+      # nothing. The gate is the input cell count -- tune with
+      # options(ea.worker_min_cells = ...).
+      #
+      # LAS inputs deliberately stay in-process. Staging a point cloud means
+      # serialising it, which can cost more than the computation, and its file path
+      # cannot be reused instead: a cloud in the pool may have been clipped or
+      # height-normalised, so the file no longer matches it -- the same trap as a
+      # raster subset reporting its parent's path.
+      cells <- sum(vapply(inp, function(x)
+        if (inherits(x, "SpatRaster")) as.numeric(terra::ncell(x))
+        else if (is.list(x)) sum(vapply(x, function(y)
+          if (inherits(y, "SpatRaster")) as.numeric(terra::ncell(y)) else 0, 0))
+        else 0, numeric(1)))
+      has_las <- any(vapply(inp, function(x) inherits(x, "LAS"), logical(1)))
+      heavy <- !has_las && cells > getOption("ea.worker_min_cells", 2e6) &&
+               requireNamespace("callr", quietly = TRUE)
+
+      if (heavy) {
+        staged <- lapply(inp, function(x)
+          if (is.list(x) && !inherits(x, "SpatRaster"))
+            list(kind = "raster", paths = lapply(x, function(y) ea_worker_stage(y)$path))
+          else ea_worker_stage(x))
+        pending(list(inputs = staged, params = p, nm = nm, started = Sys.time(),
+                     out = NULL, cells = cells))
+        if (identical(ea_worker_state(), "off")) ea_worker_warm()
+        return()
+      }
+
       withProgress(message = paste0("Running ", spec$label, "..."), value = 0.4, {
         res <- tryCatch(spec$run(inp, p), error = function(e) e)
         if (inherits(res, "error")) {
@@ -175,17 +228,85 @@ algoServer <- function(id, spec, pools) {
           return()
         }
         incProgress(0.5, detail = "Adding layer...")
-        # Name the BAND after the layer, for single-band rasters. mod_terrain.R
-        # and mod_hydro.R both did this (`names(result) <- out_nm`) and it is what
-        # labels the band in the map legend -- without it every terrain
-        # derivative shows up as "slope" or "lyr.1" whatever you called it.
-        if (inherits(res, "SpatRaster") && terra::nlyr(res) == 1L)
-          try(names(res) <- nm, silent = TRUE)
-        outp[[nm]] <- res
-        last(nm)
-        showNotification(sprintf("%s complete - added layer '%s'.", spec$label, nm),
-                         type = "message")
+        .deliver(res, nm, outp)
       })
+    })
+
+    # ---- Background run: state machine -------------------------------------
+    # Polled rather than blocking, which is the whole point -- the session stays
+    # responsive, so the Stop button below is actually clickable.
+    pending <- reactiveVal(NULL)
+
+    # Shared by both paths so an in-process and a background result are stored
+    # identically.
+    .deliver <- function(res, nm, outp) {
+      # Name the BAND after the layer, for single-band rasters. mod_terrain.R
+      # and mod_hydro.R both did this (`names(result) <- out_nm`) and it is what
+      # labels the band in the map legend -- without it every terrain
+      # derivative shows up as "slope" or "lyr.1" whatever you called it.
+      if (inherits(res, "SpatRaster") && terra::nlyr(res) == 1L)
+        try(names(res) <- nm, silent = TRUE)
+      outp[[nm]] <- res
+      last(nm)
+      showNotification(sprintf("%s complete - added layer '%s'.", spec$label, nm),
+                       type = "message")
+    }
+
+    observe({
+      job <- pending()
+      if (is.null(job)) return()
+      invalidateLater(250)
+      tick(isolate(tick()) + 1L)      # drives the status line, see above
+      st <- ea_worker_state()
+
+      if (identical(st, "off")) {          # worker died or could not start
+        pending(NULL)
+        showNotification("Could not start the background compute session; run again to try in-process.",
+                         type = "error", duration = 8)
+        return()
+      }
+      if (identical(st, "warming")) { ea_worker_ready(); return() }
+
+      if (is.null(job$out) && identical(st, "idle")) {
+        out <- ea_worker_run(getwd(), spec$id, job$inputs, job$params, spec$label)
+        if (is.null(out)) return()         # worker busy with someone else; wait
+        job$out <- out; pending(job)
+        return()
+      }
+      if (!is.null(job$out) && ea_worker_ready()) {
+        r <- ea_worker_result()
+        pending(NULL)
+        if (is.null(r) || !is.null(r$error)) {
+          showNotification(paste0(spec$label, " failed: ",
+            if (is.null(r)) "the compute session stopped" else conditionMessage(r$error)),
+            type = "error", duration = 10)
+          return()
+        }
+        res <- tryCatch(
+          if (identical(r$result, "raster")) terra::rast(job$out) else readRDS(job$out),
+          error = function(e) e)
+        if (inherits(res, "error")) {
+          showNotification(paste0(spec$label, ": could not read the result - ",
+                                  conditionMessage(res)), type = "error", duration = 10)
+          return()
+        }
+        outp <- .pool(spec$output$pool)
+        .deliver(res, .free_name(outp, job$nm), outp)
+      }
+    })
+
+    output$run_ui <- renderUI({
+      if (is.null(pending()))
+        return(actionButton(ns("run"), tagList(icon("play"), " Run"),
+                            class = "btn-success w-100"))
+      actionButton(ns("stop"), tagList(icon("stop"), " Stop"),
+                   class = "btn-outline-danger w-100")
+    })
+
+    observeEvent(input$stop, {
+      ea_worker_cancel()
+      pending(NULL)
+      showNotification(paste0(spec$label, " stopped."), type = "warning", duration = 4)
     })
 
     # Context for the Co-Analyst: what this tool made, in one line.

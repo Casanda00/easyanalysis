@@ -54,6 +54,7 @@ adding features — prefer general-purpose capability over forestry-specific ass
 | `agent_tools.R` | AI Co-Pilot agent: OpenAI tool registry + dispatcher (runs the app's models). |
 | `algorithms.R` | **Processing algorithm registry** — one spec per operation (QGIS Processing style). |
 | `mod_algo.R` | Generic runner for any `algorithms.R` entry: pick layer → set params → Run → layer. |
+| `compute_worker.R` | **Killable background R session** so a heavy run can be Stopped from the app. |
 | `helpers.R`, `evaluation_function.R` | Shared plot engines + `uef_evaluation()`. |
 | `webapp/` | Browser-build source (clean, secrets-free copy of the app). |
 | `webapp_export.R` | Builds `webapp/` → `webapp_site/` with the wasm-specific patches. |
@@ -357,6 +358,16 @@ LiDAR screen with the same `lidR` call in both.
   per entry from the same registry.
 - **Adding an operation is a list in `algorithms.R` and nothing else.** Do NOT write a new
   module for an operation that fits the spec.
+- **Heavy runs are cancellable** (`compute_worker.R`). Shiny is single-threaded, so a Stop
+  button on an in-process run could never be clicked — the work goes to a persistent
+  `callr::r_session` instead and Stop kills it. Facts that pin the design down, all measured:
+  a fresh process per run costs **13-16 s** of startup; a persistent session costs ~14 s of
+  package preload **once**, then 0.6-1.6 s per run; `interrupt()` does **not** stop a running
+  terra call (R only checks interrupts at R level), but `kill()` does, in 0.33 s and with no
+  partial output. Only inputs above `getOption("ea.worker_min_cells", 2e6)` are routed out;
+  LAS inputs never are, because serialising a point cloud can cost more than the computation.
+  **Never hand the worker a raster's `terra::sources()` path** — a slice like `d[[2]]` reports
+  its parent's path, so the worker would read 3 bands instead of 1. Always write it out.
 - **33 entries in five groups:** Surfaces & LiDAR (DTM, DSM, CHM, nDSM, ITD), Terrain
   (slope deg/pct, aspect, hillshade, profile/plan curvature, TPI, TRI, roughness), Hydrology
   (TWI, flow direction, streams, slope x area, whitebox fill + flow accumulation), Raster

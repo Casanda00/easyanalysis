@@ -743,7 +743,7 @@ minute of real work. That makes "the DEM is simply large" the leading explanatio
 report, and makes **G29 the actual fix** — the user needs to see progress and be able to stop,
 not to have curvature made 10% faster.
 
-### G29. No way to stop a heavy process from inside the app
+### G29. No way to stop a heavy process from inside the app — BUILT 2026-07-30
 > "i noticed that there are no real way to stop a heavy process in the app wihtout canceling
 > it in the terminal-basically using ctrl c."
 
@@ -779,9 +779,44 @@ The `run(inp, p)` contract in `algorithms.R` stays as it is — the worker calls
 payoff of having made the operations data: cancellation becomes one change in `mod_algo.R`
 rather than 33 changes.
 
-Cost to weigh before building: a second R process pays terra/lidR load time per run, and
-writing an in-memory raster to disk first is a real copy. Probably worth gating on an
-estimated cell count so small jobs stay in-process.
+**Built as `compute_worker.R`.** Measurements that shaped it:
+
+| approach | cost |
+|---|---|
+| fresh `callr::r_bg()` per run | **13–16 s** startup before any work — unusable |
+| persistent `callr::r_session` | ~1 s spawn + ~14 s package preload **once**, then 0.6–1.6 s per run |
+| `r_session$interrupt()` on a running terra call | **does not work** — poll timed out at 4 s, session stuck busy, next call errored |
+| `r_session$kill()` | works: 0.33 s, no partial output file left behind |
+
+So: one persistent preloaded session, `kill()` to cancel, respawn afterwards. The respawn
+re-pays the ~14 s preload, which is the right place for that cost since it only happens when
+the user actually cancels.
+
+**Gated, not universal.** Only runs whose raster inputs exceed
+`getOption("ea.worker_min_cells", 2e6)` go to the worker. Small ones stay in-process because
+they finish before a Stop button could be reached, and routing them out would add ~1.6 s each
+(plus ~14 s on the first) for nothing. **LAS inputs deliberately stay in-process**: staging a
+point cloud means serialising it, which can cost more than the computation, and its file path
+cannot be substituted because a cloud in the pool may have been clipped or height-normalised —
+the same trap as a raster subset reporting its parent's path.
+
+**A trap worth knowing.** A raster is never handed over by its own `terra::sources()` path.
+Verified: `d[[2]]`, a single-band slice, reports the path of the 3-band file it came from, so
+the worker would silently read 3 bands instead of 1. Inputs are always written out first.
+
+**Bug found and fixed during UI testing.** The status line rendered its elapsed counter once
+and then froze — it read the worker's state from a plain environment, which is not reactive, so
+nothing invalidated it. On screen it showed "14s" while the run was 38 s in, which reads
+exactly like the app having hung: the opposite of the point. A `tick` reactiveVal bumped on
+each poll drives it now.
+
+Verified in the browser against a real 6.25 M-cell DEM: the elapsed counter advances (5s → 12s
+→ 21s), the status names what it is doing ("Preparing the background session (first heavy run
+only)" then "Running on 6.2M cells in the background — Stop is safe"), the counter is
+**server-rendered while the computation runs**, which is itself the proof the session is no
+longer blocked. Stop mid-run clears the status, restores the Run button and adds **no** partial
+layer; the next heavy run re-warms and completes, adding `ProfCurv`. A 0.16 M-cell input and a
+LAS input both stay in-process and never start the worker.
 
 ---
 

@@ -166,6 +166,9 @@ source("mod_raster.R")
 # Processing algorithms: one searchable tool per operation (QGIS Processing
 # style). algorithms.R is the registry, mod_algo.R renders and runs any entry.
 source("algorithms.R")
+# Killable background session, so a heavy algorithm can be stopped from the app
+# instead of Ctrl-C in the terminal (see the note at the top of the file).
+source("compute_worker.R")
 source("mod_algo.R")
 # mod_surface.R is RETIRED: its DTM/DSM/CHM/nDSM now live in algorithms.R as
 # four separate tools, so "Surface models" no longer hides four operations
