@@ -3,30 +3,16 @@
 # Also supports full multi-predictor GAM (e.g. reflectance ~ s(dist) + s(angle) + s(cc)).
 # Mirrors the exercise workflow: lm vs GAM adj.R² comparison → plot smooths → interpret.
 
+.GAM_VIEWS <- c(smooth_plots = "Smooth Plots", model_comparis = "Model Comparison", gam_summary = "GAM Summary", cv_metrics = "CV & Metrics")
+.GAM_VIEWS_PLOT <- c("smooth_plots")  # views whose body actually renders a plot
+
+
 gamCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(full_screen = TRUE,
-    nav_panel("Smooth Plots",
-      plotOutput(ns("smooth_plot"), height = "80vh")
-    ),
-    nav_panel("Model Comparison",
-      div(class = "p-3",
-        h5("lm vs GAM — Adjusted R²"),
-        DT::DTOutput(ns("comparison_tbl")),
-        hr(),
-        uiOutput(ns("gain_summary_ui"))
-      )
-    ),
-    nav_panel("GAM Summary",
-      div(class = "p-3 overflow-auto",
-        verbatimTextOutput(ns("gam_summary"))
-      )
-    ),
-    nav_panel("CV & Metrics",
-      div(class = "p-3 overflow-auto",
-        verbatimTextOutput(ns("cv_metrics_out"))
-      )
-    )
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .GAM_VIEWS)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
@@ -68,6 +54,30 @@ gamToolsUI <- function(id) {
 
 gamServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.GAM_VIEWS)[1]
+      if (any(picked %in% .GAM_VIEWS_PLOT)) ea_plot_appearance()
+    })
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .GAM_VIEWS, function(k, solo) switch(k,
+        smooth_plots = tagList(plotOutput(ns("smooth_plot"), height = if (solo) "80vh" else "100%")),
+        model_comparis = tagList(div(class = "p-3",
+        h5("lm vs GAM — Adjusted R²"),
+        DT::DTOutput(ns("comparison_tbl")),
+        hr(),
+        uiOutput(ns("gain_summary_ui"))
+      )),
+        gam_summary = tagList(div(class = "p-3 overflow-auto",
+        verbatimTextOutput(ns("gam_summary"))
+      )),
+        cv_metrics = tagList(div(class = "p-3 overflow-auto",
+        verbatimTextOutput(ns("cv_metrics_out"))
+      )),
+        NULL))
+    })
+
     ns <- session$ns
 
     rv <- reactiveValues(

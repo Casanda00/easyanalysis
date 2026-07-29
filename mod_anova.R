@@ -24,7 +24,10 @@ anovaCanvasUI <- function(id) {
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Diagnostics",
                   div(class = "d-flex align-items-center gap-2 header-controls",
                       radioGroupButtons(ns("view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                      uiOutput(ns("single_selector")))
+                      uiOutput(ns("single_selector")),
+                      # This card's body is always a plot (see dynamic_plot_ui),
+                      # so the appearance control belongs here unconditionally.
+                      ea_plot_appearance())
       ),
       div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_plot_ui")))
     ),

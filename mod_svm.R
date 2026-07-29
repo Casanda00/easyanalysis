@@ -52,6 +52,8 @@ svmToolsUI <- function(id) {
 }
 
 .SVM_VIEWS <- c(performance = "Performance", support_vector = "Support Vectors", prediction_tab = "Prediction Table")
+.SVM_VIEWS_PLOT <- c("performance", "support_vector")  # views whose body actually renders a plot
+
 
 svmCanvasUI <- function(id) {
   ns <- NS(id)
@@ -67,7 +69,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
     output$view_tools <- renderUI({
       picked <- input$view_pick
       if (!length(picked)) picked <- names(.SVM_VIEWS)[1]
-      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+      if (any(picked %in% .SVM_VIEWS_PLOT)) ea_plot_appearance()
     })
     output$view_body <- renderUI({
       ns <- session$ns

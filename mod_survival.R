@@ -41,6 +41,8 @@ survivalToolsUI <- function(id) {
 }
 
 .SURV_VIEWS <- c(kaplan_meier = "Kaplan-Meier", cox_ph_model = "Cox PH Model", log_rank_test = "Log-rank Test", survival_table = "Survival Table")
+.SURV_VIEWS_PLOT <- c("kaplan_meier", "cox_ph_model")  # views whose body actually renders a plot
+
 
 survivalCanvasUI <- function(id) {
   ns <- NS(id)
@@ -56,7 +58,7 @@ survivalServer <- function(id, dataset_pool, active_dataset) {
     output$view_tools <- renderUI({
       picked <- input$view_pick
       if (!length(picked)) picked <- names(.SURV_VIEWS)[1]
-      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+      if (any(picked %in% .SURV_VIEWS_PLOT)) ea_plot_appearance()
     })
     output$view_body <- renderUI({
       ns <- session$ns

@@ -48,7 +48,8 @@ suitabilityCanvasUI <- function(id) {
   tagList(
     layout_columns(col_widths = c(8, 4),
       card(
-        card_header("Suitability Map  (1 = least · 5 = most suitable)"),
+        card_header(class = "d-flex justify-content-between align-items-center", "Suitability Map  (1 = least · 5 = most suitable)",
+          ea_plot_appearance(fields = "title")),
         plotOutput(ns("preview"), height = "480px")
       ),
       tagList(

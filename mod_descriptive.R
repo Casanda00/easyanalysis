@@ -40,7 +40,8 @@ descriptiveCanvasUI <- function(id) {
     ),
     nav_panel("Distributions",
       layout_columns(col_widths = c(6, 6),
-        card(card_header("Distribution"), plotOutput(ns("dist_plot"), height = "400px")),
+        card(card_header("Distribution",
+      ea_plot_appearance()), plotOutput(ns("dist_plot"), height = "400px")),
         card(card_header("Boxplot"), plotOutput(ns("box_plot"), height = "400px"))
       )
     ),

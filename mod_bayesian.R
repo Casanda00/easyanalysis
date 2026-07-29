@@ -36,20 +36,35 @@ bayesianToolsUI <- function(id) {
   )
 }
 
+.BAYES_VIEWS <- c(bayes_factor = "Bayes Factor", posterior = "Posterior", about_bayesian = "About Bayesian Methods")
+.BAYES_VIEWS_PLOT <- c("posterior")  # views whose body actually renders a plot
+
+
 bayesianCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Bayes Factor",
-      layout_columns(col_widths = c(6, 6),
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .BAYES_VIEWS)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+bayesianServer <- function(id, dataset_pool, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.BAYES_VIEWS)[1]
+      if (any(picked %in% .BAYES_VIEWS_PLOT)) ea_plot_appearance()
+    })
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .BAYES_VIEWS, function(k, solo) switch(k,
+        bayes_factor = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("Results"), verbatimTextOutput(ns("bf_out"))),
         card(card_header("Interpretation"), uiOutput(ns("bf_interp_ui")))
-      )
-    ),
-    nav_panel("Posterior",
-      card(plotOutput(ns("posterior_plot"), height = "440px"))
-    ),
-    nav_panel("About Bayesian Methods",
-      card(
+      )),
+        posterior = tagList(card(plotOutput(ns("posterior_plot"), height = if (solo) "440px" else "100%"))),
+        about_bayesian = tagList(card(
         tags$div(class = "p-4 small",
           tags$h6("What is a Bayes Factor (BF)?"),
           tags$p("BF₁₀ = P(data | H₁) / P(data | H₀). Ratio of evidence for H₁ vs H₀."),
@@ -72,13 +87,10 @@ bayesianCanvasUI <- function(id) {
             "These packages provide full probabilistic inference with Stan as the backend.",
             "Integration is planned for a future build.")
         )
-      )
-    )
-  )
-}
+      )),
+        NULL))
+    })
 
-bayesianServer <- function(id, dataset_pool, active_dataset) {
-  moduleServer(id, function(input, output, session) {
     ns <- session$ns
     has_bf <- requireNamespace("BayesFactor", quietly = TRUE)
 

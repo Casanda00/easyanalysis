@@ -9,7 +9,15 @@ ntlCanvasUI <- function(id) {
       leafletOutput(ns("map"), width = "100%", height = "100%")
     ),
     nav_panel("Scatterplots",
-      plotOutput(ns("scatter"), height = "80vh")
+      # Wrapped in a card purely so there is a header to hang the appearance
+      # control on. It is a multi-panel figure (one panel per predictor), so per
+      # helpers.R only an overall title applies -- axis labels and colour are
+      # per-panel and are not read from the store.
+      card(
+        card_header(class = "d-flex justify-content-between align-items-center",
+          "Response vs predictors", ea_plot_appearance(fields = "title")),
+        plotOutput(ns("scatter"), height = "80vh")
+      )
     ),
     nav_panel("Model Summary",
       div(class = "p-3 overflow-auto",

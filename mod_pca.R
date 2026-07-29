@@ -49,6 +49,8 @@ pcaToolsUI <- function(id) {
 
 .PCA_VIEWS <- c(main = "Main plot", scree = "Scree / variance",
                 loadings = "Loadings", table = "Summary table")
+.PCA_VIEWS_PLOT <- c("main", "scree", "loadings")  # views whose body actually renders a plot
+
 
 pcaCanvasUI <- function(id) {
   ns <- NS(id)
@@ -64,7 +66,7 @@ pcaServer <- function(id, dataset_pool, active_dataset) {
     output$view_tools <- renderUI({
       picked <- input$view_pick
       if (!length(picked)) picked <- names(.PCA_VIEWS)[1]
-      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+      if (any(picked %in% .PCA_VIEWS_PLOT)) ea_plot_appearance()
     })
     output$view_body <- renderUI({
       ea_view_panes(input$view_pick, .PCA_VIEWS, function(k, solo) switch(k,

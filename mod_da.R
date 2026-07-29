@@ -736,7 +736,9 @@ daServer <- function(id, dataset_pool, active_dataset) {
       if (mode == "1. Assumption Checks") {
         view <- input$view
         if (!isTruthy(view)) return(div(style = "padding:20px;", h4("Loading diagnostic views...", class = "text-muted")))
-        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title)
+        # Used only by views 1-4, whose bodies are all plotOutput. View 5 is text
+        # and builds its own header, so it correctly gets no appearance control.
+        make_header <- function(title) card_header(class = "d-flex justify-content-between align-items-center bg-light", title, ea_plot_appearance())
         if (view == "1. Covariance Ellipses") card(make_header("Covariance Ellipses"), plotOutput(ns("plot_ellipses"), height = "500px"))
         else if (view == "2. Equal Variance (Boxplots)") card(make_header("Equal Variance Check"), plotOutput(ns("plot_box"), height = "500px"))
         else if (view == "3. Normality (Q-Q Plots)") card(make_header("Multivariate Normality (Q-Q)"), plotOutput(ns("plot_qq"), height = "500px"))
@@ -748,7 +750,9 @@ daServer <- function(id, dataset_pool, active_dataset) {
             card_header(class = "d-flex justify-content-between align-items-center bg-light", "Discriminant Diagnostics",
                         div(class = "d-flex align-items-center gap-2 header-controls",
                             radioGroupButtons(ns("lda_view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-                            uiOutput(ns("lda_single_selector")))),
+                            uiOutput(ns("lda_single_selector")),
+                            # dynamic_lda_plot_ui only ever builds plotOutputs
+                            ea_plot_appearance())),
             div(style = "overflow-y: auto; height: 520px; padding: 5px;", uiOutput(ns("dynamic_lda_plot_ui")))
           ),
           layout_columns(

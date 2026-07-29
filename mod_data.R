@@ -134,7 +134,8 @@ dataCanvasUI <- function(id) {
         nav_panel("Column Distributions",
           card(
             card_header(class = "d-flex justify-content-between align-items-center bg-light",
-              "Active Column Distributions"),
+              "Active Column Distributions",
+      ea_plot_appearance()),
             div(style = "padding: 5px;",
               selectInput(ns("eng_view_col"), "View Frequency/Summary of:", choices = NULL),
               layout_columns(col_widths = c(6, 6),

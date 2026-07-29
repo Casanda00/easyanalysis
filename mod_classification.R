@@ -47,7 +47,8 @@ classificationCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Classification Performance (F1 Score by Class)"),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Classification Performance (F1 Score by Class)",
+      ea_plot_appearance()),
       div(style = "height: 450px; padding: 10px;", plotOutput(ns("f1_plot"), height = "430px"))
     ),
     layout_columns(

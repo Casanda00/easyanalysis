@@ -51,7 +51,8 @@ lmeCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics"),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Diagnostics",
+      ea_plot_appearance()),
       div(style = "overflow-y: auto; height: 400px; padding: 5px;", plotOutput(ns("diagnostics_plot")))
     ),
     layout_columns(

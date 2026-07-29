@@ -2,6 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "easyanalysis",
+      "runtimeExecutable": "C:\\Program Files\\R\\R-4.5.3\\bin\\Rscript.exe",
+      "runtimeArgs": [
+        "-e",
+        "shiny::runApp('C:/Users/gibso/OneDrive - University of Eastern Finland/Research papers/Tree growth and Trafficability/Modeling/All modeling/2. NFI/Shiny_app', port=7788, host='127.0.0.1', launch.browser=FALSE)"
+      ],
+      "port": 7788
+    },
+    {
       "name": "webapp-site",
       "runtimeExecutable": "C:\\Program Files\\R\\R-4.5.3\\bin\\Rscript.exe",
       "runtimeArgs": [

@@ -49,7 +49,8 @@ landClassifyCanvasUI <- function(id) {
   tagList(
     layout_columns(col_widths = c(8, 4),
       card(
-        card_header("Classification Map"),
+        card_header(class = "d-flex justify-content-between align-items-center", "Classification Map",
+          ea_plot_appearance(fields = "title")),
         plotOutput(ns("preview"), height = "480px")
       ),
       tagList(
@@ -151,7 +152,7 @@ landClassifyServer <- function(id, raster_pool) {
       }
       pal <- .class_pal(res$k)
       terra::plot(res$raster, col = pal, type = "classes",
-                  main = res$name, mar = c(3.5, 3.5, 2, 7),
+                  main = ea_main(res$name), mar = c(3.5, 3.5, 2, 7),
                   levels = paste("Class", seq_len(res$k)))
     })
 

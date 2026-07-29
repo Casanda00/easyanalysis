@@ -641,29 +641,40 @@ ea_view_panes <- function(picked, views, build) {
 # The inputs are workspace-level (`workspace-po_*`) and this writes to them
 # directly, so a module can drop the control next to its plot without any
 # server wiring of its own — there is still exactly one store behind it.
-ea_plot_appearance <- function() {
-  fld <- function(key, ico, label) div(class = "ea-pop-row",
+#
+# `fields` says which of the four this particular plot actually honours, so the
+# control never offers something that would do nothing. A raster preview draws a
+# map with a data-driven palette: its title is overridable, its axes are map
+# coordinates and its colours come from the palette, so it passes fields="title".
+ea_plot_appearance <- function(fields = c("title", "xlab", "ylab", "colour")) {
+  fields <- match.arg(fields, several.ok = TRUE)
+  fld <- function(key, ico, label) if (key %in% fields) div(class = "ea-pop-row",
     tags$label(icon(ico), tags$span(label)),
     tags$input(type = "text", class = "form-control", placeholder = "auto",
       oninput = sprintf(
         "Shiny.setInputValue('workspace-po_%s', this.value, {priority:'event'});", key)))
+  labels <- c(title = "title", xlab = "axis labels", ylab = "axis labels",
+              colour = "colour")
   div(class = "ea-pop",
     tags$button(type = "button", class = "ea-pop-btn",
-      title = "Plot appearance - title, axis labels, colour",
+      title = paste("Plot appearance -",
+                    paste(unique(labels[fields]), collapse = ", ")),
       onclick = "eaPop(this)", icon("palette")),
     div(class = "ea-pop-body",
       div(class = "ea-pop-h", icon("palette"), tags$span("Plot appearance")),
       fld("title", "heading", "Title"),
       fld("xlab", "arrows-left-right", "X label"),
       fld("ylab", "arrows-up-down", "Y label"),
-      div(class = "ea-pop-row",
+      if ("colour" %in% fields) div(class = "ea-pop-row",
         tags$label(icon("droplet"), tags$span("Colour")),
         tags$input(type = "color", class = "ea-wsx-colpick", value = "#2E7D32",
           onchange = "Shiny.setInputValue('workspace-po_colour', this.value, {priority:'event'});")),
       div(class = "ea-pop-note", "Leave a field empty to use the default.")))
 }
 
-# Which view keys in a select-and-split screen are PLOTS. Used to show the
-# appearance control only when a plot is actually on screen.
-ea_is_plot_view <- function(k)
-  grepl("plot|diag|tree|curve|import|scree|loading|km|kaplan|main", k, ignore.case = TRUE)
+# NOTE: there is deliberately no ea_is_plot_view() helper here any more.
+# Guessing "is this view a plot?" from the view KEY was wrong on most screens --
+# it missed posterior, performance, wind_rose, cox_ph_model and every timeseries
+# plot, and "predictions" is a plot on the XGBoost screen but a table on the
+# neural-net one, so no name rule could ever be right. Each screen now declares
+# its own .<TAG>_VIEWS_PLOT vector, read off the bodies it actually renders.

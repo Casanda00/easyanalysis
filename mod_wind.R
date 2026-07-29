@@ -8,12 +8,16 @@
 #   (c) Pre-processed: columns "ws" (speed) + "wd" (direction 0-360°)
 #   (d) Any dataset in dataset_pool — column mapping done interactively.
 
+.WIND_VIEWS <- c(wind_rose = "Wind Rose", speed_distribu = "Speed Distribution", statistics = "Statistics")
+.WIND_VIEWS_PLOT <- c("wind_rose", "speed_distribu")  # views whose body actually renders a plot
+
+
 windCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(full_screen = TRUE,
-    nav_panel("Wind Rose",      plotOutput(ns("windrose_plot"), height="80vh")),
-    nav_panel("Speed Distribution", plotOutput(ns("speed_hist"),   height="60vh")),
-    nav_panel("Statistics",     div(class="p-3", uiOutput(ns("stats_ui"))))
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .WIND_VIEWS)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
@@ -48,6 +52,20 @@ windToolsUI <- function(id) {
 
 windServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.WIND_VIEWS)[1]
+      if (any(picked %in% .WIND_VIEWS_PLOT)) ea_plot_appearance()
+    })
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .WIND_VIEWS, function(k, solo) switch(k,
+        wind_rose = tagList(plotOutput(ns("windrose_plot"), height=if (solo) "80vh" else "100%")),
+        speed_distribu = tagList(plotOutput(ns("speed_hist"),   height=if (solo) "60vh" else "100%")),
+        statistics = tagList(div(class="p-3", uiOutput(ns("stats_ui")))),
+        NULL))
+    })
+
     ns <- session$ns
 
     rv <- reactiveValues(

@@ -45,7 +45,8 @@ logisticCanvasUI <- function(id) {
         div(style = "overflow-y: auto; height: 300px; padding: 5px;", verbatimTextOutput(ns("summary")))
       ),
       card(
-        card_header(class = "bg-light", "Confusion Matrix & Accuracy"),
+        card_header(class = "bg-light", "Confusion Matrix & Accuracy",
+      ea_plot_appearance()),
         div(style = "height: 310px; padding: 5px;", plotOutput(ns("conf_plot"), height = "270px")),
         div(style = "padding: 5px 10px;", tags$b(textOutput(ns("accuracy"))))
       )

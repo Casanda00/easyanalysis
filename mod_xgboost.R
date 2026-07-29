@@ -43,6 +43,8 @@ xgboostToolsUI <- function(id) {
 }
 
 .XGB_VIEWS <- c(training_curve = "Training Curve", feature_import = "Feature Importance", predictions = "Predictions")
+.XGB_VIEWS_PLOT <- c("training_curve", "feature_import", "predictions")  # views whose body actually renders a plot
+
 
 xgboostCanvasUI <- function(id) {
   ns <- NS(id)
@@ -58,7 +60,7 @@ xgboostServer <- function(id, dataset_pool, active_dataset) {
     output$view_tools <- renderUI({
       picked <- input$view_pick
       if (!length(picked)) picked <- names(.XGB_VIEWS)[1]
-      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+      if (any(picked %in% .XGB_VIEWS_PLOT)) ea_plot_appearance()
     })
     output$view_body <- renderUI({
       ns <- session$ns

@@ -52,7 +52,8 @@ hydroCanvasUI <- function(id) {
   tagList(
     layout_columns(col_widths = c(8, 4),
       card(
-        card_header("Hydrology Map"),
+        card_header(class = "d-flex justify-content-between align-items-center", "Hydrology Map",
+          ea_plot_appearance(fields = "title")),
         plotOutput(ns("preview"), height = "480px")
       ),
       tagList(
@@ -167,7 +168,7 @@ hydroServer <- function(id, raster_pool) {
         return()
       }
       terra::plot(res$raster, col = .hydro_pal(res$op),
-                  main = res$name, mar = c(3.5, 3.5, 2, 7))
+                  main = ea_main(res$name), mar = c(3.5, 3.5, 2, 7))
     })
 
     output$stats <- renderPrint({

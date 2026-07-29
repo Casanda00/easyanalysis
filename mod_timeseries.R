@@ -61,32 +61,44 @@ timeseriesToolsUI <- function(id) {
   )
 }
 
+.TS_VIEWS <- c(raw_series = "Raw Series", acf_pacf = "ACF / PACF", decomposition = "Decomposition", arima = "ARIMA", smoothing = "Smoothing", stationarity = "Stationarity")
+.TS_VIEWS_PLOT <- c("raw_series", "acf_pacf", "decomposition", "arima", "smoothing")  # views whose body actually renders a plot
+
+
 timeseriesCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Raw Series",    plotOutput(ns("raw_plot"),    height = "420px")),
-    nav_panel("ACF / PACF",   plotOutput(ns("acf_plot"),    height = "420px")),
-    nav_panel("Decomposition", plotOutput(ns("decomp_plot"), height = "500px")),
-    nav_panel("ARIMA",
-      layout_columns(col_widths = c(8, 4),
-        plotOutput(ns("arima_plot"), height = "420px"),
-        card(card_header("Model Info"), verbatimTextOutput(ns("arima_info")))
-      )
-    ),
-    nav_panel("Smoothing",
-      layout_columns(col_widths = c(8, 4),
-        plotOutput(ns("hw_plot"), height = "420px"),
-        card(card_header("Smoothing Info"), verbatimTextOutput(ns("hw_info")))
-      )
-    ),
-    nav_panel("Stationarity",
-      card(verbatimTextOutput(ns("stationarity_out")))
-    )
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .TS_VIEWS)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
 timeseriesServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.TS_VIEWS)[1]
+      if (any(picked %in% .TS_VIEWS_PLOT)) ea_plot_appearance()
+    })
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .TS_VIEWS, function(k, solo) switch(k,
+        raw_series = tagList(plotOutput(ns("raw_plot"),    height = if (solo) "420px" else "100%")),
+        acf_pacf = tagList(plotOutput(ns("acf_plot"),    height = if (solo) "420px" else "100%")),
+        decomposition = tagList(plotOutput(ns("decomp_plot"), height = if (solo) "500px" else "100%")),
+        arima = tagList(layout_columns(col_widths = c(8, 4),
+        plotOutput(ns("arima_plot"), height = if (solo) "420px" else "100%"),
+        card(card_header("Model Info"), verbatimTextOutput(ns("arima_info")))
+      )),
+        smoothing = tagList(layout_columns(col_widths = c(8, 4),
+        plotOutput(ns("hw_plot"), height = if (solo) "420px" else "100%"),
+        card(card_header("Smoothing Info"), verbatimTextOutput(ns("hw_info")))
+      )),
+        stationarity = tagList(card(verbatimTextOutput(ns("stationarity_out")))),
+        NULL))
+    })
+
     ns <- session$ns
 
     active_data <- reactive({

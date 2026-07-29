@@ -74,7 +74,8 @@ testsCanvasUI <- function(id) {
           uiOutput(ns("interp_ui"))
         ),
         card(
-          card_header("Plot"),
+          card_header("Plot",
+      ea_plot_appearance()),
           plotOutput(ns("test_plot"), height = "280px")
         )
       )

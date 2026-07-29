@@ -40,6 +40,8 @@ dtreeToolsUI <- function(id) {
 
 .DTREE_VIEWS <- c(tree = "Tree diagram", cp = "CP / pruning",
                   imp = "Variable importance", perf = "Performance")
+.DTREE_VIEWS_PLOT <- c("tree", "cp", "imp", "perf")  # views whose body actually renders a plot
+
 
 dtreeCanvasUI <- function(id) {
   ns <- NS(id)
@@ -55,7 +57,7 @@ dtreeServer <- function(id, dataset_pool, active_dataset) {
     output$view_tools <- renderUI({
       picked <- input$view_pick
       if (!length(picked)) picked <- names(.DTREE_VIEWS)[1]
-      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+      if (any(picked %in% .DTREE_VIEWS_PLOT)) ea_plot_appearance()
     })
     output$view_body <- renderUI({
       ns <- session$ns

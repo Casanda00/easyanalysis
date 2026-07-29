@@ -68,7 +68,8 @@ lidarPointcloudCanvasUI <- function(id) {
     # Headless static render: works on shinyapps.io (no WebGL screenshot needed),
     # is downloadable, and is the image the AI Co-Pilot can actually see.
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Static 3D Snapshot (download / AI view)"),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Static 3D Snapshot (download / AI view)",
+                  ea_plot_appearance(fields = c("title", "xlab", "ylab"))),
       div(class = "d-flex align-items-center gap-2 px-2",
           sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):", min = 10000, max = 5000000, value = 60000, step = 10000, width = "320px")),
       plotOutput(ns("static_3d"), height = "430px")
@@ -76,7 +77,8 @@ lidarPointcloudCanvasUI <- function(id) {
     layout_columns(
       col_widths = c(6, 6),
       card(card_header(class = "bg-light", "LAS Summary"), verbatimTextOutput(ns("las_summary"))),
-      card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Elevation & Intensity Distributions"),
+      card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Elevation & Intensity Distributions",
+                       ea_plot_appearance(fields = "title")),   # multi-panel: overall title only
            plotOutput(ns("las_hists")))
     )
   )
@@ -95,7 +97,8 @@ lidar3DOnlyUI <- function(id) {
     ),
     card(
       card_header(class = "d-flex justify-content-between align-items-center",
-                  "Static snapshot (download / AI view)"),
+                  "Static snapshot (download / AI view)",
+                  ea_plot_appearance(fields = c("title", "xlab", "ylab"))),
       div(class = "d-flex align-items-center gap-2 px-2",
           sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):",
                       min = 10000, max = 5000000, value = 60000, step = 10000,
@@ -125,7 +128,8 @@ lidarChmToolsUI <- function(id) {
 lidarChmCanvasUI <- function(id) {
   ns <- NS(id)
   div(
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "2D CHM & Detected Trees"),
+    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "2D CHM & Detected Trees",
+                     ea_plot_appearance(fields = "title")),   # raster map: palette and axes are fixed
          plotOutput(ns("chm_plot"), height = "500px")),
     card(card_header(class = "bg-light", "ITD Output Table"), DT::dataTableOutput(ns("itd_table")))
   )
@@ -149,7 +153,8 @@ lidarMetricsCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(card_header(class = "bg-light", "Extracted Plot Predictors"), DT::dataTableOutput(ns("metrics_table"))),
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation (RMSE, Bias)"),
+    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation (RMSE, Bias)",
+                     ea_plot_appearance()),
          verbatimTextOutput(ns("eval_metrics_out")), plotOutput(ns("eval_plot")))
   )
 }
@@ -492,7 +497,8 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       bins <- if (diff(zr) > 0) cut(z, breaks = 50, labels = FALSE) else rep(1L, length(z))
       cols <- grDevices::terrain.colors(50)[bins]
       scatterplot3d::scatterplot3d(d$X[idx], d$Y[idx], z, color = cols, pch = 20, cex.symbols = 0.3,
-        xlab = "X", ylab = "Y", zlab = "Z (height)", main = paste0("Point cloud (", length(idx), " pts, decimated)"))
+        xlab = ea_xlab("X"), ylab = ea_ylab("Y"), zlab = "Z (height)",
+        main = ea_main(paste0("Point cloud (", length(idx), " pts, decimated)")))
     }
     output$static_3d <- renderPlot({ static3d_fn() })
     
@@ -511,7 +517,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
 
     chm_fn <- function() {
       req(rv_lidar$chm)
-      terra::plot(rv_lidar$chm, main = "Canopy Height Model (CHM)")
+      terra::plot(rv_lidar$chm, main = ea_main("Canopy Height Model (CHM)"))
       if (!is.null(rv_lidar$plot_shp)) plot(sf::st_geometry(rv_lidar$plot_shp), add = TRUE, border = "white", lwd = 2)
       if (!is.null(rv_lidar$tops)) plot(sf::st_geometry(rv_lidar$tops), add = TRUE, col = "red", pch = 16, cex = 0.5)
     }
@@ -562,7 +568,10 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
     eval_plot_fn <- function() {
       e <- eval_data()
       if (is.null(e) || is.null(e$obs) || is.null(e$pred)) { show_placeholder("Run 'Calculate Error Metrics'."); return() }
-      plot(e$pred, e$obs, xlab = paste("Predicted (", e$pred_name, ")"), ylab = paste("Observed (", e$target, ")"), main = "Prediction Accuracy", pch = 16, col = "blue")
+      plot(e$pred, e$obs,
+           xlab = ea_xlab(paste("Predicted (", e$pred_name, ")")),
+           ylab = ea_ylab(paste("Observed (", e$target, ")")),
+           main = ea_main("Prediction Accuracy"), pch = 16, col = ea_col("blue"))
       abline(0, 1, col = "red", lwd = 2)
     }
     output$eval_plot <- renderPlot({ eval_plot_fn() })

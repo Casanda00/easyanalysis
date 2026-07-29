@@ -46,7 +46,8 @@ clusteringCanvasUI <- function(id) {
   ns <- NS(id)
   div(
     card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Visual Diagnostics"),
+      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Visual Diagnostics",
+      ea_plot_appearance()),
       div(style = "padding: 10px;", uiOutput(ns("explanation"))),
       div(style = "height: 500px; padding: 10px;", plotOutput(ns("main_plot"), height = "480px"))
     ),

@@ -28,7 +28,8 @@ rfCanvasUI <- function(id) {
     card(
       card_header(class = "d-flex justify-content-between align-items-center bg-light", "Variable Importance",
                   div(class = "d-flex gap-2",
-                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary"))),
+                    downloadButton(ns("dl_importance"), "CSV", class = "btn-sm btn-outline-secondary")),
+      ea_plot_appearance()),
       div(style = "padding: 5px;", plotOutput(ns("varimp"), height = "460px"))
     ),
     layout_columns(

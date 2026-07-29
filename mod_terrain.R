@@ -55,7 +55,8 @@ terrainCanvasUI <- function(id) {
   tagList(
     layout_columns(col_widths = c(8, 4),
       card(
-        card_header("Terrain Map"),
+        card_header(class = "d-flex justify-content-between align-items-center", "Terrain Map",
+          ea_plot_appearance(fields = "title")),
         div(style = "padding:4px;",
           plotOutput(ns("preview"), height = "480px"))
       ),
