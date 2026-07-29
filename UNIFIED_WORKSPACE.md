@@ -484,3 +484,36 @@ customised gives the supplied title, both labels and `#B4531F`.
 **Scope note:** this currently covers the workspace chart builder only. Applying it to
 every analysis and model screen needs a shared mechanism rather than 35 copies — see the
 open item in the response accompanying this change.
+
+### Plot appearance, app-wide (2026-07-29)
+
+Users can set a plot's **title, X label, Y label and colour**, and it had to work on
+every analysis and model screen rather than be re-implemented ~35 times.
+
+**The seam is `print.ggplot`.** Shiny's `renderPlot` prints the ggplot object, and S3
+dispatch finds the `print.ggplot` defined in `helpers.R` (global env) before ggplot2's —
+so every ggplot in the app passes through `ea_style_gg()` with no module changes at all.
+The read happens inside `renderPlot`'s reactive context, so changing an option
+re-renders the affected plot on its own. It must call
+`getFromNamespace("print.ggplot", "ggplot2")` explicitly or it recurses.
+
+Settings are stored **per screen** (`plot_opts` in server.R, keyed by the workspace's
+current tool), so configuring the LM screen does not restyle Random Forest. Only what
+the user actually set is overridden; an untouched plot keeps exactly the labels its
+module chose. Colour is applied only to layers carrying a FIXED colour/fill — layers
+mapped to a variable are left alone, because overriding those would destroy the encoding.
+
+The controls are one block (`.plot_opts_ui()`) used twice: inline in the Data view's
+chart bar, and stacked in the tool panel for every non-map tool.
+
+Verified: nothing set -> module's own labels and colour survive; set on screen `lm` ->
+title/x/y/colour all applied; screen `rf` unaffected; `print.ggplot` resolves to
+`R_GlobalEnv`; and with no store installed at all, ggplot and base plots both render
+normally and `ea_opt()` returns its default.
+
+**Base-R plots are NOT covered by the seam** — they bake `main`/`xlab`/`ylab` in at draw
+time. `ea_opt("title", default)` exists for those modules to call when building their
+arguments. Deliberately not applied wholesale: most base plots here are **multi-panel
+diagnostic grids** (`plot_lm_diagnostics` and friends), where one shared title and axis
+pair across every panel would be actively wrong — each panel means something different.
+Single-panel base plots are the sensible candidates; that pass is still open.

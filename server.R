@@ -531,6 +531,18 @@ server <- function(input, output, session) {
   # ======================================================================
   current_project  <- reactiveVal(NULL)   # project id, or NULL on the Projects screen
   layer_style      <- reactiveVal(list())  # per-layer render settings, persisted
+
+  # Plot appearance (title / axis labels / colour), per screen. Installed into
+  # the helper env so print.ggplot and ea_opt() can reach it from any module
+  # without every module having to accept it as an argument. Reads happen inside
+  # renderPlot, so a change here re-renders the affected plot by itself.
+  plot_opts <- reactiveValues()
+  .EA_PLOTOPTS$rv  <- plot_opts
+  .EA_PLOTOPTS$ctx <- reactive({
+    v <- input$current_view %||% "global"
+    t <- tryCatch(workspace_ctx$plot_ctx(), error = function(e) NULL)
+    if (!is.null(t) && nzchar(t)) t else v
+  })
   project_refresh  <- reactiveVal(0)      # bumped when the on-disk list changes
   restoring        <- reactiveVal(FALSE)  # guards autosave while we load
 

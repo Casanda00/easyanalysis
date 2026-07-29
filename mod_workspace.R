@@ -605,6 +605,43 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       DT::datatable(ip, options = list(pageLength = 12, scrollX = TRUE), rownames = FALSE)
     }, server = TRUE)
 
+    # Title / axis labels / colour. These write to the SHARED store in server.R
+    # (plot_opts), so they drive every screen's plot through print.ggplot and
+    # ea_opt() rather than being wired per module.
+    .pkey <- function() { t <- current_tool(); if (is.null(t)) "workspace" else t }
+    .popt <- function(nm, dflt = "") {
+      o <- plot_opts[[.pkey()]]
+      v <- if (is.list(o)) o[[nm]] else NULL
+      if (is.null(v)) dflt else v
+    }
+    .set_popt <- function(nm, val) {
+      k <- .pkey(); o <- plot_opts[[k]]; if (!is.list(o)) o <- list()
+      o[[nm]] <- val; plot_opts[[k]] <- o
+    }
+    observeEvent(input$po_title,  .set_popt("title",  input$po_title),  ignoreInit = TRUE)
+    observeEvent(input$po_xlab,   .set_popt("xlab",   input$po_xlab),   ignoreInit = TRUE)
+    observeEvent(input$po_ylab,   .set_popt("ylab",   input$po_ylab),   ignoreInit = TRUE)
+    observeEvent(input$po_colour, .set_popt("colour", input$po_colour), ignoreInit = TRUE)
+    .plot_opts_ui <- function(inline = FALSE) {
+      cls <- if (inline) "ea-wsx-popts inline" else "ea-wsx-popts"
+      div(class = cls,
+        if (!inline) div(class = "ea-wsx-lgh", "Plot appearance"),
+        tags$label("Title"),
+        textInput(ns("po_title"), NULL, value = .popt("title"),
+                  placeholder = "auto", width = if (inline) "150px" else "100%"),
+        tags$label("X"),
+        textInput(ns("po_xlab"), NULL, value = .popt("xlab"),
+                  placeholder = "auto", width = if (inline) "110px" else "100%"),
+        tags$label("Y"),
+        textInput(ns("po_ylab"), NULL, value = .popt("ylab"),
+                  placeholder = "auto", width = if (inline) "110px" else "100%"),
+        tags$label("Colour"),
+        tags$input(type = "color", id = ns("po_colour"), class = "ea-wsx-colpick",
+                   value = .popt("colour", "#2E7D32"),
+                   onchange = sprintf(
+                     "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("po_colour"))))
+    }
+
     # Panels here are renderUI-built, so ANY dependency change (render mode, a
     # new layer, a different table) rebuilds them from scratch and the user's
     # picks would silently snap back to the defaults. Carry them over instead:
@@ -638,21 +675,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                       selected = .keep_sel("cy", cols,
                                            if (length(cols) > 1) cols[2] else cols[1]),
                       width = "140px"),
-          # Labels and colour. Blank = use the column name / default green.
-          tags$label("Title"),
-          textInput(ns("ctitle"), NULL, value = .keep_txt("ctitle"),
-                    placeholder = "Plot title", width = "150px"),
-          tags$label("X label"),
-          textInput(ns("clabx"), NULL, value = .keep_txt("clabx"),
-                    placeholder = "auto", width = "110px"),
-          tags$label("Y label"),
-          textInput(ns("claby"), NULL, value = .keep_txt("claby"),
-                    placeholder = "auto", width = "110px"),
-          tags$label("Colour"),
-          tags$input(type = "color", id = ns("ccol"), class = "ea-wsx-colpick",
-                     value = isolate(input$ccol) %||% "#2E7D32",
-                     onchange = sprintf(
-                       "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("ccol"))),
+          .plot_opts_ui(inline = TRUE),
           # static (ggplot) <-> interactive (plotly: hover, zoom, pan, select)
           div(class = "ea-wsx-cmode",
             tags$button(class = paste("ea-wsx-cmb", if (!identical(input$cmode %||% "static", "interactive")) "on" else ""),
@@ -1287,31 +1310,27 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       req(isTruthy(x))
       num <- function(c) suppressWarnings(as.numeric(df[[c]]))
       g <- ggplot2::ggplot(df)
-      # User-set colour and labels. Empty means "use the sensible default", so
-      # clearing a box restores the column name rather than blanking the axis.
-      fg  <- if (isTruthy(input$ccol)) input$ccol else "#2E7D32"
-      sky <- fg
-      .lab <- function(user, dflt) if (isTruthy(user)) user else dflt
+      # No label/colour wiring here on purpose: ea_style_gg() applies the
+      # shared plot options to every ggplot in the app at print time.
+      fg <- "#2E7D32"; sky <- "#3E7CB1"
       p <- switch(geom,
         histogram = g + ggplot2::aes(x = num(x)) +
                     ggplot2::geom_histogram(fill = sky, colour = "white", bins = 20) +
-                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, "count")),
+                    ggplot2::labs(x = x, y = "count"),
         boxplot   = { req(isTruthy(y)); g + ggplot2::aes(y = num(y)) +
                     ggplot2::geom_boxplot(fill = fg, alpha = .7) +
-                    ggplot2::labs(y = .lab(input$claby, y)) },
+                    ggplot2::labs(y = y) },
         bars      = g + ggplot2::aes(x = factor(df[[x]])) +
                     ggplot2::geom_bar(fill = fg) +
-                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, "count")) +
+                    ggplot2::labs(x = x, y = "count") +
                     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)),
         line      = { req(isTruthy(y)); g + ggplot2::aes(x = num(x), y = num(y)) +
                     ggplot2::geom_line(colour = fg, linewidth = .9) +
-                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, y)) },
+                    ggplot2::labs(x = x, y = y) },
         { req(isTruthy(y)); g + ggplot2::aes(x = num(x), y = num(y)) +
                     ggplot2::geom_point(colour = fg, size = 2.2, alpha = .85) +
-                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, y)) })
-      if (isTruthy(input$ctitle)) p <- p + ggplot2::labs(title = input$ctitle)
-      p + ggplot2::theme_minimal(base_size = 12) +
-        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 13))
+                    ggplot2::labs(x = x, y = y) })
+      p + ggplot2::theme_minimal(base_size = 12)
     })
 
     output$chart_i <- plotly::renderPlotly({
@@ -1502,7 +1521,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         if (isTRUE(mi$map_based))
           div(class = "ea-wsx-mapnote2", icon("map-location-dot"),
               " Results are drawn on the workspace map and added to the Layers panel."),
-        mi$tools(mi$id)))            # real migrated module's own settings panel
+        mi$tools(mi$id),
+        # Every screen gets the same appearance controls, kept per screen.
+        if (!isTRUE(mi$map_based)) .plot_opts_ui()))            # real migrated module's own settings panel
       spec <- TOOLS[[t]]; cols <- .cols()
       head <- div(class = "ea-wsx-toolhead",
         span(class = "ea-wsx-sw", style = "background:var(--forest);"),
@@ -1676,6 +1697,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       gc(FALSE)
     })
 
-    list(context = reactive("Unified workspace (beta scaffold)."))
+    list(context  = reactive("Unified workspace (beta scaffold)."),
+         plot_ctx = reactive({ t <- current_tool(); if (is.null(t)) "workspace" else t }))
   })
 }

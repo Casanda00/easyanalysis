@@ -460,3 +460,73 @@ plot_lm_diagnostics <- function(model, dataset, y_var, view_mode, target) {
 # removed 2026-07-27. They were abandoned in favour of the browser file
 # picker + downloadHandler, were referenced nowhere, and shelling out to
 # PowerShell was an unnecessary code-execution surface.
+
+# ==========================================================================
+# PLOT APPEARANCE — one mechanism for every screen
+# --------------------------------------------------------------------------
+# Users can name a plot's title, its axis labels and its colour, and that has
+# to work on EVERY analysis and model screen — not be re-implemented ~35 times.
+#
+# The seam is `print.ggplot`. Shiny's renderPlot prints the ggplot object, and
+# S3 dispatch finds a print.ggplot defined here (global env) before ggplot2's,
+# so every ggplot in the app passes through ea_style_gg() without the modules
+# knowing. The read happens inside renderPlot's reactive context, so changing
+# an option re-renders the plot on its own.
+#
+# Base-R plots (plot/hist/barplot/...) cannot be restyled after the fact — they
+# bake main/xlab/ylab in at draw time. Those modules call ea_opt() when building
+# their arguments instead; see ea_opt() below.
+# ==========================================================================
+
+.EA_PLOTOPTS <- new.env(parent = emptyenv())
+.EA_PLOTOPTS$rv  <- NULL      # reactiveValues, installed by server.R
+.EA_PLOTOPTS$ctx <- NULL      # reactive returning the current screen's key
+
+# Which screen's settings are in play. Falls back to a shared "global" bucket
+# so a plot rendered outside the workspace still picks options up.
+ea_plot_ctx <- function() {
+  f <- .EA_PLOTOPTS$ctx
+  k <- tryCatch(if (is.function(f)) f() else NULL, error = function(e) NULL)
+  if (is.null(k) || !nzchar(k)) "global" else k
+}
+
+# One option for the current screen, or `default` when the user has not set it.
+# Base-R plot modules use this directly, e.g.
+#   plot(x, y, main = ea_opt("title", "Residuals"), xlab = ea_opt("xlab", "Fitted"))
+ea_opt <- function(name, default = NULL) {
+  rv <- .EA_PLOTOPTS$rv
+  if (is.null(rv)) return(default)
+  o <- tryCatch(rv[[ea_plot_ctx()]], error = function(e) NULL)
+  v <- if (is.list(o)) o[[name]] else NULL
+  if (is.null(v) || !nzchar(as.character(v))) default else v
+}
+
+# Apply the current screen's settings to a ggplot. Only overrides what the user
+# actually set, so an untouched plot keeps exactly the labels its module chose.
+ea_style_gg <- function(p) {
+  ttl <- ea_opt("title"); xl <- ea_opt("xlab"); yl <- ea_opt("ylab")
+  col <- ea_opt("colour")
+  if (!is.null(ttl)) p <- p + ggplot2::labs(title = ttl)
+  if (!is.null(xl))  p <- p + ggplot2::labs(x = xl)
+  if (!is.null(yl))  p <- p + ggplot2::labs(y = yl)
+  if (!is.null(col)) {
+    # Recolour the layers that carry a FIXED colour/fill. Layers mapped to a
+    # variable are left alone — overriding those would destroy the encoding.
+    p$layers <- lapply(p$layers, function(L) {
+      ap <- L$aes_params
+      if (!is.null(ap$colour)) L$aes_params$colour <- col
+      if (!is.null(ap$color))  L$aes_params$color  <- col
+      if (!is.null(ap$fill))   L$aes_params$fill   <- col
+      L
+    })
+  }
+  if (!is.null(ttl))
+    p <- p + ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+  p
+}
+
+# THE seam. Must call ggplot2's own method explicitly or this recurses.
+print.ggplot <- function(x, ...) {
+  x <- tryCatch(ea_style_gg(x), error = function(e) x)
+  getFromNamespace("print.ggplot", "ggplot2")(x, ...)
+}

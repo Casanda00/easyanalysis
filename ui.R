@@ -540,6 +540,14 @@ page_fillable(
     .ea-wsx-tab { font: 600 12.5px var(--ui); border: none; background: transparent; color: var(--bark);
                   padding: 6px 15px; cursor: pointer; }
     .ea-wsx-tab.on { background: var(--forest); color: var(--onbrand); }
+    /* Plot appearance controls: a stacked block in the tool panel, a compact
+       inline strip in the chart bar. */
+    .ea-wsx-popts { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+    .ea-wsx-popts label { display: block; font: 600 8.5px var(--mono); color: var(--bark);
+                  text-transform: uppercase; letter-spacing: .08em; margin: 6px 0 2px; }
+    .ea-wsx-popts .shiny-input-container { margin-bottom: 0; width: 100% !important; }
+    .ea-wsx-popts.inline { display: contents; }
+    .ea-wsx-popts.inline label { display: inline-block; margin: 0 0 0 4px; }
     .ea-wsx-colpick { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line);
                   border-radius: 6px; background: var(--panel); cursor: pointer; }
     .ea-wsx-chartbar .shiny-input-container { margin-bottom: 0; }
