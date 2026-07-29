@@ -358,14 +358,37 @@ body text, or both? Worth a side-by-side before changing tokens that affect ever
 ### B4. Dataset information missing from the options
 > "in the data & exploration the dataset information is not being seen in the options"
 
-### B5. Tabs do nothing — everything lands on Dataset Overview  **LIKELY REGRESSION**
+### B5. Tabs do nothing — everything lands on Dataset Overview — FIXED 2026-07-29
 > "the tabs in the data & exploration does not working. everything has been placed on
 > dataset overview. column distributions and plot reslationships shows nothing."
 
-Same shape as round-1 item 11 (tabs that looked broken). Check first whether this is the
-lazy-render/repopulate problem again, or something the select-and-split rollout disturbed.
-`mod_data.R` was NOT converted, so it should be untouched — which makes this worth
-diagnosing rather than assuming.
+Two independent bugs that happened to land on the same screen. It was worth diagnosing
+rather than assuming: neither cause was the select-and-split rollout.
+
+**1. Every tab rendered at once (`ui.R`).** The workspace fill rule listed
+`.html-fill-container` as one of its selectors — and every `tab-pane` carries that class.
+It is more specific than Bootstrap's `.tab-content > .tab-pane { display: none }`, so
+inactive panes were `display: flex` too. All three tabs were on screen, stacked, and
+clicking one did nothing visible because its pane was already showing. Fixed with
+`:not(.tab-pane)`; active panes were already covered by `.tab-pane.active`. See gotcha 25.
+
+**2. The pickers were empty, so the two plot tabs had nothing to draw.** This was gotcha
+18 (lazy render drops `update*Input`) reaching every screen except this one. Logging
+`inputMessages` off the websocket while re-opening a tool showed `lm-y`, `anova-y`,
+`rf-target`, `da-*`, `logistic-*`, `lme-*`, `clustering-*` and `classification-*` all
+re-arming, and **zero `data-*` messages**. Two compounding reasons: `observeEvent`
+isolates its handler, so `active_dataset()` read inside the body is not a dependency; and
+the re-arm arrives here as `rv$working_data <- <the same data frame>`, which does not
+invalidate. Fixed with a shared `pop_arm()` reactive as the event expression. See
+gotcha 26.
+
+Verified in the browser: one pane visible at a time, all four columns in every picker
+split correctly into numeric/categorical, Column Distributions renders its plot and
+summary, Plot Relationships renders the grid.
+
+**Noticed while testing, not part of B5:** at ~1265px the top bar overflows and the whole
+page scrolls sideways (`.app-topbar` / `.topbar-right` extend to 1519px). Unrelated to
+the pane CSS.
 
 ### B6. Separate the commands, but keep them synced
 > "separate the columns in data and exploration each command should now be separate but

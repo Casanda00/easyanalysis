@@ -217,7 +217,23 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
     })
 
     # ---- Toolbox picker population ----
-    observeEvent(rv$working_data, {
+    # Every observer that fills a selector must depend on THIS, not on
+    # rv$working_data alone. The workspace renders this panel lazily, so the
+    # first update*Input fires at an element that does not exist yet and Shiny
+    # drops it. Re-opening a tool re-arms that on every other screen by bumping
+    # active_dataset() (see server.R), but the re-arm never reached this module,
+    # for two compounding reasons:
+    #   * observeEvent ISOLATES its handler, so reading active_dataset() inside
+    #     a handler body creates no dependency on it; and
+    #   * the re-arm arrives here as `rv$working_data <- <the same data frame>`,
+    #     and assigning an IDENTICAL value to a reactiveValues field does not
+    #     invalidate (verified) -- so the chain died at that assignment.
+    # The screen therefore opened with every picker empty, which is also why the
+    # Column Distributions and Plot Relationships tabs showed nothing: they have
+    # no columns to plot until these run.
+    pop_arm <- reactive({ list(active_dataset(), rv$working_data) })
+
+    observeEvent(pop_arm(), {
       req(rv$working_data)
       df <- rv$working_data
       cols <- names(df)
@@ -249,7 +265,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
     })
 
     # Datasets available to join / batch against.
-    observeEvent(dataset_names(), {
+    observeEvent(list(pop_arm(), dataset_names()), {
       updateSelectInput(session, "batch_targets", choices = dataset_names())
       updateSelectInput(session, "join_target", choices = dataset_names())
     })
@@ -670,6 +686,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     # ---- Dataset Overview ----
     observe({
+      pop_arm()                       # re-arm on tool open, see above
       req(rv$working_data)
       cols <- names(rv$working_data)
       curr_view <- if (isTruthy(isolate(input$eng_view_col)) && isolate(input$eng_view_col) %in% cols) isolate(input$eng_view_col) else cols[1]
@@ -867,6 +884,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     # ---- Exploratory plots (EDA) ----
     observe({
+      pop_arm()                       # re-arm on tool open, see above
       df <- rv$working_data
       req(df)
       num_cols <- names(df)[sapply(df, is.numeric)]

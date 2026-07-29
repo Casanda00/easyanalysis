@@ -561,10 +561,16 @@ page_fillable(
     .app-main.view-workspace { min-height: 0; }
     .app-main.view-workspace .app-center {
       display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
+    /* :not(.tab-pane) matters. Every tab-pane also carries .html-fill-container,
+       so without it this rule set display:flex on INACTIVE panes too — it is more
+       specific than Bootstrap's .tab-content > .tab-pane { display: none }, which
+       stopped hiding them. Every tab of a screen rendered at once, stacked, and
+       clicking a tab looked like it did nothing because the pane it selected was
+       already on screen. Active panes are covered by .tab-pane.active above. */
     .app-main.view-workspace .app-center .tabbable,
     .app-main.view-workspace .app-center .tab-content,
     .app-main.view-workspace .app-center .tab-pane.active,
-    .app-main.view-workspace .app-center .html-fill-container {
+    .app-main.view-workspace .app-center .html-fill-container:not(.tab-pane) {
       flex: 1 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; }
     .ea-wsx { display: flex; flex-direction: column; flex: 1 1 auto;
               width: 100%; height: 100%; min-height: 0; }

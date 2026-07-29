@@ -183,6 +183,25 @@ browser (or the whole app) and coming back resumes where the user stopped.
     fire, so leaflet tiles all read `opacity: 0` (basemap included) and `openSettings()`
     never opens. Check `_tiles` and canvas pixel data instead, and force a reflow before
     reading computed styles after `eaSetTheme()`.
+25. **Never style `.html-fill-container` on its own inside the workspace.** EVERY
+    `tab-pane` carries that class, so a rule like
+    `.app-main.view-workspace .app-center .html-fill-container { display: flex }` beats
+    Bootstrap's `.tab-content > .tab-pane { display: none }` and shows INACTIVE panes
+    too. Symptom: a screen's tabs all render at once, stacked, and clicking a tab looks
+    dead because the pane it selects is already on screen — this is what made Data &
+    Exploration look like "everything landed on Dataset Overview". Use
+    `.html-fill-container:not(.tab-pane)` and let `.tab-pane.active` handle panes.
+26. **The `ds_refresh` re-arm (gotcha 18) dies at a `reactiveValues` hop.** Two facts
+    compound: `observeEvent` **isolates its handler**, so calling `active_dataset()`
+    inside the body creates no dependency — only the eventExpr does; and assigning an
+    **identical** value to a `reactiveValues` field does not invalidate (verified — it is
+    not just `reactiveVal`, gotcha 19). So a module that keeps its own
+    `rv$working_data <- dataset_pool[[active_dataset()]]` copy and populates selectors off
+    `rv$working_data` never re-arms: the bump reassigns the same data frame and stops
+    dead. `mod_data.R` opened with every picker empty for exactly this reason. Fix is
+    `pop_arm <- reactive({ list(active_dataset(), rv$working_data) })` as the eventExpr.
+    Diagnose it by logging `inputMessages` off the websocket — the other modules' updates
+    show up on tool open and the broken one's are simply absent.
 14. **`reactiveValues[[k]] <- NULL` does NOT delete the key.** The name stays in `names()` with a NULL
     value, so anything counting/looping over pool names must filter NULLs (`.pool_names()` in server.R).
     This is the root cause of the older `ds_refresh` workaround too.
