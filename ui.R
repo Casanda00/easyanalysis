@@ -250,6 +250,17 @@ page_fillable(
     .nav-tabs { --bs-nav-tabs-link-active-bg: var(--panel);
              --bs-nav-tabs-link-active-color: var(--ink);
              --bs-nav-tabs-border-color: var(--line); }
+    /* Bootstrap UTILITY colour classes. ~51 card headers across the modules use
+       .bg-light, which bslib compiles from the DEFAULT (dark) palette — so it is
+       a near-black that never follows the theme. That is the black bar reported
+       in the 3D view, and the same bar on every other screen. Fixing it here covers
+       every module at once, including ones not yet looked at. */
+    .bg-light, .card-header.bg-light { background-color: var(--sunk) !important;
+                  color: var(--ink) !important; }
+    .bg-white { background-color: var(--panel) !important; color: var(--ink) !important; }
+    .bg-dark  { background-color: var(--sunk)  !important; color: var(--ink) !important; }
+    .bg-body, .bg-body-tertiary, .bg-body-secondary {
+                  background-color: var(--panel) !important; color: var(--ink) !important; }
     /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
     .form-control, .form-select, textarea.form-control,
     .selectize-input, .selectize-dropdown {

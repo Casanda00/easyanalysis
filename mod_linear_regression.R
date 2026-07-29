@@ -7,8 +7,14 @@
 # ---- File-scope helpers ---------------------------------------------------
 
 .as_row <- function(label, status, value, note = NULL) {
-  col <- c(pass = "#2e7d32", warn = "#f57c00", fail = "#c62828", info = "#1565c0")
-  bg  <- c(pass = "#f1f8e9", warn = "#fff3e0", fail = "#ffebee", info = "#e3f2fd")
+  # Semantic colours from the theme, and the row background as a TRANSLUCENT
+  # tint of the same colour. The old fixed pastels (#f1f8e9 and friends) with
+  # grey text were unreadable on the dark sets — a tint works on every set
+  # because it takes its lightness from whatever is behind it.
+  col <- c(pass = "var(--forest)", warn = "var(--warn)",
+           fail = "var(--danger)", info = "var(--canopy)")
+  bg  <- vapply(col, function(c) paste0("color-mix(in srgb, ", c, " 14%, transparent)"),
+                character(1))
   # icons, not emoji (app rule: no picture characters anywhere in the UI)
   sym <- list(pass = icon("circle-check"), warn = icon("triangle-exclamation"),
               fail = icon("circle-xmark"),  info = icon("circle-info"))
@@ -21,9 +27,9 @@
               sym[[status]]),
     tags$div(
       tags$div(style = "font-size:13px;font-weight:600;", label),
-      tags$div(style = "font-size:12px;color:#555;", value),
+      tags$div(style = "font-size:12px;color:var(--ink);", value),
       if (!is.null(note))
-        tags$div(style = "font-size:11px;color:#888;margin-top:2px;", note)
+        tags$div(style = "font-size:11px;color:var(--bark);margin-top:2px;", note)
     )
   )
 }
@@ -201,7 +207,7 @@ lmToolsUI <- function(id) {
   ns <- NS(id)
   tagList(
     tags$p(
-      style = "font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#2e7d32;font-weight:700;margin:0 0 4px;",
+      style = "font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--forest);font-weight:700;margin:0 0 4px;",
       "Regression Type"
     ),
     radioButtons(ns("reg_type"), NULL,
@@ -244,7 +250,7 @@ lmToolsUI <- function(id) {
       textAreaInput(ns("formula_text"), NULL, value = "", rows = 3,
         placeholder = "e.g., x1 + log(x2) + x1:x2", width = "100%"),
       div(
-        style = "background:#f8f9fa;padding:8px;border-radius:4px;border:1px solid #dee2e6;",
+        style = "background:var(--sunk);color:var(--ink);padding:8px;border-radius:4px;border:1px solid var(--line);",
         tags$small(class = "text-muted", "Quick Builder"),
         selectInput(ns("build_var"),   NULL, choices = NULL, width = "100%"),
         selectInput(ns("build_trans"), NULL, width = "100%",
@@ -305,7 +311,7 @@ lmCanvasUI <- function(id) {
             "Model Summary",
             downloadButton(ns("dl_coefs"), "CSV", class = "btn-sm btn-outline-secondary")),
           div(class = "formula-box",
-            style = "padding:8px 10px;background:#e9ecef;border-bottom:1px solid #dee2e6;font-size:12px;",
+            style = "padding:8px 10px;background:var(--sunk);color:var(--ink);border-bottom:1px solid var(--line);font-size:12px;",
             textOutput(ns("formula_display"))),
           div(style = "overflow-y:auto;max-height:340px;padding:5px;",
             verbatimTextOutput(ns("summary")))

@@ -72,12 +72,19 @@ Verified: 114 menu items indexed; "regression" returns Linear regression and Log
 regression, "raster" and "lidar" return their screens, nonsense returns "No tools match";
 clicking a hit opens the tool, closes the results, clears the box and closes the menus.
 
-## 3. Black bar in the 3D view
+## 3. Black bar in the 3D view — FIXED 2026-07-29
 
 > "in the 3d view, there is a black color there in the bar. it does not match the theme."
 
-Another hardcoded colour that survives the theme, same class as the R console's old
-`#0f1a12`. Find it in the LiDAR 3D UI and move it to tokens. **Bug.**
+**Not a hardcoded hex — it was `card_header(class = "bg-light")`.** Bootstrap's `.bg-light`
+is compiled by bslib from the DEFAULT (dark) palette, so it is a near-black that never
+follows the theme. **51 card headers across the modules use it**, so this was the same bar
+on many screens, not just the 3D one.
+
+Fixed once in CSS rather than 51 times in R: `.bg-light`, `.bg-white`, `.bg-dark` and the
+`.bg-body*` family now take the tokens. Every module inherits it, including ones not yet
+looked at. Verified on the LiDAR screen: 5 bars, 0 mismatched — light theme
+`rgb(238,241,234)`, forest `rgb(19,24,19)`.
 
 ## 4. 3D view should be 3D only, and the toggle should be obvious
 
@@ -135,13 +142,17 @@ Attributes that were never uploaded cannot be recovered — the file has to be a
 with its parts. Verified: the shapefile now explains itself ("33 features but no attribute
 columns…"), and a proper vector still shows its real table (6 rows, plot_id/species/stems).
 
-## 8. Linear regression colours, including black
+## 8. Linear regression colours, including black — FIXED 2026-07-29
 
 > "the color viz on linear regression isnt good. some hardcoded ones are in there. the
 > black too"
 
-Hardcoded colours in `mod_linear_regression.R` that ignore the theme. Related to items 3
-and 10 — same root cause, different screens. **Bug.**
+Inline hex throughout `mod_linear_regression.R`: grey body text (`#555`, `#888`), fixed
+light panels (`#f8f9fa`, `#e9ecef`) and a hardcoded brand green. All now tokens.
+
+The two remaining hex values are `abline(col = "#2e7d32")` inside base plots, left alone
+deliberately: base graphics render on their own white device regardless of the app theme,
+so a themed colour there would be wrong, not right.
 
 ## 9. Adjustable sidebar
 
@@ -150,14 +161,22 @@ and 10 — same root cause, different screens. **Bug.**
 Draggable width for the workspace side panels. The app already has drag-to-resize for the
 console dock, the attribute dock and the data-view split, so reuse that pattern.
 
-## 10. Regression output highlighting is unreadable
+## 10. Regression output highlighting is unreadable — FIXED 2026-07-29
 
 > "hightliighting the output from the regression cant really be seen due to color problems.
 > this should be the same for others, i guess."
 
-Highlighted/selected output has poor contrast. The reporter expects this to affect **other
-screens too** — so treat it as a sweep, not a one-screen fix, like the earlier text and
-surface passes. **Bug.**
+This is the assumption-check rows in `.as_row()`: fixed pastel backgrounds
+(`#f1f8e9`, `#fff3e0`, …) with grey text, which is legible on a white page and unreadable
+on every dark set.
+
+The backgrounds are now a **translucent tint of the semantic colour**
+(`color-mix(in srgb, var(--forest) 14%, transparent)`) rather than a fixed pastel, so the
+row takes its lightness from whatever is behind it and works on every set. Status colours
+map to `--forest` / `--warn` / `--danger` / `--canopy`.
+
+Verified across light, forest and midnight: body text luminance flips 0.08 -> 0.92 -> 0.93
+against page 0.97 -> 0.07 -> 0.00, and the tint itself shifts with the theme's green.
 
 ## 11. Results / Diagnostics / Assumptions tabs that may do nothing
 
