@@ -12,7 +12,7 @@ no-toolchain install.)
 
 ---
 
-## 1. Project loading shows no progress, and reloads work already done
+## 1. Project loading shows no progress, and reloads work already done — FIXED 2026-07-29
 
 > "when a project has many files and we click to open, it loads in the terminal but we
 > dont see any progress of that in the app - can we make that possible with real info and
@@ -29,11 +29,28 @@ no-toolchain install.)
 - **Files reload every time; suspected purge.** Opening a project re-reads sources that
   were already read. Wants a cache so re-opening is fast.
 
-**To check first:** whether the pools are genuinely cleared on every open (`.clear_pools()`
-in `open_project`) and whether a re-read is actually necessary, or whether a session-level
-cache keyed by path+mtime would be sound. Caching spatial objects has a memory cost — the
-LAS OOM history (CLAUDE.md, `.read_las_capped`) is the cautionary tale, so a cache needs a
-bound and probably a size check.
+**Confirmed:** `open_project` does clear the pools and re-read every file, so "being
+purged" was exactly right. The cost is almost entirely the point cloud — a 500k-point read
+out of an 18.7M-point file.
+
+**Progress.** A `shiny::Progress` now reports the real thing: the counter advances only
+once a layer has finished, and each step names the file and what it is
+("Loading 2 of 4 — kiihtelys.laz (point cloud)"), plus "cached" when it was not re-read.
+No timer, nothing that fills on a guess. Verified in the browser on a cold open.
+
+**Cache.** Keyed by **path + mtime + size**, so an edited file is re-read rather than
+served stale. Measured: LAS **19.56 s -> 0.02 s**, vector 0.05 s -> 0.00 s. On the second
+open the steps go by too fast to catch.
+
+**Rasters are deliberately NOT cached** — `terra::rast()` only opens a handle, so there is
+nothing to save and caching would pin memory for no gain.
+
+**Bounded at 4 entries**, and cleared when the session ends. This is the one place the
+memory lesson had to be respected: an unbounded cache of point clouds is precisely how the
+app OOM-crashed before (`.read_las_capped`, CLAUDE.md).
+
+Also fixed in passing: `return(NULL)` inside that loop returned from `open_project`
+itself, so an unrecognised layer kind silently abandoned every remaining layer.
 
 ## 2. Search bar returns nothing — FIXED 2026-07-29
 

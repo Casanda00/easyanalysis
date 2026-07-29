@@ -587,6 +587,52 @@ server <- function(input, output, session) {
     gc(FALSE)   # release the freed objects (large LAS/raster) promptly
   }
 
+  # ---- Spatial read cache ---------------------------------------------------
+  # Opening a project clears the pools and re-reads every file, so re-opening the
+  # same project paid the full cost again -- and for a point cloud that is a
+  # 500k-point read out of an 18.7M-point file, which is most of the wait.
+  #
+  # The cache is keyed by path + mtime + size, so an edited file is re-read
+  # rather than served stale. It is BOUNDED, because these objects are large and
+  # an unbounded cache of point clouds is exactly how this app ran out of memory
+  # before (see .read_las_capped and the LAS OOM note in CLAUDE.md). Rasters are
+  # not cached: terra::rast() only opens a handle, so there is nothing to save.
+  .SPATIAL_CACHE_MAX <- 4L
+  .spatial_cache <- new.env(parent = emptyenv())
+  .spatial_key <- function(kind, path) {
+    if (!nzchar(path %||% "") || !file.exists(path)) return(NA_character_)
+    fi <- file.info(path)
+    paste(kind, path, as.numeric(fi$mtime), fi$size, sep = "|")
+  }
+  .spatial_cached <- function(kind, path) {
+    if (identical(kind, "raster")) return(FALSE)
+    k <- .spatial_key(kind, path)
+    !is.na(k) && !is.null(.spatial_cache[[k]])
+  }
+  .spatial_get <- function(kind, path) {
+    read_it <- function() switch(kind,
+      raster = terra::rast(path),
+      # LAS stays capped on open: the full cloud OOM-crashed the app when a
+      # raster, a vector and a big LAS all loaded at once.
+      las    = .read_las_capped(path, cap = 500000L),
+      vector = sf::st_read(path, quiet = TRUE),
+      NULL)
+    if (identical(kind, "raster")) return(read_it())
+    k <- .spatial_key(kind, path)
+    if (is.na(k)) return(NULL)
+    hit <- .spatial_cache[[k]]
+    if (!is.null(hit)) return(hit)
+    obj <- read_it()
+    if (is.null(obj)) return(NULL)
+    if (length(ls(.spatial_cache)) >= .SPATIAL_CACHE_MAX)
+      rm(list = ls(.spatial_cache), envir = .spatial_cache)
+    assign(k, obj, envir = .spatial_cache)
+    obj
+  }
+  session$onSessionEnded(function() {
+    try(rm(list = ls(.spatial_cache), envir = .spatial_cache), silent = TRUE)
+  })
+
   open_project <- function(pid) {
     restoring(TRUE)
     on.exit(restoring(FALSE), add = TRUE)
@@ -600,25 +646,42 @@ server <- function(input, output, session) {
       dataset_pool[[nm]] <- st$tables[[nm]]
     }
 
-    # Spatial layers: re-read each stored file back into its pool.
+    # Spatial layers: restore each stored file into its pool, reporting REAL
+    # progress. The counter advances only once a layer has actually finished,
+    # and it names the file and what is being done to it -- no timer, no bar
+    # that fills on a guess.
     failed <- character(0)
-    for (s in st$spatial) {
+    spat   <- Filter(function(s) nzchar(s$name %||% ""), st$spatial)
+    steps  <- length(spat) + 1L
+    prog   <- shiny::Progress$new(session, min = 0, max = steps)
+    on.exit(try(prog$close(), silent = TRUE), add = TRUE)
+    prog$set(value = 1, message = "Opening project",
+             detail = sprintf("%d table(s) restored", length(st$tables)))
+
+    kind_label <- c(raster = "raster", las = "point cloud", vector = "vector")
+    for (i in seq_along(spat)) {
+      s <- spat[[i]]
       nm <- s$name %||% ""; kind <- s$kind %||% ""; path <- s$path %||% ""
-      if (!nzchar(nm) || isTRUE(s$missing)) { failed <- c(failed, nm); next }
+      lab <- kind_label[[kind]] %||% "layer"
+      cached <- .spatial_cached(kind, path)
+      prog$set(value = i, message = sprintf("Loading %d of %d", i, length(spat)),
+               detail = paste0(nm, " (", lab, if (cached) ", cached" else "", ")"))
+      if (isTRUE(s$missing)) { failed <- c(failed, nm); next }
       okl <- tryCatch({
-        if (identical(kind, "raster"))      raster_pool[[nm]] <- terra::rast(path)
-        # LAS handling PAUSED: reopen loads a small, memory-safe PREVIEW (500k pts)
-        # instead of the full cloud, which was OOM-crashing the app on project open
-        # (raster + vector + a big LAS all loading at once). The reference is kept,
-        # so full-resolution loading can be restored later. See MEMORY undone list.
-        else if (identical(kind, "las"))    las_pool[[nm]]    <- .read_las_capped(path, cap = 500000L)
-        else if (identical(kind, "vector")) vector_pool[[nm]] <- sf::st_read(path, quiet = TRUE)
-        else return(NULL)
-        src_paths[[nm]] <- path
-        TRUE
+        obj <- .spatial_get(kind, path)
+        if (is.null(obj)) FALSE else {
+          if (identical(kind, "raster"))      raster_pool[[nm]] <- obj
+          else if (identical(kind, "las"))    las_pool[[nm]]    <- obj
+          else if (identical(kind, "vector")) vector_pool[[nm]] <- obj
+          else obj <- NULL
+          # NOTE: never return() from inside this loop -- it returns from
+          # open_project() itself and abandons every remaining layer.
+          if (is.null(obj)) FALSE else { src_paths[[nm]] <- path; TRUE }
+        }
       }, error = function(e) FALSE)
       if (!isTRUE(okl)) failed <- c(failed, nm)
     }
+    prog$set(value = steps, message = "Ready", detail = "")
     if (length(failed))
       showNotification(
         sprintf("Could not reload %d spatial layer(s): %s",
