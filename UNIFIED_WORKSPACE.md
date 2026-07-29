@@ -365,3 +365,44 @@ inputs would mean N observers all fighting that rebuild.
 Verified in the browser by sampling canvas pixels: true colour is green-dominant
 (102 G vs 4 B) with natural greens and browns; NIR-in-red flips it to red-dominant
 (126 R vs 29 G); single band returns the viridis purple (165 B).
+
+### R Console: themed, side-by-side, and dockable (2026-07-29)
+
+- **Theme.** The console hardcoded a near-black (`#0f1a12`) plus fixed greens and greys,
+  so it stayed dark on every light colour set. All of it now comes from tokens
+  (`--sunk`, `--ink`, `--canopy`, `--danger`, `--bark`), including the log text, the
+  error colour and the editor.
+- **Layout.** Editor and results were stacked, with a `46vh` log and a permanently
+  reserved plot card. They are now a two-column grid — editor left, results right — each
+  column a flex chain with `min-height: 0` so it fills the dock instead of overflowing.
+  The plot slot only exists once something has actually been plotted.
+- **Modes.** Like the tool panels, the console can **dock / float / minimize**. Floating
+  uses `position: fixed`, which takes it out of the flex column so the workspace above
+  reclaims the space rather than leaving a gap. Minimized keeps the header bar only.
+  **Docking always returns it to the bottom**, clearing any inline geometry left by
+  dragging. Mode changes are class swaps (`window.eaConsole`), so the editor contents and
+  scroll position survive. Header drag resizes when docked and moves when floating.
+
+### Zoom to layer (fixed 2026-07-29)
+
+Three separate defects:
+
+- **"Zoom to active layer" was wired to the same input as "Zoom to layers"**, so it always
+  framed everything. It now has its own input and `.layer_bounds(only = )` targets one
+  layer — ignoring that layer's visibility, since naming a layer is an explicit request.
+- **No explicit-fit path.** Both commands nudged the same `fit_sig`/auto-fit machinery
+  that also decides the *automatic* first fit, so a zoom could be skipped whenever the
+  layer signature already matched. There is now a `fit_req` reactiveVal holding bounds to
+  apply on the next build, and it outranks both the auto-fit and the preserved view.
+- **lidar was missing from the fit signature**, so a LAZ-only project never got its
+  first automatic fit.
+
+Failure is now reported: zooming to a layer with no location shows a notification naming
+the layer instead of doing nothing.
+
+**Zooming must not recompute pixels.** A fit requires a full map rebuild (there is no
+proxy), which re-ran `.stretch_byte` and rebuilt the composite every time — on a 33 M-cell
+orthomosaic that walked the session into `cannot allocate vector` and GDAL block-cache
+failures after a handful of zooms. `.rgb_raster()` caches the finished composite, keyed by
+layer and band mapping. Verified: five pan-away/zoom-to-layers cycles produce **2**
+reprojections total and zero allocation errors.

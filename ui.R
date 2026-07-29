@@ -751,6 +751,9 @@ page_fillable(
     .ea-wsx-rgbsel > div { flex: 1 1 0; min-width: 0; }
     .ea-wsx-rgbsel label { display: block; font: 600 8.5px var(--mono); color: var(--bark);
                            text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+    .ea-wsx-note { font-size: 10.5px; line-height: 1.45; color: var(--bark);
+                   background: var(--sunk); border: 1px solid var(--line);
+                   border-radius: 6px; padding: 6px 8px; margin-top: 6px; }
     .ea-wsx-band { width: 100%; max-width: 100%; font-size: 11px; padding: 2px 4px;
                    background: var(--panel); color: var(--ink);
                    border: 1px solid var(--line); border-radius: 5px; }
@@ -805,12 +808,28 @@ page_fillable(
                   border-top: 1px solid var(--line); transition: min-height .18s ease;
                   display: flex; flex-direction: column; }
     .ea-wsx-console.open { height: 300px; min-height: 300px; }
+    /* FLOATING: fixed takes it out of the flex column, so the workspace above
+       reclaims the space instead of leaving a gap where the dock used to be. */
+    .ea-wsx-console.open.float { position: fixed; left: 18vw; top: 16vh;
+                  width: min(64vw, 900px); height: 46vh; min-height: 200px;
+                  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+                  box-shadow: 0 18px 50px rgba(0,0,0,.45); z-index: 1200; transition: none; }
+    .ea-wsx-console.open.float .ea-wsx-conh { cursor: move; }
+    /* MINIMIZED: header bar only, still docked at the bottom. */
+    .ea-wsx-console.open.min { height: auto; min-height: 0; }
+    .ea-wsx-console.open.min .ea-wsx-conb { display: none; }
+    .ea-wsx-console.open.min .ea-wsx-conh { cursor: default; }
+    /* Only the buttons that apply to the current mode are shown. */
+    .ea-wsx-console .con-dock { display: none; }
+    .ea-wsx-console.float .con-dock, .ea-wsx-console.min .con-dock { display: inline-block; }
+    .ea-wsx-console.float .con-float, .ea-wsx-console.min .con-float { display: none; }
+    .ea-wsx-console.min .con-min { display: none; }
     .ea-wsx-conh { display: flex; align-items: center; gap: 8px; padding: 7px 12px; flex: none;
                   background: var(--sunk); border-bottom: 1px solid var(--line);
                   font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase;
                   color: var(--bark); cursor: ns-resize; }
     .ea-wsx-conh svg, .ea-wsx-conh .fa { color: var(--canopy); }
-    .ea-wsx-conx { margin-left: auto; }
+    .ea-wsx-conx { margin-left: auto; display: flex; align-items: center; gap: 2px; }
     .ea-wsx-conx button { border: none; background: transparent; color: var(--bark);
                   cursor: pointer; font: 600 15px var(--mono); line-height: 1; padding: 0 4px; }
     .ea-wsx-conx button:hover { color: var(--ink); }
@@ -1466,15 +1485,46 @@ page_fillable(
           window.dispatchEvent(new Event('resize')); }
         document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up); e.preventDefault();
       });
-      /* R Console bottom dock: drag its header to resize (drag up = taller). */
+      /* R Console mode: dock (bottom) | float (over the canvas) | min (bar).
+         Docking always returns it to the BOTTOM, clearing any inline geometry
+         left behind by dragging or resizing while floating. */
+      window.eaConsole = function(id, mode){
+        var c = document.getElementById(id); if(!c) return;
+        c.classList.remove('float','min','dock');
+        if(mode === 'close'){ c.classList.remove('open'); c.classList.add('dock');
+          c.style.left = c.style.top = c.style.width = ''; return; }
+        if(mode === 'float'){ c.classList.add('open','float'); }
+        else if(mode === 'min'){ c.classList.add('open','min');
+          c.style.left = c.style.top = c.style.width = ''; c.style.height = ''; c.style.minHeight = ''; }
+        else { c.classList.add('open','dock');
+          c.style.left = c.style.top = c.style.width = '';
+          c.style.height = '300px'; c.style.minHeight = '300px'; }
+        window.dispatchEvent(new Event('resize'));   /* let plots re-measure */
+      };
+      /* Header drag: RESIZE when docked (drag up = taller), MOVE when floating. */
       document.addEventListener('mousedown', function(e){
         var h = e.target.closest ? e.target.closest('.ea-wsx-conh') : null;
         if (!h || e.target.tagName === 'BUTTON') return;
-        var dock = h.parentNode, sy = e.clientY, sh = dock.offsetHeight;
-        function mv(ev){ var h = Math.max(90, Math.min(window.innerHeight - 160, sh - (ev.clientY - sy)));
-                         dock.style.height = h + 'px'; dock.style.minHeight = h + 'px'; }
-        function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
-        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up); e.preventDefault();
+        var dock = h.parentNode;
+        if (dock.classList.contains('min')) return;
+        var floating = dock.classList.contains('float');
+        var sx = e.clientX, sy = e.clientY;
+        var r = dock.getBoundingClientRect(), sh = dock.offsetHeight;
+        function mv(ev){
+          if (floating){
+            var nx = Math.max(0, Math.min(window.innerWidth  - 120, r.left + ev.clientX - sx));
+            var ny = Math.max(0, Math.min(window.innerHeight - 60,  r.top  + ev.clientY - sy));
+            dock.style.left = nx + 'px'; dock.style.top = ny + 'px';
+          } else {
+            var nh = Math.max(90, Math.min(window.innerHeight - 160, sh - (ev.clientY - sy)));
+            dock.style.height = nh + 'px'; dock.style.minHeight = nh + 'px';
+          }
+        }
+        function up(){ document.removeEventListener('mousemove', mv);
+                       document.removeEventListener('mouseup', up);
+                       window.dispatchEvent(new Event('resize')); }
+        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+        e.preventDefault();
       });
       /* Workspace attribute dock: drag the header to resize (drag up = taller). */
       document.addEventListener('mousedown', function(e){

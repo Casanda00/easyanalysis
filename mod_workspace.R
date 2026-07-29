@@ -50,14 +50,22 @@ workspaceCanvasUI <- function(id) {
       ),
       tags$aside(class = "ea-wsx-dock", uiOutput(ns("dock")))
     ),
-    # M6: R Console — a BOTTOM dock that slides up when opened (GeoLibre style).
-    div(id = ns("console"), class = "ea-wsx-console",
+    # M6: R Console. Docks to the BOTTOM by default and, like the tool panels,
+    # can be floated over the canvas or minimized to a bar. Mode changes are
+    # pure class swaps (eaConsole in ui.R) — no server round-trip, so the
+    # console keeps its scroll position and its editor contents.
+    div(id = ns("console"), class = "ea-wsx-console dock",
       div(class = "ea-wsx-conh",
         tags$span(icon("terminal"), " R Console"),
         tags$span(class = "ea-wsx-conx",
-          tags$button(type = "button", title = "close",
-            onclick = sprintf("document.getElementById('%s').classList.remove('open')", ns("console")),
-            "×"))),
+          tags$button(type = "button", class = "con-float", title = "Float over the canvas",
+            onclick = sprintf("eaConsole('%s','float')", ns("console")), HTML("&#9744;")),
+          tags$button(type = "button", class = "con-dock", title = "Dock back to the bottom",
+            onclick = sprintf("eaConsole('%s','dock')", ns("console")), HTML("&#9707;")),
+          tags$button(type = "button", class = "con-min", title = "Minimize",
+            onclick = sprintf("eaConsole('%s','min')", ns("console")), "–"),
+          tags$button(type = "button", title = "Close",
+            onclick = sprintf("eaConsole('%s','close')", ns("console")), "×"))),
       div(class = "ea-wsx-conb", rconsoleCanvasUI("rconsole")))
   )
 }
@@ -69,7 +77,7 @@ workspaceToolsUI <- function(id) {
 }
 
 workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool, active_dataset,
-                            tool_request = reactive(NULL)) {
+                            tool_request = reactive(NULL), layer_style = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     wsview <- reactiveVal("map")
@@ -152,8 +160,15 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               div(tags$label("R"), .band_sel(l, "r", cfg$r, nb)),
               div(tags$label("G"), .band_sel(l, "g", cfg$g, nb)),
               div(tags$label("B"), .band_sel(l, "b", cfg$b, nb))),
-            div(class = "ea-wsx-lgh2", "2-98% stretch per band"))
+            div(class = "ea-wsx-lgh2",
+                if (!is.null(cfg$why)) paste0("From ", cfg$why, " · 2-98% stretch")
+                else "2-98% stretch per band"))
           else tagList(
+            # Undeclared band order is stated, not papered over with a guess.
+            if (nb >= 3 && is.null(.detect_rgb(l$nm)))
+              div(class = "ea-wsx-note",
+                  "This file does not declare which band is red, green or blue. ",
+                  "Switch on true colour and set them."),
             div(class = "ea-wsx-lgh", "Legend · continuous"), div(class = "ea-wsx-ramp"),
             div(class = "ea-wsx-ends", span("low"), span("high")),
             div(class = "ea-wsx-lgh", "Colour ramp"),
@@ -332,12 +347,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           proc_items,
           .msep(),
           # R Console opens the BOTTOM dock (not the right tool panel).
-          .mi("R Console", sprintf("document.getElementById('%s').classList.toggle('open')", ns("console")))
+          .mi("R Console", sprintf(
+            "var c=document.getElementById('%s'); eaConsole('%s', c.classList.contains('open') ? 'close' : 'dock');",
+            ns("console"), ns("console")))
         )),
         .menu("Controls", "sliders", tagList(
           tags$div(class = "gm-grp", "Map"),
           .mi("Zoom to layers", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("ws_zoom"))),
-          .mi("Zoom to active layer", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("ws_zoom"))),
+          .mi("Zoom to active layer", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("ws_zoom_active"))),
           .msep(),
           tags$div(class = "gm-grp", "Panels"),
           .mi("Layers panel", "document.querySelector('.ea-wsx-grid').classList.toggle('no-left')"),
@@ -373,7 +390,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       )
     })
 
-    observeEvent(input$ws_zoom, { fitAll(fitAll() + 1) })
+    .zoom_to <- function(only = NULL, what = "layers") {
+      bb <- tryCatch(.layer_bounds(only), error = function(e) NULL)
+      if (is.null(bb)) {
+        showNotification(
+          if (is.null(only)) "Nothing to zoom to: no spatial layer has a known location."
+          else sprintf("Cannot zoom to '%s': it has no location on the map.", only),
+          type = "warning", duration = 5)
+        return(invisible(FALSE))
+      }
+      fit_req(bb); map_rebuild(map_rebuild() + 1); invisible(TRUE)
+    }
+    observeEvent(input$ws_zoom,        { .zoom_to(NULL) })
+    observeEvent(input$ws_zoom_active, { .zoom_to(activeLayer()) })
     observeEvent(input$ws_tour, { session$sendCustomMessage("ea-tour", "start") })
 
     observeEvent(input$ws_share, {
@@ -668,8 +697,8 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     })
 
     # Step 6: attribute-table dock (Map view) — active layer's features / raster info
-    fitAll      <- reactiveVal(0)
     fit_sig     <- reactiveVal("")   # which layer set we last auto-zoomed to
+    fit_req     <- reactiveVal(NULL)  # explicit "Zoom to ..." bounds, applied once
     map_rebuild <- reactiveVal(0)    # bump to rebuild the map (and re-fit)
     # The map DEPENDS on basemap() so choosing one rebuilds the map with those
     # tiles. (A leafletProxy tile-swap was unreliable here: the canvas uiOutput
@@ -719,33 +748,124 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       x
     }
 
-    # Which bands feed R, G and B for a raster layer (and whether to composite
-    # at all). The DEFAULT is a heuristic, not a fact: a 3/4-band ortho is
-    # almost always stored R,G,B in order, whereas a 5+ band multispectral cube
-    # is typically B,G,R,(RedEdge,NIR) — so red sits at band 3 and using 1,2,3
-    # renders a cyan false-colour image. The user can override per layer.
-    lrgb <- reactiveValues()
+    # The FINISHED composite (downsampled, projected, stretched, RGB-tagged).
+    # Cached because every map rebuild re-runs .draw_layers — and a rebuild is
+    # triggered by things that do not change the pixels at all, such as zooming
+    # or switching basemap. Recomputing the stretch each time allocated a fresh
+    # set of rasters per zoom, which on a 33 M-cell orthomosaic walked the
+    # session into "cannot allocate vector" / GDAL block-cache failures.
+    .rgb_cache <- new.env(parent = emptyenv())
+    .rgb_raster <- function(nm, cfg) {
+      key <- paste0(nm, "|", cfg$r, "-", cfg$g, "-", cfg$b)
+      if (!is.null(.rgb_cache[[key]])) return(.rgb_cache[[key]])
+      x <- .disp_raster(nm, c(cfg$r, cfg$g, cfg$b))
+      if (is.null(x) || terra::nlyr(x) < 3) return(NULL)
+      x <- .stretch_byte(x)
+      terra::RGB(x) <- 1:3
+      if (length(ls(.rgb_cache)) > 4L) rm(list = ls(.rgb_cache), envir = .rgb_cache)
+      assign(key, x, envir = .rgb_cache)
+      x
+    }
+
+    # Which bands feed R, G and B — DETECTED from what the file declares, never
+    # inferred from band count. Band order genuinely varies: a plain ortho is
+    # R,G,B, while a multispectral cube is often B,G,R,(RedEdge,NIR), so a guess
+    # silently produces a wrong-coloured image that still looks plausible. If
+    # the file does not say, we do not decide: the layer stays single-band and
+    # the panel asks. Returns NULL when nothing authoritative is available.
+    .detect_cache <- new.env(parent = emptyenv())
+    .detect_rgb <- function(nm) {
+      r <- raster_pool[[nm]]
+      if (is.null(r) || terra::nlyr(r) < 3) return(NULL)
+      if (!is.null(.detect_cache[[nm]])) return(.detect_cache[[nm]]$v)
+      out <- NULL
+      # (a) the raster carries RGB channel tags (terra/GDAL colour interpretation)
+      if (isTRUE(tryCatch(terra::has.RGB(r), error = function(e) FALSE))) {
+        i <- tryCatch(terra::RGB(r), error = function(e) NULL)
+        if (length(i) >= 3 && all(is.finite(i[1:3])))
+          out <- list(r = i[1], g = i[2], b = i[3], why = "the file's RGB channel tags")
+      }
+      # (b) gdalinfo's per-band ColorInterp (Red/Green/Blue), when tags are absent
+      if (is.null(out)) {
+        src <- tryCatch(terra::sources(r), error = function(e) character(0))
+        if (length(src) && nzchar(src[1]) && file.exists(src[1])) {
+          info <- tryCatch(terra::describe(src[1]), error = function(e) character(0))
+          ci   <- grep("^Band [0-9]+ .*ColorInterp=", info, value = TRUE)
+          pick <- function(w) {
+            h <- grep(paste0("ColorInterp=", w, "$"), ci, value = TRUE)
+            if (!length(h)) return(NA_integer_)
+            as.integer(sub("^Band ([0-9]+) .*$", "\\1", h[1]))
+          }
+          idx <- c(r = pick("Red"), g = pick("Green"), b = pick("Blue"))
+          if (all(!is.na(idx)))
+            out <- list(r = idx[["r"]], g = idx[["g"]], b = idx[["b"]],
+                        why = "the file's colour interpretation")
+        }
+      }
+      # (c) band names that state the colour outright (e.g. "red", "B03_green")
+      if (is.null(out)) {
+        nms  <- tolower(c(names(r)))
+        pick <- function(w) { h <- grep(paste0("(^|[^a-z])", w, "([^a-z]|$)"), nms)
+                              if (length(h) == 1L) h else NA_integer_ }
+        idx <- c(r = pick("red"), g = pick("green"), b = pick("blue"))
+        if (all(!is.na(idx)))
+          out <- list(r = idx[["r"]], g = idx[["g"]], b = idx[["b"]],
+                      why = "the band names")
+      }
+      assign(nm, list(v = out), envir = .detect_cache)
+      out
+    }
+
+    # Stored settings live in the PROJECT (layer_style), so a mapping chosen
+    # once survives closing the app. NULL layer_style = tests/standalone use.
+    .style_get <- function() if (is.null(layer_style)) list() else (layer_style() %||% list())
+    .style_set <- function(nm, cfg) {
+      if (is.null(layer_style)) return(invisible(NULL))
+      st <- .style_get(); st[[nm]] <- cfg; layer_style(st)
+    }
     .rgb_of <- function(nm, nb) {
-      cur <- lrgb[[nm]]
-      if (!is.null(cur)) return(cur)
-      if (nb < 3) list(mode = "single", r = 1, g = 1, b = 1)
-      else if (nb >= 5) list(mode = "rgb", r = 3, g = 2, b = 1)
-      else              list(mode = "rgb", r = 1, g = 2, b = 3)
+      cur <- .style_get()[[nm]]
+      if (is.list(cur) && !is.null(cur$mode)) return(cur)   # the user decided
+      det <- .detect_rgb(nm)
+      if (!is.null(det))
+        list(mode = "rgb", r = det$r, g = det$g, b = det$b, why = det$why)
+      else list(mode = "single", r = 1, g = 2, b = 3, why = NULL)  # undeclared: ask
     }
     observeEvent(input$ws_rgb, {
       s <- input$ws_rgb; nm <- s$nm
       r <- raster_pool[[nm]]; if (is.null(r)) return()
       cfg <- .rgb_of(nm, terra::nlyr(r))
-      cfg[[s$ch]] <- as.integer(s$b)
-      lrgb[[nm]] <- cfg
+      cfg[[s$ch]] <- as.integer(s$b); cfg$why <- "your choice"
+      .style_set(nm, cfg)
     })
     observeEvent(input$ws_rgbmode, {
       nm <- input$ws_rgbmode
       r <- raster_pool[[nm]]; if (is.null(r)) return()
       cfg <- .rgb_of(nm, terra::nlyr(r))
       cfg$mode <- if (identical(cfg$mode, "rgb")) "single" else "rgb"
-      lrgb[[nm]] <- cfg
+      if (identical(cfg$mode, "rgb") && is.null(cfg$why)) cfg$why <- "your choice"
+      .style_set(nm, cfg)
     })
+
+    # A raster's footprint in WGS84, computed from its EXTENT ALONE — the pixels
+    # are never touched. Bounds used to come from the projected display copy,
+    # which tied the zoom to a full raster reprojection: if that copy was built
+    # for different bands (or failed on memory) the map silently skipped its fit
+    # and sat at the default view with the layer drawn as a dot. Segmentised so
+    # a curved projection does not clip the edges.
+    .rast_bbox <- function(r) {
+      if (is.null(r)) return(NULL)
+      tryCatch({
+        e  <- as.numeric(as.vector(terra::ext(r)))          # xmin,xmax,ymin,ymax
+        cr <- sf::st_crs(terra::crs(r))
+        if (is.na(cr)) return(NULL)
+        bx <- sf::st_as_sfc(sf::st_bbox(
+                c(xmin = e[1], ymin = e[3], xmax = e[2], ymax = e[4]), crs = cr))
+        bx <- sf::st_segmentize(bx, max(diff(e[1:2]), diff(e[3:4])) / 25)
+        v  <- as.numeric(sf::st_bbox(sf::st_transform(bx, 4326)))
+        if (length(v) == 4 && all(is.finite(v))) v else NULL
+      }, error = function(e) NULL)
+    }
 
     # LAS/LAZ footprint in WGS84. The pool may hold a full LAS *or* just its
     # header (big clouds are capped at read time), so read whichever it is.
@@ -771,21 +891,22 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         error = function(e) NULL)
     }
 
-    # Bounds of all visible spatial layers, in WGS84 (lng1, lat1, lng2, lat2).
-    .layer_bounds <- function() {
+    # Bounds in WGS84 (lng1, lat1, lng2, lat2). With `only`, just that layer —
+    # and its visibility is ignored, because "zoom to this layer" is an explicit
+    # instruction about a layer the user just named.
+    .layer_bounds <- function(only = NULL) {
       bb <- NULL
-      for (l in Filter(function(x) x$kind %in% c("raster", "vector", "lidar") && .vis(x$nm),
-                       layers())) {
+      keep <- if (is.null(only))
+        function(x) x$kind %in% c("raster", "vector", "lidar") && .vis(x$nm)
+      else
+        function(x) x$kind %in% c("raster", "vector", "lidar") && identical(x$nm, only)
+      for (l in Filter(keep, layers())) {
         e <- tryCatch({
           if (identical(l$kind, "raster")) {
-            r1 <- .disp_raster(l$nm)
             # NOTE: yield NULL, never return() — return() inside this loop exits
             # .layer_bounds() entirely, so one empty pool entry used to throw
             # away the bounds of every other layer and the map never zoomed.
-            if (is.null(r1)) NULL else {
-              v <- as.numeric(as.vector(terra::ext(r1)))   # xmin,xmax,ymin,ymax
-              c(v[1], v[3], v[2], v[4])
-            }
+            .rast_bbox(raster_pool[[l$nm]])
           } else if (identical(l$kind, "lidar")) {
             .las_bbox(las_pool[[l$nm]])
           } else {
@@ -820,12 +941,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               # TRUE-COLOUR COMPOSITE. leaflet only takes its RGB path when
               # terra::has.RGB() is set, so declare the channels; otherwise it
               # silently keeps band 1 and warns "using the first layer in 'x'".
-              x <- .disp_raster(l$nm, c(cfg$r, cfg$g, cfg$b))
-              if (is.null(x) || terra::nlyr(x) < 3) m else {
-                x <- .stretch_byte(x)
-                terra::RGB(x) <- 1:3
+              x <- .rgb_raster(l$nm, cfg)     # cached: stretched + RGB-tagged
+              if (is.null(x)) m else
                 leaflet::addRasterImage(m, x, opacity = 0.9, group = "ws_layers")
-              }
             } else {
               r1 <- .disp_raster(l$nm, 1L)   # cached, downsampled + in WGS84
               if (is.null(r1)) m else {
@@ -882,11 +1000,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # element is re-created whenever the canvas re-renders, which silently
       # discarded pending proxy fitBounds calls — so the raster never zoomed.
       bb  <- isolate(tryCatch(.layer_bounds(), error = function(e) NULL))
+      # lidar belongs in the signature too — a LAZ-only project otherwise had an
+      # empty signature and so never triggered its first automatic fit.
       sig <- isolate(tryCatch(paste(vapply(
-               Filter(function(x) x$kind %in% c("raster","vector") && .vis(x$nm), layers()),
+               Filter(function(x) x$kind %in% c("raster","vector","lidar") && .vis(x$nm), layers()),
                function(l) l$nm, character(1)), collapse = "|"), error = function(e) ""))
+      fr  <- isolate(fit_req())
       m <- leaflet::leaflet()
-      if (!is.null(bb) && !identical(sig, isolate(fit_sig())) && nzchar(sig)) {
+      # An explicit "Zoom to ..." outranks everything; then the automatic
+      # first-fit for a new layer set; then wherever the user had panned to.
+      if (!is.null(fr)) {
+        m <- leaflet::fitBounds(m, fr[1], fr[2], fr[3], fr[4])
+        fit_req(NULL); fit_sig(sig)
+      } else if (!is.null(bb) && !identical(sig, isolate(fit_sig())) && nzchar(sig)) {
         m <- leaflet::fitBounds(m, bb[1], bb[2], bb[3], bb[4])
         fit_sig(sig)
       } else if (!is.null(ctr) && !is.null(zm)) {
@@ -912,8 +1038,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                function(l) l$nm, character(1)), collapse = "|"), error = function(e) "")
       if (!identical(sig, fit_sig())) map_rebuild(map_rebuild() + 1)
     }, ignoreInit = FALSE)
-    # "Zoom to layers" must re-fit even when the layer set has not changed.
-    observeEvent(fitAll(), { fit_sig(""); map_rebuild(map_rebuild() + 1) }, ignoreInit = TRUE)
+
 
     output$attr <- renderUI({
       act <- activeLayer(); req(act)

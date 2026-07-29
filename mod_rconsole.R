@@ -56,33 +56,50 @@ rconsoleCanvasUI <- function(id) {
   ns <- NS(id)
   # Static CSS (no sprintf / no namespaced ids) — the classes are global but
   # scoped enough for this one screen, and this avoids brace/percent pitfalls
-  # inside an HTML() string.
+  # inside an HTML() string. Every colour is a THEME TOKEN: the console used to
+  # hardcode a near-black (#0f1a12) and stayed dark on the light colour sets.
   css <- paste(
-    ".rc-log { height: 46vh; min-height: 240px; overflow-y: auto; background: #0f1a12;",
-    "  border-radius: 8px; padding: 10px 12px; font-size: 12.5px; }",
-    ".rc-log pre { background: transparent; border: 0; padding: 0; color: #d7e3d8; }",
-    ".rc-prompt { color: #7ddc8a; font-weight: 600; font-family: monospace; white-space: pre-wrap; margin-top: 8px; }",
-    ".rc-input textarea { font-family: monospace; font-size: 13px; }",
+    ".rc-split { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr);",
+    "  gap: 10px; height: 100%; min-height: 0; }",
+    ".rc-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }",
+    ".rc-colh { font: 600 8.5px var(--mono); text-transform: uppercase; letter-spacing: .08em;",
+    "  color: var(--bark); margin-bottom: 4px; flex: none; display: flex;",
+    "  align-items: center; justify-content: space-between; gap: 8px; }",
+    ".rc-log { flex: 1 1 auto; min-height: 60px; overflow-y: auto; background: var(--sunk);",
+    "  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; }",
+    ".rc-log pre { background: transparent; border: 0; padding: 0; color: var(--ink);",
+    "  white-space: pre-wrap; margin: 2px 0; }",
+    ".rc-prompt { color: var(--canopy); font-weight: 600; font-family: var(--mono);",
+    "  white-space: pre-wrap; margin-top: 8px; }",
+    ".rc-log pre.rc-err { color: var(--danger); }",
+    ".rc-note { color: var(--canopy); font-size: 11px; }",
+    ".rc-empty { color: var(--bark); font-style: italic; }",
+    ".rc-editor { flex: 1 1 auto; min-height: 0; display: flex; }",
+    ".rc-editor .shiny-input-container { flex: 1 1 auto; min-height: 0; display: flex;",
+    "  margin-bottom: 0; width: 100% !important; }",
+    ".rc-editor textarea { font-family: var(--mono); font-size: 12.5px; height: 100% !important;",
+    "  resize: none; background: var(--sunk); color: var(--ink); border-color: var(--line); }",
+    ".rc-actions { flex: none; display: flex; gap: 6px; margin-top: 6px; }",
+    ".rc-plot { flex: none; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }",
     sep = "\n")
   tagList(
     tags$style(HTML(css)),
-    tags$div(id = ns("wrap"),
-      card(
-        card_header(class = "d-flex justify-content-between align-items-center",
-          "R Console",
-          tags$small(class = "text-muted", "Ctrl+Enter to run")),
+    tags$div(class = "rc-split", id = ns("wrap"),
+      # LEFT: the editor
+      tags$div(class = "rc-col",
+        tags$div(class = "rc-colh", tags$span("Code"), tags$span("Ctrl+Enter to run")),
+        tags$div(class = "rc-editor",
+          textAreaInput(ns("code"), NULL, width = "100%",
+                        placeholder = "Type R here, e.g.  summary(df)")),
+        tags$div(class = "rc-actions",
+          actionButton(ns("run"), "Run", class = "btn-success btn-sm", icon = icon("play")),
+          actionButton(ns("clear"), "Clear", class = "btn-outline-secondary btn-sm",
+                       icon = icon("eraser")))),
+      # RIGHT: results (and the plot, only once there is one)
+      tags$div(class = "rc-col",
+        tags$div(class = "rc-colh", tags$span("Results"), uiOutput(ns("objects_inline"), inline = TRUE)),
         tags$div(class = "rc-log", id = ns("logbox"), uiOutput(ns("log"))),
-        tags$div(class = "rc-input", style = "margin-top:8px; display:flex; gap:8px; align-items:flex-end;",
-          tags$div(style = "flex:1 1 auto;",
-            textAreaInput(ns("code"), NULL, rows = 3, width = "100%",
-              placeholder = "Type R here, e.g.  summary(df)")),
-          actionButton(ns("run"), "Run", class = "btn-success", icon = icon("play"),
-            style = "height:38px;"))
-      ),
-      card(
-        card_header("Last plot"),
-        plotOutput(ns("plot"), height = "320px")
-      )
+        uiOutput(ns("plotwrap")))
     ),
     tags$script(HTML(sprintf(
       "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); $('#%s').click(); }});",
@@ -152,20 +169,34 @@ rconsoleServer <- function(id, dataset_pool, active_dataset) {
     output$log <- renderUI({
       entries <- log_r()
       if (!length(entries))
-        return(tags$div(class = "text-muted", style = "font-style:italic;color:#8aa78d;",
-          "Results appear here. Type R below and press Run (or Ctrl+Enter)."))
+        return(tags$div(class = "rc-empty",
+          "Results appear here. Write R on the left and press Run (or Ctrl+Enter)."))
       items <- lapply(entries, function(en) {
-        col <- if (identical(en$status, "error")) "#ff8a80" else "#d7e3d8"
         tagList(
           tags$div(class = "rc-prompt", paste0("> ", en$code)),
           if (nzchar(en$out))
-            tags$pre(style = sprintf("color:%s; white-space:pre-wrap; margin:2px 0;", col), en$out),
-          if (isTRUE(en$plotted))
-            tags$div(style = "color:#7ddc8a; font-size:11px;", "[plot rendered below]")
+            tags$pre(class = if (identical(en$status, "error")) "rc-err" else NULL, en$out),
+          if (isTRUE(en$plotted)) tags$div(class = "rc-note", "[plot shown below]")
         )
       })
       tagList(items, tags$script(HTML(sprintf(
         "var b=document.getElementById('%s'); if(b) b.scrollTop=b.scrollHeight;", ns("logbox")))))
+    })
+
+    # The plot slot only exists once something has been plotted, so the results
+    # column is not permanently shortened by an empty box.
+    output$plotwrap <- renderUI({
+      if (is.null(last_plot())) return(NULL)
+      tags$div(class = "rc-plot", plotOutput(ns("plot"), height = "150px"))
+    })
+    # Compact "df + N datasets" hint in the results header (the old tools panel
+    # that carried this is not mounted anywhere — the console lives in the dock).
+    output$objects_inline <- renderUI({
+      nms <- tryCatch(names(dataset_pool), error = function(err) character(0))
+      nms <- nms[!vapply(nms, function(n) is.null(dataset_pool[[n]]), logical(1))]
+      tags$span(if (length(nms))
+                  paste0("df + ", length(nms), " dataset", if (length(nms) == 1) "" else "s")
+                else "no datasets loaded")
     })
 
     output$plot <- renderPlot({

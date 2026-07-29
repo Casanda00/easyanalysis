@@ -530,6 +530,7 @@ server <- function(input, output, session) {
   # closing the browser (or the app) resumable.
   # ======================================================================
   current_project  <- reactiveVal(NULL)   # project id, or NULL on the Projects screen
+  layer_style      <- reactiveVal(list())  # per-layer render settings, persisted
   project_refresh  <- reactiveVal(0)      # bumped when the on-disk list changes
   restoring        <- reactiveVal(FALSE)  # guards autosave while we load
 
@@ -592,6 +593,11 @@ server <- function(input, output, session) {
       pid, vapply(st$spatial, function(s) s$path %||% "", character(1))), silent = TRUE)
 
     current_project(pid)
+    # Per-layer render settings (a raster's R/G/B band mapping) come back with
+    # the project, so a mapping the user had to choose once is never asked for
+    # again — and is never re-guessed.
+    ls0 <- st$meta$layer_style
+    layer_style(if (is.list(ls0)) ls0 else list())
     ad <- st$meta$active_dataset
     active_ds(if (isTruthy(ad) && ad %in% .pool_names(dataset_pool)) ad else NULL)
     ds_refresh(ds_refresh() + 1)
@@ -615,7 +621,8 @@ server <- function(input, output, session) {
          las     = .pool_names(las_pool),
          vectors = .pool_names(vector_pool),
          active  = active_ds(),
-         view    = input$current_view)
+         view    = input$current_view,
+         style   = layer_style())
   })
   observe({
     st  <- project_state()
@@ -628,7 +635,8 @@ server <- function(input, output, session) {
       lapply(st$vectors, function(n) list(name = n, kind = "vector", path = .src_path(n)))
     )
     try(ea_project_save_data(pid, tables = st$tables, spatial = spatial,
-                             last_view = st$view, active_dataset = st$active), silent = TRUE)
+                             last_view = st$view, active_dataset = st$active,
+                             layer_style = st$style), silent = TRUE)
     project_refresh(isolate(project_refresh()) + 1)
   })
 
@@ -862,7 +870,8 @@ server <- function(input, output, session) {
   # above, unchanged). `tool_request` lets a menubar click select a tool in it.
   workspace_ctx  <- workspaceServer("workspace", dataset_pool, raster_pool,
                                     las_pool, vector_pool, active_dataset,
-                                    tool_request = reactive(input$current_view))
+                                    tool_request = reactive(input$current_view),
+                                    layer_style = layer_style)
 
   module_ctx <- list(
     data = data_ctx,
