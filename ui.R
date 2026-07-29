@@ -548,6 +548,18 @@ page_fillable(
     .ea-wsx-popts .shiny-input-container { margin-bottom: 0; width: 100% !important; }
     .ea-wsx-popts.inline { display: contents; }
     .ea-wsx-popts.inline label { display: inline-block; margin: 0 0 0 4px; }
+    /* rename buttons: right-hand end of the chart bar, on the selectors' line */
+    .ea-wsx-rnrow { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+    .ea-wsx-popts.inline .ea-wsx-rnrow { margin-left: auto; }
+    .ea-wsx-popts:not(.inline) .ea-wsx-rnrow { margin-left: 0; flex-wrap: wrap; margin-top: 6px; }
+    .ea-wsx-rnbtn { font: 500 10.5px var(--ui); border: 1px solid var(--line);
+                  background: var(--panel); color: var(--bark); border-radius: 6px;
+                  padding: 2px 7px; cursor: pointer; white-space: nowrap;
+                  display: inline-flex; align-items: center; gap: 4px; }
+    .ea-wsx-rnbtn:hover { border-color: var(--forest); color: var(--forest); }
+    .ea-wsx-rnbtn.set { border-color: var(--forest); color: var(--forest);
+                  background: color-mix(in srgb, var(--forest) 12%, transparent); }
+    .ea-wsx-rnbtn svg, .ea-wsx-rnbtn .fa { font-size: 9px; }
     .ea-wsx-colpick { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line);
                   border-radius: 6px; background: var(--panel); cursor: pointer; }
     .ea-wsx-chartbar .shiny-input-container { margin-bottom: 0; }
@@ -1614,6 +1626,25 @@ page_fillable(
           });
         }, 400);
       });
+      /* Rename buttons for the plot labels. A prompt keeps the chart bar free of
+         three permanent text boxes; empty input clears the override so the plot
+         falls back to the column name. */
+      window.eaRename = function(btn, inputId, noun, current){
+        /* the button remembers its own current value, so no attribute rewriting */
+        var now = (btn && btn.dataset.cur !== undefined) ? btn.dataset.cur : (current || '');
+        var v = window.prompt('Set the ' + noun + '  (leave empty to use the default)', now);
+        if (v === null) return;                 /* cancelled: change nothing */
+        Shiny.setInputValue(inputId, v, {priority: 'event'});
+        /* Reflect it on the button here rather than re-rendering the bar: the
+           panel deliberately does NOT depend on the option store, because that
+           dependency is what made it rebuild and wipe itself mid-edit. */
+        if (btn){
+          btn.dataset.cur = v;
+          var set = v.length > 0;
+          btn.classList.toggle('set', set);
+          btn.title = set ? (noun + ': ' + v + '  (click to change)') : ('Set the ' + noun);
+        }
+      };
       /* Line numbers for the R Console editor. A gutter div beside the textarea
          rather than a code-editor library: no external dependency (the CSP
          blocks them anyway), and it stays a plain Shiny textarea so Ctrl+Enter,

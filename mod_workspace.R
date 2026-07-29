@@ -629,24 +629,35 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     observeEvent(input$po_xlab,   .set_popt("xlab",   input$po_xlab),   ignoreInit = TRUE)
     observeEvent(input$po_ylab,   .set_popt("ylab",   input$po_ylab),   ignoreInit = TRUE)
     observeEvent(input$po_colour, .set_popt("colour", input$po_colour), ignoreInit = TRUE)
+    # Three always-visible text boxes ate most of the chart bar for something
+    # used occasionally. They are buttons now: the label shows what is currently
+    # set, and clicking opens a small prompt. A set label is highlighted, so the
+    # bar also tells you at a glance what has been overridden.
+    .rename_btn <- function(key, label, noun) {
+      cur <- .popt(key)
+      tags$button(type = "button",
+        class = paste("ea-wsx-rnbtn", if (nzchar(cur)) "set" else ""),
+        title = if (nzchar(cur)) paste0(noun, ": ", cur, "  (click to change)")
+                else paste0("Set the ", noun),
+        onclick = sprintf("eaRename(this, '%s', %s, %s)",
+                          ns(paste0("po_", key)),
+                          jsonlite::toJSON(noun, auto_unbox = TRUE),
+                          jsonlite::toJSON(cur, auto_unbox = TRUE)),
+        icon("pen"), paste0(" ", label))
+    }
     .plot_opts_ui <- function(inline = FALSE) {
       cls <- if (inline) "ea-wsx-popts inline" else "ea-wsx-popts"
       div(class = cls,
         if (!inline) div(class = "ea-wsx-lgh", "Plot appearance"),
-        tags$label("Title"),
-        textInput(ns("po_title"), NULL, value = .popt("title"),
-                  placeholder = "auto", width = if (inline) "150px" else "100%"),
-        tags$label("X"),
-        textInput(ns("po_xlab"), NULL, value = .popt("xlab"),
-                  placeholder = "auto", width = if (inline) "110px" else "100%"),
-        tags$label("Y"),
-        textInput(ns("po_ylab"), NULL, value = .popt("ylab"),
-                  placeholder = "auto", width = if (inline) "110px" else "100%"),
-        tags$label("Colour"),
-        tags$input(type = "color", id = ns("po_colour"), class = "ea-wsx-colpick",
-                   value = .popt("colour", "#2E7D32"),
-                   onchange = sprintf(
-                     "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("po_colour"))))
+        div(class = "ea-wsx-rnrow",
+          .rename_btn("title", "Rename title", "plot title"),
+          .rename_btn("xlab",  "Rename X",     "X axis label"),
+          .rename_btn("ylab",  "Rename Y",     "Y axis label"),
+          tags$input(type = "color", id = ns("po_colour"), class = "ea-wsx-colpick",
+                     title = "Plot colour",
+                     value = .popt("colour", "#2E7D32"),
+                     onchange = sprintf(
+                       "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("po_colour")))))
     }
 
     # Panels here are renderUI-built, so ANY dependency change (render mode, a
@@ -675,13 +686,13 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(class = "ea-wsx-chartbar",
           tags$label("Plot"),
           selectInput(ns("cgeom"), NULL, geoms,
-                      selected = .keep_sel("cgeom", geoms, "scatter"), width = "130px"),
+                      selected = .keep_sel("cgeom", geoms, "scatter"), width = "112px"),
           tags$label("X"), selectInput(ns("cx"), NULL, cols,
-                      selected = .keep_sel("cx", cols, cols[1]), width = "140px"),
+                      selected = .keep_sel("cx", cols, cols[1]), width = "118px"),
           tags$label("Y"), selectInput(ns("cy"), NULL, cols,
                       selected = .keep_sel("cy", cols,
                                            if (length(cols) > 1) cols[2] else cols[1]),
-                      width = "140px"),
+                      width = "118px"),
           .plot_opts_ui(inline = TRUE),
           # static (ggplot) <-> interactive (plotly: hover, zoom, pan, select)
           div(class = "ea-wsx-cmode",

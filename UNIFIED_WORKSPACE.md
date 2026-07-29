@@ -700,3 +700,23 @@ Verified: before, `lm y:[]`, `anova y:[] x:[]`, `rf target:[] predictors:[]`; af
 With that fixed, the agent chain completes end to end: it opened Linear regression, set
 the response to `height_m` and the formula to `dbh_cm + age_yr`, pressed Run, and the
 screen now shows a fitted `lm()` with coefficients, both predictors and R-squared.
+
+### Plot labels: buttons, not permanent text boxes (2026-07-29)
+
+Three always-visible text inputs took most of the chart bar for something used
+occasionally. They are now three small buttons — **Rename title / Rename X / Rename Y** —
+at the right-hand end of the same line as the Plot/X/Y selectors, with the colour picker
+beside them. Clicking one opens a prompt seeded with the current value; leaving it empty
+clears the override so the plot falls back to the column name.
+
+A button that has a value set is **highlighted and says so in its tooltip**
+("plot title: Height against diameter (click to change)"), so the bar shows at a glance
+what has been overridden.
+
+The state is updated **client-side** on the button itself, and the button remembers its
+value in a data attribute. That is deliberate: the panel must NOT depend on the option
+store, because that dependency is exactly what previously made it rebuild and wipe the
+box being typed in.
+
+Verified: text inputs gone; all three buttons share the selectors' row; a click applies
+the title to the plot (645 px of title ink) and flips the button to its "set" state.
