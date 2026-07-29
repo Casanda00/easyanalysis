@@ -871,7 +871,7 @@ server <- function(input, output, session) {
   workspace_ctx  <- workspaceServer("workspace", dataset_pool, raster_pool,
                                     las_pool, vector_pool, active_dataset,
                                     tool_request = reactive(input$current_view),
-                                    layer_style = layer_style)
+                                    layer_style = layer_style, src_paths = src_paths)
 
   module_ctx <- list(
     data = data_ctx,

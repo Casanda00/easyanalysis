@@ -540,6 +540,17 @@ page_fillable(
     .ea-wsx-tab { font: 600 12.5px var(--ui); border: none; background: transparent; color: var(--bark);
                   padding: 6px 15px; cursor: pointer; }
     .ea-wsx-tab.on { background: var(--forest); color: var(--onbrand); }
+    .ea-wsx-colpick { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line);
+                  border-radius: 6px; background: var(--panel); cursor: pointer; }
+    .ea-wsx-chartbar .shiny-input-container { margin-bottom: 0; }
+    .ea-wsx-3dbtn { margin-left: auto; font: 600 11px var(--ui); border: 1px solid var(--line);
+                  background: var(--panel); color: var(--ink); border-radius: 7px;
+                  padding: 4px 10px; cursor: pointer; display: inline-flex;
+                  align-items: center; gap: 5px; }
+    .ea-wsx-3dbtn:hover { border-color: var(--forest); color: var(--forest); }
+    .ea-wsx-3dbtn.on { background: var(--forest); border-color: var(--forest); color: var(--onbrand); }
+    .ea-wsx-3dbtn svg, .ea-wsx-3dbtn .fa { font-size: 10px; }
+    .ea-wsx-threewrap { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 10px; }
     /* Point-density control, floating over the map (LAZ layers only) */
     .ea-wsx-lasctl { position: absolute; left: 12px; bottom: 14px; z-index: 620;
                   background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
@@ -801,7 +812,7 @@ page_fillable(
     .ea-wsx-tdh { font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em;
                   color: var(--bark); margin-bottom: 8px; }
     /* Step 6: Map-view attribute-table dock */
-    .ea-wsx-maptop { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font-size: 13px; font-weight: 620; }
+    .ea-wsx-maptop { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; font-weight: 620; }
     .ea-wsx-mapsub { font: 400 11px var(--mono); color: var(--bark); }
     .ea-wsx-attrdock { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px;
                   overflow: hidden; background: var(--panel); }
@@ -1044,6 +1055,25 @@ page_fillable(
     }
     .settings-action-btn .fa { font-size: 13px; }
     .settings-hint { font-size: 11px; color: var(--bark); margin: 0; }
+    .settings-flash { animation: setFlash 1.2s ease; }
+    @keyframes setFlash { 0%, 100% { background: transparent; }
+                          25% { background: color-mix(in srgb, var(--forest) 16%, transparent); } }
+    /* Buttons: bslib bakes the dark palette into Bootstrap's own button vars,
+       declared ON .btn, so the :root remap in the surfaces block cannot reach
+       them (same root cause as the tables and accordions). */
+    .btn { --bs-btn-bg: transparent; --bs-btn-color: var(--ink);
+           --bs-btn-border-color: var(--line); --bs-btn-hover-color: var(--ink);
+           --bs-btn-hover-bg: var(--sunk); --bs-btn-hover-border-color: var(--forest);
+           --bs-btn-active-bg: var(--sunk); --bs-btn-active-color: var(--ink);
+           --bs-btn-disabled-color: var(--bark); --bs-btn-disabled-bg: transparent; }
+    .btn-success, .btn-primary { --bs-btn-bg: var(--forest); --bs-btn-color: var(--onbrand);
+           --bs-btn-border-color: var(--forest); --bs-btn-hover-bg: var(--canopy);
+           --bs-btn-hover-color: var(--onbrand); --bs-btn-hover-border-color: var(--canopy);
+           --bs-btn-active-bg: var(--canopy); --bs-btn-active-color: var(--onbrand); }
+    /* stated outright: this one is not a Bootstrap button and had no rule that
+       survived the colour sets */
+    .settings-action-btn { background-color: var(--sunk) !important; color: var(--ink) !important; }
+    .settings-action-btn:hover { background-color: var(--tint) !important; color: var(--forest) !important; }
     /* Keyboard shortcut rows */
     .kbd-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -1687,13 +1717,23 @@ page_fillable(
       }
 
       /* ---- Settings drawer ---- */
-      function openSettings(){
+      function openSettings(section){
         var p  = document.getElementById('settings-panel');
         var ov = document.getElementById('settings-overlay');
         ov.style.display = 'block';
         requestAnimationFrame(function(){
           p.classList.add('open');
           ov.style.opacity = '1';
+          /* Menu entries name a SECTION (About, Keyboard shortcuts, ...) — land
+             on it rather than dumping the reader at the top of the panel. */
+          if (section){
+            var el = document.getElementById(section);
+            if (el) setTimeout(function(){
+              el.scrollIntoView({behavior:'smooth', block:'start'});
+              el.classList.add('settings-flash');
+              setTimeout(function(){ el.classList.remove('settings-flash'); }, 1200);
+            }, 240);
+          }
         });
       }
       function closeSettings(){
@@ -2136,7 +2176,7 @@ page_fillable(
       ),
 
       # --- Section: Display ---
-      tags$div(class = "settings-section",
+      tags$div(class = "settings-section", id = "set-display",
         tags$p(class = "settings-section-title", "Display"),
         selectInput("setting_decimal_places", "Decimal places in summaries",
           choices  = c("2 decimal places" = 2, "3 decimal places" = 3,
@@ -2177,7 +2217,7 @@ page_fillable(
       ),
 
       # --- Section: Keyboard Shortcuts ---
-      tags$div(class = "settings-section",
+      tags$div(class = "settings-section", id = "set-keys",
         tags$p(class = "settings-section-title", "Keyboard Shortcuts"),
         .kbdRow("Ctrl + Z",        "Undo last data operation"),
         .kbdRow("Ctrl + Shift + Z","Reset dataset to upload"),
@@ -2191,7 +2231,7 @@ page_fillable(
       ),
 
       # --- Section: About ---
-      tags$div(class = "settings-section",
+      tags$div(class = "settings-section", id = "set-about",
         tags$p(class = "settings-section-title", "About"),
         tags$div(class = "about-logo-mark", icon("lightbulb")),
         tags$div(

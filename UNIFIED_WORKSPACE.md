@@ -445,3 +445,42 @@ own `uiOutput` inside the map container rather than part of `.map_ui()`, so sele
 layer does not re-create the leaflet element and rebuild the map. The sample is cached per
 (layer, budget), and the legend states the decimation outright: "showing 4,000 of 500,802
 points". Verified: 4,000 -> 12,000 markers with the view preserved.
+
+### LAZ: sampled on load, full cloud reachable from the slider (2026-07-29)
+
+Loading is capped for RAM, so the pool holds a SAMPLE (500,802 of this file's
+18,685,539 points). The slider is therefore bounded by the **file's** count, not the
+sample's, and the extra points are read from disk only when the slider asks for them
+(`.las_at()`, a `-keep_random_fraction` read proportional to the request, cached one
+cloud deep). Nothing extra is read at load time.
+
+Points are **never rasterized** — a LAZ layer is a point cloud, not a surface. The map is
+built with `preferCanvas`, so markers are painted onto a canvas instead of becoming one
+DOM node each; that is what keeps large clouds drawable.
+
+The **3D view** is a small button at the right-hand end of the map header strip (not a
+tab), visible only while a point cloud is the selected layer, toggling into the existing
+`lidarPointcloudCanvasUI` viewer and back. Selecting a non-cloud layer while in 3D
+returns to the map rather than stranding the user on a view with no way back.
+
+### Settings and About point at their own sections (2026-07-29)
+
+`Preferences…`, `Keyboard shortcuts` and `About EasyAnalysis` all called a bare
+`openSettings()`, which dumped the reader at the top of the panel — About in particular
+looked like it "opened the settings". `openSettings(section)` now scrolls to the named
+section (`set-display`, `set-keys`, `set-about`) and flashes it briefly.
+
+Bootstrap's button variables were added to the surfaces block: like the tables and
+accordions, `--bs-btn-bg` and friends are declared ON `.btn`, so the `:root` remap never
+reached them.
+
+### Plot titles, axis labels and colour (2026-07-29)
+
+The chart builder takes a title, X and Y labels, and a colour. Blank means "use the
+default" — clearing a label restores the column name rather than blanking the axis.
+Verified at the ggplot level: defaults give `x: dbh / y: height / no title / #2E7D32`;
+customised gives the supplied title, both labels and `#B4531F`.
+
+**Scope note:** this currently covers the workspace chart builder only. Applying it to
+every analysis and model screen needs a shared mechanism rather than 35 copies — see the
+open item in the response accompanying this change.

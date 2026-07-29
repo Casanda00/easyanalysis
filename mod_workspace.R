@@ -29,7 +29,7 @@ workspaceCanvasUI <- function(id) {
           "Data view"),
         tags$button(id = ns("tab_split"), class = "ea-wsx-tab", type = "button",
           onclick = sprintf("Shiny.setInputValue('%s','split',{priority:'event'});", ns("wsview")),
-          "Split")
+          "Split"),
       ),
       # M7: the old tool dropdown is retired — tools are launched from the
       # Processing menu in the top bar. This shows the ACTIVE tool instead.
@@ -77,7 +77,8 @@ workspaceToolsUI <- function(id) {
 }
 
 workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool, active_dataset,
-                            tool_request = reactive(NULL), layer_style = NULL) {
+                            tool_request = reactive(NULL), layer_style = NULL,
+                            src_paths = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     wsview <- reactiveVal("map")
@@ -385,9 +386,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Whitebox tools", NULL, disabled = TRUE)
         )),
         .menu("Settings", "gear", tagList(
-          .mi("Preferences…", "openSettings()"),
+          .mi("Preferences…", "openSettings('set-display')"),
           .msep(),
-          .mi("Keyboard shortcuts", "openSettings()")
+          .mi("Keyboard shortcuts", "openSettings('set-keys')")
         )),
         .menu("Help", "circle-question", tagList(
           .mi("Documentation", .setTool("docs")),
@@ -396,7 +397,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Ask the Co-Analyst", "document.getElementById('chat-panel').classList.add('open')"),
           .mi("Take the tour", "Shiny.setInputValue('ws_tour', Date.now(), {priority:'event'})"),
           .msep(),
-          .mi("About EasyAnalysis", "openSettings()")
+          .mi("About EasyAnalysis", "openSettings('set-about')")
         ))
       )
     })
@@ -625,6 +626,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!length(cols)) return(div(class = "ea-hint",
         "No table active. Select a table layer in the Layers panel."))
       geoms <- c("scatter","histogram","boxplot","line","bars")
+      .keep_txt <- function(id) { v <- isolate(input[[id]]); if (is.null(v)) "" else v }
       tagList(
         div(class = "ea-wsx-chartbar",
           tags$label("Plot"),
@@ -636,6 +638,21 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                       selected = .keep_sel("cy", cols,
                                            if (length(cols) > 1) cols[2] else cols[1]),
                       width = "140px"),
+          # Labels and colour. Blank = use the column name / default green.
+          tags$label("Title"),
+          textInput(ns("ctitle"), NULL, value = .keep_txt("ctitle"),
+                    placeholder = "Plot title", width = "150px"),
+          tags$label("X label"),
+          textInput(ns("clabx"), NULL, value = .keep_txt("clabx"),
+                    placeholder = "auto", width = "110px"),
+          tags$label("Y label"),
+          textInput(ns("claby"), NULL, value = .keep_txt("claby"),
+                    placeholder = "auto", width = "110px"),
+          tags$label("Colour"),
+          tags$input(type = "color", id = ns("ccol"), class = "ea-wsx-colpick",
+                     value = isolate(input$ccol) %||% "#2E7D32",
+                     onchange = sprintf(
+                       "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("ccol"))),
           # static (ggplot) <-> interactive (plotly: hover, zoom, pan, select)
           div(class = "ea-wsx-cmode",
             tags$button(class = paste("ea-wsx-cmb", if (!identical(input$cmode %||% "static", "interactive")) "on" else ""),
@@ -656,12 +673,25 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             div(class = "ea-wsx-tdh", "Data table · ", tags$b(dtName() %||% "—")),
             DT::dataTableOutput(ns("dt")))))
     }
+    .three_ui <- function() {
+      if (!length(Filter(function(x) identical(x$kind, "lidar"), layers())))
+        return(div(class = "ea-hint",
+          "No point cloud in this project. Add a .las/.laz file to use the 3D view."))
+      tagList(
+        div(class = "ea-wsx-maptop", tags$span("3D view"),
+            tags$span(class = "ea-wsx-mapsub", "Drag to rotate · scroll to zoom"),
+            uiOutput(ns("tab_three_ui"), inline = TRUE)),
+        div(class = "ea-wsx-threewrap", lidarPointcloudCanvasUI("lidar")))
+    }
     .map_ui <- function() {
       act <- activeLayer(); vis <- Filter(function(l) .vis(l$nm) && l$kind != "table", layers())
       tagList(
         div(class = "ea-wsx-maptop", tags$span("Map view"),
           tags$span(class = "ea-wsx-mapsub", "Visible: ",
-            if (length(vis)) paste(vapply(vis, function(l) l$nm, character(1)), collapse = ", ") else "none")),
+            if (length(vis)) paste(vapply(vis, function(l) l$nm, character(1)), collapse = ", ") else "none"),
+          # 3D viewer: sits at the right-hand end of this strip, and only while
+          # a point cloud is the selected layer.
+          uiOutput(ns("tab_three_ui"), inline = TRUE)),
         leaflet::leafletOutput(ns("map"), height = "100%"),
         # Point-density control. Rendered as its own small output rather than
         # inside .map_ui() so that selecting a layer does NOT re-create the
@@ -708,7 +738,8 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               onclick = sprintf("Shiny.setInputValue('%s','',{priority:'event'})", ns("tool_pick")),
               "← back")),
           div(class = "ea-wsx-modcanvas", mi$canvas(mi$id))))
-      if (identical(wsview(), "data")) .data_ui() else .map_ui()
+      if (identical(wsview(), "three")) .three_ui()
+      else if (identical(wsview(), "data")) .data_ui() else .map_ui()
     })
 
     # Step 6: attribute-table dock (Map view) — active layer's features / raster info
@@ -886,11 +917,52 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # Decimated hard on purpose: the pool holds up to 500k points and leaflet
     # renders one DOM element per marker, so the full cloud would lock the
     # browser. Cached per layer — this runs on every map rebuild otherwise.
-    .LAS_DRAW_CAP <- 4000L
+    .LAS_DRAW_CAP   <- 4000L      # points drawn by default
+    .LAS_MARKER_MAX <- 25000L     # above this, markers stop being viable (see below)
     lden <- reactiveValues()                       # per-layer point budget
     .las_cap <- function(nm) {
       v <- if (is.null(nm)) NULL else lden[[nm]]
       if (is.null(v)) .LAS_DRAW_CAP else as.integer(v)
+    }
+    .las_read_cache <- new.env(parent = emptyenv())
+    .las_src <- function(nm) {
+      if (is.null(src_paths) || is.null(nm)) return("")
+      p <- tryCatch(src_paths[[nm]], error = function(e) NULL)
+      if (is.null(p) || !nzchar(p) || !file.exists(p)) "" else p
+    }
+    # Points in the ORIGINAL FILE. Loading is capped for RAM, so the pool holds
+    # a sample; the slider is bounded by the file so the whole cloud is
+    # reachable, and the extra points are read only WHEN THE SLIDER ASKS.
+    .las_total <- function(nm) {
+      p <- .las_src(nm); if (!nzchar(p)) return(NA_real_)
+      tryCatch({
+        h <- lidR::readLASheader(p)
+        n <- h@PHB[["Number of point records"]]
+        if (is.null(n) || is.na(n) || n == 0) n <- h@PHB[["Number of points by return"]][1]
+        as.numeric(n)
+      }, error = function(e) NA_real_)
+    }
+    # A cloud holding at least `cap` points, re-reading from disk only when the
+    # pool's sample is thinner than asked. Read cost is proportional to the ask,
+    # not the whole file, via a random-fraction filter.
+    .las_at <- function(nm, cap) {
+      las  <- las_pool[[nm]]
+      have <- tryCatch(if (is.null(las) || inherits(las, "LASheader")) 0L else nrow(las@data),
+                       error = function(e) 0L)
+      if (have >= cap) return(las)
+      p <- .las_src(nm); if (!nzchar(p)) return(las)
+      tot <- .las_total(nm); if (is.na(tot) || tot <= have) return(las)
+      key <- paste0(nm, "|", cap)
+      if (!is.null(.las_read_cache[[key]])) return(.las_read_cache[[key]])
+      out <- tryCatch({
+        f <- if (tot > cap) paste("-keep_random_fraction", round(min(1, cap / tot), 6)) else ""
+        lidR::readLAS(p, filter = f)
+      }, error = function(e) NULL)
+      if (is.null(out)) return(las)
+      if (length(ls(.las_read_cache)) > 1L)   # a full cloud is large; keep one
+        rm(list = ls(.las_read_cache), envir = .las_read_cache)
+      assign(key, out, envir = .las_read_cache)
+      out
     }
     .las_pts_cache <- new.env(parent = emptyenv())
     .las_points <- function(x, cap = .LAS_DRAW_CAP) {
@@ -1009,20 +1081,28 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             # where the data was but not what it looked like. Drawn as a
             # DECIMATED sample: the pool holds up to 500k points and the browser
             # cannot take that many markers, so a few thousand carry the shape.
-            las <- las_pool[[l$nm]]
+            cap <- .las_cap(l$nm)
+            las <- .las_at(l$nm, cap) %||% las_pool[[l$nm]]   # reads more only if asked
             e   <- .las_bbox(las)
-            pts <- .las_points(las, .las_cap(l$nm))
+            pts <- .las_points(las, cap)
             mm  <- m
             if (!is.null(e))                       # outline of the full tile
               mm <- leaflet::addRectangles(mm, e[1], e[2], e[3], e[4],
                       color = "#D99B57", weight = 1.2, fill = FALSE,
                       label = l$nm, group = "ws_layers")
             if (is.null(pts)) mm else {
+              # ALWAYS real points — a LAZ layer is a point cloud, not a surface.
+              # The map is built with preferCanvas so these are painted onto a
+              # canvas rather than becoming one DOM node each, which is what
+              # keeps large clouds drawable.
               pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(pts$Z),
                                            na.color = "transparent")
-              leaflet::addCircleMarkers(mm, data = pts, radius = 2, stroke = FALSE,
-                fillOpacity = .75, fillColor = pal(pts$Z), group = "ws_layers",
-                label = paste0(l$nm, " · Z ", round(pts$Z, 1)))
+              big <- nrow(pts) > .LAS_MARKER_MAX
+              leaflet::addCircleMarkers(mm, data = pts,
+                radius = if (big) 1.4 else 2, stroke = FALSE,
+                fillOpacity = if (big) .6 else .75,
+                fillColor = pal(pts$Z), group = "ws_layers",
+                label = if (big) NULL else paste0(l$nm, " · Z ", round(pts$Z, 1)))
             }
           } else {
             v <- vector_pool[[l$nm]]
@@ -1063,7 +1143,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                Filter(function(x) x$kind %in% c("raster","vector","lidar") && .vis(x$nm), layers()),
                function(l) l$nm, character(1)), collapse = "|"), error = function(e) ""))
       fr  <- isolate(fit_req())
-      m <- leaflet::leaflet()
+      # preferCanvas: point clouds are drawn as circle markers, and the default
+      # SVG renderer makes one DOM node per point. Canvas keeps tens of
+      # thousands of points viable without turning them into a raster.
+      m <- leaflet::leaflet(options = leaflet::leafletOptions(preferCanvas = TRUE))
       # An explicit "Zoom to ..." outranks everything; then the automatic
       # first-fit for a new layer set; then wherever the user had panned to.
       if (!is.null(fr)) {
@@ -1107,6 +1190,28 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     }, ignoreInit = FALSE)
 
 
+    .active_is_lidar <- reactive({
+      a <- activeLayer()
+      if (is.null(a)) return(FALSE)
+      l <- Filter(function(x) identical(x$nm, a), layers())
+      length(l) > 0 && identical(l[[1]]$kind, "lidar")
+    })
+    output$tab_three_ui <- renderUI({
+      if (!.active_is_lidar()) return(NULL)
+      on3d <- identical(wsview(), "three")
+      tags$button(id = ns("tab_three"),
+        class = paste("ea-wsx-3dbtn", if (on3d) "on" else ""), type = "button",
+        title = if (on3d) "Back to the map" else "Open the 3D point cloud",
+        onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'});",
+                          ns("wsview"), if (on3d) "map" else "three"),
+        icon("cube"), " 3D view")
+    })
+    # Selecting a non-cloud layer takes the 3D tab away, so do not strand the
+    # user on a view that no longer has a tab.
+    observe({
+      if (identical(wsview(), "three") && !.active_is_lidar()) wsview("map")
+    })
+
     # Visible ONLY while a point cloud is the selected layer — it is that
     # layer's control, and an always-on slider would be noise for everything else.
     output$las_ctl <- renderUI({
@@ -1116,15 +1221,17 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       x <- las_pool[[a]]
       n <- tryCatch(if (is.null(x) || inherits(x, "LASheader")) 0L else nrow(x@data),
                     error = function(e) 0L)
-      if (!n) return(NULL)
-      hi  <- min(50000L, n)
+      tot <- .las_total(a)
+      hi  <- if (!is.na(tot) && tot > 0) tot else n     # the FILE's point count
+      if (!hi) return(NULL)
       cur <- min(.las_cap(a), hi)
       div(class = "ea-wsx-lasctl",
         div(class = "ea-wsx-lasctl-h", "Points shown"),
-        sliderInput(ns("las_density"), NULL, min = 500L, max = hi, value = cur,
-                    step = 500L, width = "170px", ticks = FALSE),
+        sliderInput(ns("las_density"), NULL, min = 500, max = hi, value = cur,
+                    step = max(500, round(hi / 200)), width = "170px", ticks = FALSE),
         div(class = "ea-wsx-lasctl-n",
-            paste0("of ", format(n, big.mark = ","), " loaded · more = slower")))
+            paste0("of ", format(hi, big.mark = ","), " in file",
+                   if (cur > .LAS_MARKER_MAX) " · heavy" else "")))
     })
     observeEvent(input$las_density, {
       a <- activeLayer(); req(a)
@@ -1180,23 +1287,31 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       req(isTruthy(x))
       num <- function(c) suppressWarnings(as.numeric(df[[c]]))
       g <- ggplot2::ggplot(df)
-      fg <- "#2E7D32"; sky <- "#3E7CB1"
+      # User-set colour and labels. Empty means "use the sensible default", so
+      # clearing a box restores the column name rather than blanking the axis.
+      fg  <- if (isTruthy(input$ccol)) input$ccol else "#2E7D32"
+      sky <- fg
+      .lab <- function(user, dflt) if (isTruthy(user)) user else dflt
       p <- switch(geom,
         histogram = g + ggplot2::aes(x = num(x)) +
                     ggplot2::geom_histogram(fill = sky, colour = "white", bins = 20) +
-                    ggplot2::labs(x = x, y = "count"),
+                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, "count")),
         boxplot   = { req(isTruthy(y)); g + ggplot2::aes(y = num(y)) +
-                    ggplot2::geom_boxplot(fill = fg, alpha = .7) + ggplot2::labs(y = y) },
+                    ggplot2::geom_boxplot(fill = fg, alpha = .7) +
+                    ggplot2::labs(y = .lab(input$claby, y)) },
         bars      = g + ggplot2::aes(x = factor(df[[x]])) +
                     ggplot2::geom_bar(fill = fg) +
-                    ggplot2::labs(x = x, y = "count") +
+                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, "count")) +
                     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)),
         line      = { req(isTruthy(y)); g + ggplot2::aes(x = num(x), y = num(y)) +
-                    ggplot2::geom_line(colour = fg, linewidth = .9) + ggplot2::labs(x = x, y = y) },
+                    ggplot2::geom_line(colour = fg, linewidth = .9) +
+                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, y)) },
         { req(isTruthy(y)); g + ggplot2::aes(x = num(x), y = num(y)) +
                     ggplot2::geom_point(colour = fg, size = 2.2, alpha = .85) +
-                    ggplot2::labs(x = x, y = y) })
-      p + ggplot2::theme_minimal(base_size = 12)
+                    ggplot2::labs(x = .lab(input$clabx, x), y = .lab(input$claby, y)) })
+      if (isTruthy(input$ctitle)) p <- p + ggplot2::labs(title = input$ctitle)
+      p + ggplot2::theme_minimal(base_size = 12) +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 13))
     })
 
     output$chart_i <- plotly::renderPlotly({
