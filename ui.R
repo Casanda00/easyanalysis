@@ -250,6 +250,29 @@ page_fillable(
     .nav-tabs { --bs-nav-tabs-link-active-bg: var(--panel);
              --bs-nav-tabs-link-active-color: var(--ink);
              --bs-nav-tabs-border-color: var(--line); }
+    /* Linear regression: one output area chosen from a dropdown (backlog 12) */
+    .lm-view-label { font: 600 9px var(--mono); text-transform: uppercase;
+                  letter-spacing: .08em; color: var(--bark); }
+    .lm-viewport { padding: 10px 12px; min-height: 320px; display: flex; flex-direction: column; }
+    /* 2+ selected: stacked panes with a draggable divider between them */
+    .lm-panes { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 460px; }
+    .lm-pane { display: flex; flex-direction: column; min-height: 60px; overflow: hidden;
+                  flex: 1 1 0; }
+    .lm-pane-h { flex: none; font: 600 8.5px var(--mono); text-transform: uppercase;
+                  letter-spacing: .08em; color: var(--bark); padding: 2px 0 4px; }
+    .lm-pane-b { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .lm-split { flex: none; height: 7px; margin: 2px 0; cursor: row-resize;
+                  border-top: 1px solid var(--line); position: relative; }
+    .lm-split:hover, .lm-split.dragging { border-top-color: var(--forest); }
+    .lm-split::after { content: ''; position: absolute; left: 50%; top: 1px;
+                  width: 34px; height: 3px; margin-left: -17px; border-radius: 2px;
+                  background: var(--line); }
+    .lm-split:hover::after, .lm-split.dragging::after { background: var(--forest); }
+    .lm-scroll { overflow: auto; max-height: 60vh; }
+    .lm-formula-box { padding: 7px 10px; margin-bottom: 8px; font-size: 12px;
+                  background: var(--sunk); color: var(--ink);
+                  border: 1px solid var(--line); border-radius: 6px; }
+    .card-header .shiny-input-container { margin-bottom: 0; }
     /* Bootstrap UTILITY colour classes. ~51 card headers across the modules use
        .bg-light, which bslib compiles from the DEFAULT (dark) palette — so it is
        a near-black that never follows the theme. That is the black bar reported
@@ -1670,6 +1693,32 @@ page_fillable(
             });
           });
         }, 400);
+      });
+      /* Stacked output panes: drag a divider to trade height between the pane
+         above it and the one below. Sizes are flex-basis, so the panes keep
+         filling the area no matter how many are shown. */
+      document.addEventListener('mousedown', function(e){
+        var sp = e.target.closest ? e.target.closest('.lm-split') : null;
+        if (!sp) return;
+        var prev = sp.previousElementSibling, next = sp.nextElementSibling;
+        if (!prev || !next) return;
+        var sy = e.clientY, ph = prev.getBoundingClientRect().height,
+            nh = next.getBoundingClientRect().height;
+        sp.classList.add('dragging'); document.body.classList.add('ea-resizing');
+        function mv(ev){
+          var d = ev.clientY - sy;
+          var a = Math.max(60, ph + d), b = Math.max(60, nh - d);
+          prev.style.flex = '0 0 ' + a + 'px';
+          next.style.flex = '0 0 ' + b + 'px';
+        }
+        function up(){
+          sp.classList.remove('dragging'); document.body.classList.remove('ea-resizing');
+          document.removeEventListener('mousemove', mv);
+          document.removeEventListener('mouseup', up);
+          window.dispatchEvent(new Event('resize'));
+        }
+        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+        e.preventDefault();
       });
       /* Side panels are resizable by dragging their shared border. The width is
          written to a CSS variable on the grid, so the collapse classes keep

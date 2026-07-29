@@ -234,17 +234,36 @@ open, with no repeat picks needed.
 **Consequence for item 12:** that redesign is now a layout change over working content,
 not a way to hide broken panes.
 
-## 12. Stop competing for space — one view with a dropdown
+## 12. Stop competing for space — SELECT what to show, and it splits — FIXED 2026-07-29
 
 > "maybe we should start competing for view and do the simple thing: use a drop down for
 > view. this applies to model summary, performance metrics, LLOCV, ANOVA table, the plots,
 > Assumption checks. they are too clutter. one view, a drop down to change."
 
-A layout principle, not a single fix: **one output area, a dropdown to choose what it
-shows.** Applies to Model summary, Performance metrics, LOOCV, ANOVA table, plots and
-assumption checks. Likely the same treatment for other model screens afterwards.
-This subsumes part of item 11 — decide 11 first, since a dropdown over broken panes is
-worse than no panes.
+Built first as a single-view dropdown, then extended on the reporter's suggestion: the
+dropdown is **multi-select**, and picking more than one splits the area between them with
+a draggable divider.
+
+**The default is deliberately ONE.** That is the whole point — clutter you chose is fine,
+clutter by default is what was wrong. Six outputs no longer arrive uninvited.
+
+**Stacked, not side by side.** Summary, ANOVA and metrics are wide monospace text that
+wraps badly at half width, and plots want width too. Stacking keeps full width for every
+pane and trades height instead.
+
+Header controls follow the selection: the CSV download appears when the summary is shown,
+the Grid/Single switch when the plots are, and both together when both are.
+
+**Presentation only** — every output id is unchanged, so the server renders exactly what
+item 11 verified was already working.
+
+Verified: one selection renders with no pane wrappers; selecting summary + ANOVA +
+diagnostics gives 3 labelled panes and 2 dividers, each with real content (602 chars,
+245 chars, 1 plot) and the header showing `CSV Grid Single`; dragging a divider moves
+146/146/146 to 206/86/146, so it trades height between its two neighbours and leaves the
+third alone.
+
+**Still to do:** the same treatment for the other model screens.
 
 ## 13. Plot appearance belongs above the plot, and multi-variable handling
 

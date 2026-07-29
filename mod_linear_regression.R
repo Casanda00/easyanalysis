@@ -300,59 +300,47 @@ lmToolsUI <- function(id) {
 
 lmCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    id = ns("main_tab"),
-
-    nav_panel("Results",
-      uiOutput(ns("interp_ui")),
-      layout_columns(col_widths = c(8, 4),
-        card(
-          card_header(class = "d-flex justify-content-between align-items-center",
-            "Model Summary",
-            downloadButton(ns("dl_coefs"), "CSV", class = "btn-sm btn-outline-secondary")),
-          div(class = "formula-box",
-            style = "padding:8px 10px;background:var(--sunk);color:var(--ink);border-bottom:1px solid var(--line);font-size:12px;",
-            textOutput(ns("formula_display"))),
-          div(style = "overflow-y:auto;max-height:340px;padding:5px;",
-            verbatimTextOutput(ns("summary")))
-        ),
-        card(
-          card_header("Performance Metrics"),
-          div(style = "padding:5px;overflow-y:auto;max-height:380px;",
-            verbatimTextOutput(ns("uef_metrics")))
-        ),
-        card(
-          card_header("LOOCV (Leave-One-Out Cross-Validation)"),
-          div(style = "padding:5px;", verbatimTextOutput(ns("loocv_out")))
-        )
-      ),
-      card(
-        card_header("ANOVA / Deviance Table"),
-        div(style = "overflow-y:auto;max-height:260px;padding:5px;",
-          verbatimTextOutput(ns("anova")))
-      )
+  # You choose what is on screen, and it splits between them.
+  #
+  # This screen used to show six outputs at once across three tabs: summary,
+  # metrics and LOOCV squeezed side by side, ANOVA below them, plots and
+  # assumption checks on their own tabs. Everything competed for the same space
+  # and nothing had enough of it.
+  #
+  # DEFAULT IS ONE. That is the whole point -- clutter you chose is fine, clutter
+  # by default is what was wrong. Pick a second output and the area splits, with
+  # a draggable divider between panes.
+  #
+  # Stacked rather than side by side on purpose: summary, ANOVA and metrics are
+  # wide monospace text that wraps badly at half width, and plots want width too.
+  # Stacking keeps full width for every pane and lets you trade height instead.
+  #
+  # Note this is presentation only -- every output id is unchanged, so the
+  # server still renders exactly what it did before (verified working: R-squared
+  # and RMSE, the diagnostic plot, Shapiro-Wilk and the rest).
+  card(
+    card_header(
+      class = "d-flex justify-content-between align-items-center gap-2",
+      div(class = "d-flex align-items-center gap-2",
+        tags$span(class = "lm-view-label", "Show"),
+        selectizeInput(ns("view_pick"), NULL, width = "330px", multiple = TRUE,
+          choices = c("Model summary"      = "summary",
+                      "Performance metrics" = "metrics",
+                      "Cross-validation (LOOCV)" = "loocv",
+                      "ANOVA / deviance table"   = "anova",
+                      "Diagnostic plots"    = "diag",
+                      "Assumption checks"   = "assume"),
+          selected = "summary",
+          options = list(plugins = list("remove_button"),
+                         placeholder = "Pick one or more"))),
+      # Controls that belong to the CURRENT view only, so the header does not
+      # carry buttons for things that are not on screen.
+      uiOutput(ns("view_tools"), inline = TRUE)
     ),
-
-    nav_panel("Diagnostics",
-      card(
-        card_header(
-          class = "d-flex justify-content-between align-items-center bg-light",
-          "Diagnostic Plots",
-          div(class = "d-flex align-items-center gap-2",
-            uiOutput(ns("diag_mode_ui")),
-            uiOutput(ns("single_selector"))
-          )
-        ),
-        plotOutput(ns("diag_plot"), height = "480px")
-      )
-    ),
-
-    nav_panel("Assumptions",
-      card(
-        card_header("Assumption Checks"),
-        div(style = "padding:10px;", uiOutput(ns("assumption_ui")))
-      )
-    )
+    # The interpretation line stays visible across views: it is the plain-English
+    # answer, and hiding it behind a dropdown choice would bury the point.
+    uiOutput(ns("interp_ui")),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
@@ -363,6 +351,54 @@ lmCanvasUI <- function(id) {
 lmServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # ---- The single view area (backlog item 12) ----------------------------
+    # Renders ONE output at a time. Every id here is the same one the rest of
+    # this server already writes to, so nothing about the modelling changed.
+    .VIEW_NAMES <- c(summary = "Model summary", metrics = "Performance metrics",
+                     loocv = "Cross-validation (LOOCV)", anova = "ANOVA / deviance table",
+                     diag = "Diagnostic plots", assume = "Assumption checks")
+    .view_one <- function(k, solo) switch(k,
+      summary = tagList(
+        div(class = "lm-formula-box", textOutput(ns("formula_display"))),
+        div(class = "lm-scroll", verbatimTextOutput(ns("summary")))),
+      metrics = div(class = "lm-scroll", verbatimTextOutput(ns("uef_metrics"))),
+      loocv   = div(class = "lm-scroll", verbatimTextOutput(ns("loocv_out"))),
+      anova   = div(class = "lm-scroll", verbatimTextOutput(ns("anova"))),
+      # A plot needs a real height; when sharing the area it takes the pane's.
+      diag    = plotOutput(ns("diag_plot"), height = if (solo) "560px" else "100%"),
+      assume  = div(class = "lm-scroll", uiOutput(ns("assumption_ui"))),
+      NULL)
+
+    output$view_body <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- "summary"        # never show an empty canvas
+      if (length(picked) == 1) return(.view_one(picked, solo = TRUE))
+      # 2+ : stacked panes, each labelled, with a draggable divider between them
+      panes <- list()
+      for (i in seq_along(picked)) {
+        k <- picked[[i]]
+        if (i > 1) panes[[length(panes) + 1]] <- div(class = "lm-split",
+                                                     title = "Drag to resize")
+        panes[[length(panes) + 1]] <- div(class = "lm-pane",
+          div(class = "lm-pane-h", .VIEW_NAMES[[k]] %||% k),
+          div(class = "lm-pane-b", .view_one(k, solo = FALSE)))
+      }
+      div(class = "lm-panes", panes)
+    })
+    # Header controls follow the view: the CSV download belongs to the summary,
+    # the grid/single switch belongs to the plots, and neither should sit in the
+    # header while the other is showing.
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- "summary"
+      tagList(
+        if ("summary" %in% picked)
+          downloadButton(ns("dl_coefs"), "CSV", class = "btn-sm btn-outline-secondary"),
+        if ("diag" %in% picked)
+          div(class = "d-flex align-items-center gap-2",
+              uiOutput(ns("diag_mode_ui")), uiOutput(ns("single_selector"))))
+    })
 
     active_data <- reactive({
       ds <- active_dataset()
