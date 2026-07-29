@@ -705,12 +705,12 @@ page_fillable(
     /* flip to the left when the menu is near the right edge of the window */
     .gm-sub.flip { left: auto; right: 100%; }
     /* panel visibility toggles (Controls menu) */
-    .ea-wsx-grid.no-left  { grid-template-columns: 0 1fr 240px 46px; }
-    .ea-wsx-grid.no-right { grid-template-columns: 200px 1fr 0 46px; }
-    .ea-wsx-grid.no-dock  { grid-template-columns: 200px 1fr 240px 0; }
+    .ea-wsx-grid.no-left  { grid-template-columns: 0 1fr var(--ws-right, 240px) 46px; }
+    .ea-wsx-grid.no-right { grid-template-columns: var(--ws-left, 200px) 1fr 0 46px; }
+    .ea-wsx-grid.no-dock  { grid-template-columns: var(--ws-left, 200px) 1fr var(--ws-right, 240px) 0; }
     .ea-wsx-grid.no-left.no-right  { grid-template-columns: 0 1fr 0 46px; }
-    .ea-wsx-grid.no-left.no-dock   { grid-template-columns: 0 1fr 240px 0; }
-    .ea-wsx-grid.no-right.no-dock  { grid-template-columns: 200px 1fr 0 0; }
+    .ea-wsx-grid.no-left.no-dock   { grid-template-columns: 0 1fr var(--ws-right, 240px) 0; }
+    .ea-wsx-grid.no-right.no-dock  { grid-template-columns: var(--ws-left, 200px) 1fr 0 0; }
     .ea-wsx-grid.no-left.no-right.no-dock { grid-template-columns: 0 1fr 0 0; }
     .ea-wsx-grid.no-left  > .ea-wsx-left,
     .ea-wsx-grid.no-right > .ea-wsx-right,
@@ -731,8 +731,20 @@ page_fillable(
                   border-radius: 50%; width: 22px; height: 22px; cursor: pointer;
                   font: 600 13px var(--mono); line-height: 1; }
     .ea-wsx-atl-x:hover { border-color: var(--danger); color: var(--danger); }
-    .ea-wsx-grid { flex: 1 1 auto; display: grid; grid-template-columns: 200px 1fr 240px 46px; min-height: 0; }
-    .ea-wsx-left, .ea-wsx-right { background: var(--sunk); padding: 12px 11px; overflow-y: auto; }
+    /* Side panel widths are VARIABLES so the drag handles can set them; the
+       collapse variants below only ever zero the column they hide, leaving the
+       other panel at whatever width the user chose. */
+    .ea-wsx-grid { flex: 1 1 auto; display: grid; min-height: 0;
+                  grid-template-columns: var(--ws-left, 200px) 1fr var(--ws-right, 240px) 46px; }
+    .ea-wsx-left, .ea-wsx-right { background: var(--sunk); padding: 12px 11px;
+                  overflow-y: auto; position: relative; }
+    /* Drag handles sit ON the shared border, a few pixels wide, and only show
+       themselves on hover so they do not add visual noise. */
+    .ea-wsx-resize { position: absolute; top: 0; bottom: 0; width: 6px; cursor: col-resize;
+                  z-index: 30; background: transparent; transition: background .12s; }
+    .ea-wsx-resize.l { right: -3px; } .ea-wsx-resize.r { left: -3px; }
+    .ea-wsx-resize:hover, .ea-wsx-resize.dragging { background: var(--forest); }
+    body.ea-resizing { cursor: col-resize; user-select: none; }
     .ea-wsx-left { border-right: 1px solid var(--line); } .ea-wsx-right { border-left: 1px solid var(--line); }
     .ea-wsx-left h6, .ea-wsx-right h6 { font: 600 10px var(--mono); letter-spacing: .12em;
                   text-transform: uppercase; color: var(--bark); margin: 0 0 10px; }
@@ -1658,6 +1670,32 @@ page_fillable(
             });
           });
         }, 400);
+      });
+      /* Side panels are resizable by dragging their shared border. The width is
+         written to a CSS variable on the grid, so the collapse classes keep
+         working and a hidden panel does not lose the width it had. */
+      document.addEventListener('mousedown', function(e){
+        var h = e.target.closest ? e.target.closest('.ea-wsx-resize') : null;
+        if (!h) return;
+        var grid = h.closest('.ea-wsx-grid'); if (!grid) return;
+        var isLeft = h.classList.contains('l');
+        var panel  = h.parentNode, startW = panel.getBoundingClientRect().width;
+        var sx = e.clientX;
+        h.classList.add('dragging'); document.body.classList.add('ea-resizing');
+        function mv(ev){
+          var d = ev.clientX - sx;
+          var w = Math.round(isLeft ? startW + d : startW - d);
+          w = Math.max(140, Math.min(520, w));
+          grid.style.setProperty(isLeft ? '--ws-left' : '--ws-right', w + 'px');
+        }
+        function up(){
+          h.classList.remove('dragging'); document.body.classList.remove('ea-resizing');
+          document.removeEventListener('mousemove', mv);
+          document.removeEventListener('mouseup', up);
+          window.dispatchEvent(new Event('resize'));   /* let plots re-measure */
+        }
+        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+        e.preventDefault();
       });
       /* .ea-pop behaviour. Hover alone is not enough for a panel holding
          inputs: the moment focus moves the pointer can leave and the panel

@@ -167,12 +167,25 @@ The two remaining hex values are `abline(col = "#2e7d32")` inside base plots, le
 deliberately: base graphics render on their own white device regardless of the app theme,
 so a themed colour there would be wrong, not right.
 
-## 9. Adjustable sidebar
+## 9. Adjustable sidebar — FIXED 2026-07-29
 
 > "can we make the sidebar adjustable?"
 
-Draggable width for the workspace side panels. The app already has drag-to-resize for the
-console dock, the attribute dock and the data-view split, so reuse that pattern.
+Both side panels take a drag handle on their shared border: a 6 px strip that stays
+invisible until hovered, so it adds no visual noise.
+
+The widths are **CSS variables on the grid** (`--ws-left`, `--ws-right`) rather than inline
+widths on the panels. That matters because the panel-collapse classes rewrite
+`grid-template-columns`: with fixed values they would have thrown away whatever width the
+user had chosen. Written this way, hiding one panel zeroes only its own column and the
+other keeps its size.
+
+Clamped to 140-520 px, and a `resize` event fires on release so plots re-measure.
+
+Verified: left 200 -> 290 on a +90 px drag, right 240 -> 310 on a -70 px drag, a 2000 px
+drag clamps at 520, and with the left panel hidden the computed template is
+`0px 1162.8px 310px 46px` — the right panel holds its custom width and the canvas takes
+the freed space.
 
 ## 10. Regression output highlighting is unreadable — FIXED 2026-07-29
 

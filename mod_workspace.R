@@ -38,13 +38,15 @@ workspaceCanvasUI <- function(id) {
     div(class = "ea-wsx-grid",
       tags$aside(class = "ea-wsx-left",
         tags$h6("Layers / Data"),
-        uiOutput(ns("layers"))
+        uiOutput(ns("layers")),
+        tags$div(class = "ea-wsx-resize l", title = "Drag to resize")
       ),
       tags$main(class = "ea-wsx-canvas",
         uiOutput(ns("canvas")),
         div(class = "ea-wsx-panels", uiOutput(ns("panels")))
       ),
       tags$aside(class = "ea-wsx-right",
+        tags$div(class = "ea-wsx-resize r", title = "Drag to resize"),
         tags$h6("Tool"),
         uiOutput(ns("tool"))
       ),
