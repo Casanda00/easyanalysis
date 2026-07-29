@@ -280,21 +280,29 @@ it was written for.
 `mod_linear_regression.R` keeps its own copy because it also has per-view header controls
 (the CSV download, the grid/single switch) that the generic helper does not model.
 
-## 13. Plot appearance belongs above the plot, and multi-variable handling
+## 13. Plot appearance belongs above the plot — FIXED 2026-07-29
 
 > "the plot appearance button should not be in the side bar, it should be on top of the
 > plot. i think it only applies to single variables, what if we have multiple variables,
 > does it handle it?"
 
-- **Move it.** The `.ea-pop` icon should sit above the plot it affects, not in the tool
-  panel. It is one icon, so this is cheap.
-- **The multi-variable question — answer, because it is a real limitation.** The colour
-  setting is applied only to layers carrying a **fixed** colour or fill. Layers that map
-  colour to a *variable* are deliberately left alone, because overriding them would
-  destroy the encoding and make the plot lie. So on a multi-series plot the single colour
-  does **not** apply, by design. Title and axis labels work regardless.
-  **Decide:** whether multi-series plots should get a palette choice (a set of colours)
-  rather than one colour. That is the honest fix, and is more work than a colour picker.
+**Moved.** The `.ea-pop` icon now sits in the result header, directly above the module's
+canvas, and is gone from the tool panel. It changes what you are looking at, so it belongs
+with it rather than across the screen. Verified: header reads
+`Linear regression | Plot appearance … | ← back`, the icon is above the canvas, and no
+copy remains in the sidebar.
+
+**Multi-series colour:** parked at the reporter's request. Title and axis labels work
+regardless; the single colour applies only to fixed-colour layers, and a palette for
+multi-series plots is a separate piece of work.
+
+**Console plots are NOT affected — deliberately.** Asked whether the tool colours plots
+drawn from the R console. Tested: it does not (10 px of title ink in the top band, i.e.
+none). It was true only by accident, because the console prints its ggplot itself rather
+than returning it to the wrapper, so `mod_rconsole.R` now calls `shiny::renderPlot`
+explicitly with a comment saying why. In the console **your code is the source of truth**:
+if you write `geom_point(colour = "red")`, the app repainting it from a screen's settings
+would be the app lying about what your script does.
 
 ---
 

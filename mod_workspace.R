@@ -789,6 +789,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         return(tagList(
           div(class = "ea-wsx-resulthead",
             span(class = "ea-wsx-toolnm", mi$nm),
+            # Plot appearance belongs WITH THE PLOT, not across the screen in the
+            # tool panel: it changes what you are looking at, so it sits above it.
+            .plot_opts_ui(inline = TRUE),
             tags$button(class = "ea-wsx-backbtn", type = "button",
               onclick = sprintf("Shiny.setInputValue('%s','',{priority:'event'})", ns("tool_pick")),
               "← back")),
@@ -1582,9 +1585,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         if (isTRUE(mi$map_based))
           div(class = "ea-wsx-mapnote2", icon("map-location-dot"),
               " Results are drawn on the workspace map and added to the Layers panel."),
-        mi$tools(mi$id),
-        # Every screen gets the same appearance controls, kept per screen.
-        if (!isTRUE(mi$map_based)) .plot_opts_ui()))            # real migrated module's own settings panel
+        mi$tools(mi$id)))            # real migrated module's own settings panel
       spec <- TOOLS[[t]]; cols <- .cols()
       head <- div(class = "ea-wsx-toolhead",
         span(class = "ea-wsx-sw", style = "background:var(--forest);"),

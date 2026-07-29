@@ -681,6 +681,8 @@ page_fillable(
                   margin-bottom: 10px; }
     .ea-wsx-mapnote2 svg, .ea-wsx-mapnote2 .fa { color: var(--canopy); margin-right: 4px; }
     /* Data view: a tool's results take the centre, with a way back to the data */
+    /* the appearance icon sits between the tool name and the back button */
+    .ea-wsx-resulthead .ea-pop { margin-left: auto; margin-right: 8px; }
     .ea-wsx-resulthead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
                   padding-bottom: 9px; border-bottom: 1px solid var(--line); }
     .ea-wsx-backbtn { margin-left: auto; font: 550 11.5px var(--mono); color: var(--canopy);

@@ -395,7 +395,13 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
                 else "no datasets loaded")
     })
 
-    output$plot <- renderPlot({
+    # shiny::renderPlot ON PURPOSE, bypassing the app-wide styling wrapper in
+    # helpers.R. In the console YOUR CODE is the source of truth: if you write
+    # geom_point(colour = "red"), the app repainting it from a screen's plot
+    # settings would be the app lying about what your script does. Console plots
+    # therefore ignore the plot-appearance tool — set titles and colours in the
+    # code, which is the whole point of having a console.
+    output$plot <- shiny::renderPlot({
       p <- last_plot(); req(!is.null(p))
       if (.is_ggplot(p)) print(p) else grDevices::replayPlot(p)
     })
