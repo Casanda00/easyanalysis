@@ -182,7 +182,18 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         dm <- if (is.data.frame(d)) paste0(nrow(d), " rows × ", ncol(d), " cols") else "table"
         return(div(class = "ea-wsx-lgh2", dm, " · not drawn on the map"))
       }
-      if (identical(l$kind, "lidar")) return(div(class = "ea-wsx-lgh2", "point cloud · height-shaded"))
+      if (identical(l$kind, "lidar")) {
+        n <- tryCatch({ x <- las_pool[[l$nm]]
+                        if (is.null(x) || inherits(x, "LASheader")) 0L else nrow(x@data) },
+                      error = function(e) 0L)
+        return(div(class = "ea-wsx-lgh2",
+          if (n > .LAS_DRAW_CAP)
+            paste0("point cloud · height-shaded · showing ",
+                   format(.LAS_DRAW_CAP, big.mark = ","), " of ",
+                   format(n, big.mark = ","), " points")
+          else if (n > 0) paste0("point cloud · height-shaded · ", format(n, big.mark = ","), " points")
+          else "point cloud · extent only (points not loaded)"))
+      }
       tagList(  # vector
         div(class = "ea-wsx-lgh", "Symbol"),
         div(class = "ea-wsx-symrow", span(class = "ea-wsx-sym", style = paste0("background:", l$col, ";")), " single symbol"),
@@ -652,6 +663,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           tags$span(class = "ea-wsx-mapsub", "Visible: ",
             if (length(vis)) paste(vapply(vis, function(l) l$nm, character(1)), collapse = ", ") else "none")),
         leaflet::leafletOutput(ns("map"), height = "100%"),
+        # Point-density control. Rendered as its own small output rather than
+        # inside .map_ui() so that selecting a layer does NOT re-create the
+        # leaflet element (which would rebuild the whole map).
+        uiOutput(ns("las_ctl")),
         div(class = "ea-wsx-attrdock",
           div(class = "ea-wsx-attrhead",
             tags$span("Attributes · ", tags$b(act %||% "—")),
@@ -867,6 +882,38 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       }, error = function(e) NULL)
     }
 
+    # A drawable sample of a point cloud, in WGS84, carrying Z for shading.
+    # Decimated hard on purpose: the pool holds up to 500k points and leaflet
+    # renders one DOM element per marker, so the full cloud would lock the
+    # browser. Cached per layer — this runs on every map rebuild otherwise.
+    .LAS_DRAW_CAP <- 4000L
+    lden <- reactiveValues()                       # per-layer point budget
+    .las_cap <- function(nm) {
+      v <- if (is.null(nm)) NULL else lden[[nm]]
+      if (is.null(v)) .LAS_DRAW_CAP else as.integer(v)
+    }
+    .las_pts_cache <- new.env(parent = emptyenv())
+    .las_points <- function(x, cap = .LAS_DRAW_CAP) {
+      if (is.null(x) || inherits(x, "LASheader")) return(NULL)   # header-only: no points
+      d <- tryCatch(x@data, error = function(e) NULL)
+      if (is.null(d) || !nrow(d) || is.null(d$Z)) return(NULL)
+      cap <- max(100L, as.integer(cap))
+      key <- paste0(nrow(d), "|", d$X[1], "|", d$Y[1], "|", d$Z[1], "|", cap)
+      if (!is.null(.las_pts_cache[[key]])) return(.las_pts_cache[[key]])
+      out <- tryCatch({
+        cr <- sf::st_crs(x); if (is.na(cr)) return(NULL)
+        i  <- if (nrow(d) > cap) sort(sample.int(nrow(d), cap)) else seq_len(nrow(d))
+        p  <- sf::st_transform(sf::st_as_sf(
+                data.frame(X = d$X[i], Y = d$Y[i], Z = d$Z[i]),
+                coords = c("X", "Y"), crs = cr), 4326)
+        if (!nrow(p) || !any(is.finite(p$Z))) NULL else p
+      }, error = function(e) NULL)
+      if (length(ls(.las_pts_cache)) > 4L)
+        rm(list = ls(.las_pts_cache), envir = .las_pts_cache)
+      assign(key, out, envir = .las_pts_cache)
+      out
+    }
+
     # LAS/LAZ footprint in WGS84. The pool may hold a full LAS *or* just its
     # header (big clouds are capped at read time), so read whichever it is.
     # lidR::extent() is avoided on purpose: it returns a terra::SpatExtent on
@@ -958,15 +1005,25 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               }
             }
           } else if (identical(l$kind, "lidar")) {
-            # A point cloud is far too heavy to draw as points, and it used to be
-            # skipped entirely — a LAZ-only project opened on a blank world map.
-            # Show its FOOTPRINT so the data is at least locatable; the 3D view
-            # stays in the LiDAR screen.
-            e <- .las_bbox(las_pool[[l$nm]])
-            if (is.null(e)) m else
-              leaflet::addRectangles(m, e[1], e[2], e[3], e[4],
-                color = "#D99B57", weight = 1.5, fillOpacity = .12,
-                label = l$nm, group = "ws_layers")
+            # The cloud itself, height-shaded — the footprint alone told you
+            # where the data was but not what it looked like. Drawn as a
+            # DECIMATED sample: the pool holds up to 500k points and the browser
+            # cannot take that many markers, so a few thousand carry the shape.
+            las <- las_pool[[l$nm]]
+            e   <- .las_bbox(las)
+            pts <- .las_points(las, .las_cap(l$nm))
+            mm  <- m
+            if (!is.null(e))                       # outline of the full tile
+              mm <- leaflet::addRectangles(mm, e[1], e[2], e[3], e[4],
+                      color = "#D99B57", weight = 1.2, fill = FALSE,
+                      label = l$nm, group = "ws_layers")
+            if (is.null(pts)) mm else {
+              pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(pts$Z),
+                                           na.color = "transparent")
+              leaflet::addCircleMarkers(mm, data = pts, radius = 2, stroke = FALSE,
+                fillOpacity = .75, fillColor = pal(pts$Z), group = "ws_layers",
+                label = paste0(l$nm, " · Z ", round(pts$Z, 1)))
+            }
           } else {
             v <- vector_pool[[l$nm]]
             if (is.null(v)) m else {
@@ -1012,7 +1069,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!is.null(fr)) {
         m <- leaflet::fitBounds(m, fr[1], fr[2], fr[3], fr[4])
         fit_req(NULL); fit_sig(sig)
-      } else if (!is.null(bb) && !identical(sig, isolate(fit_sig())) && nzchar(sig)) {
+      } else if (!is.null(bb) && !nzchar(isolate(fit_sig())) && nzchar(sig)) {
+        # ONE MAP, everything overlays on it. The automatic fit therefore fires
+        # only for the FIRST spatial layer, to get off the default world view.
+        # Adding a second file must not yank the view away from what the user is
+        # looking at — re-framing is on request ("Zoom to layers").
         m <- leaflet::fitBounds(m, bb[1], bb[2], bb[3], bb[4])
         fit_sig(sig)
       } else if (!is.null(ctr) && !is.null(zm)) {
@@ -1031,6 +1092,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                              options = leaflet::providerTileOptions(zIndex = 0))
       .draw_layers(m)
     })
+    # Opening another project clears the pools first; re-arm the first-fit so
+    # the incoming project frames itself instead of inheriting the old view.
+    observe({
+      if (!length(Filter(function(x) x$kind %in% c("raster","vector","lidar"), layers())))
+        fit_sig("")
+    })
     # New layers must rebuild the map so the fit applies.
     observeEvent(layers(), {
       sig <- tryCatch(paste(vapply(
@@ -1039,6 +1106,32 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!identical(sig, fit_sig())) map_rebuild(map_rebuild() + 1)
     }, ignoreInit = FALSE)
 
+
+    # Visible ONLY while a point cloud is the selected layer — it is that
+    # layer's control, and an always-on slider would be noise for everything else.
+    output$las_ctl <- renderUI({
+      a <- activeLayer(); if (is.null(a)) return(NULL)
+      l <- Filter(function(x) identical(x$nm, a), layers())
+      if (!length(l) || !identical(l[[1]]$kind, "lidar")) return(NULL)
+      x <- las_pool[[a]]
+      n <- tryCatch(if (is.null(x) || inherits(x, "LASheader")) 0L else nrow(x@data),
+                    error = function(e) 0L)
+      if (!n) return(NULL)
+      hi  <- min(50000L, n)
+      cur <- min(.las_cap(a), hi)
+      div(class = "ea-wsx-lasctl",
+        div(class = "ea-wsx-lasctl-h", "Points shown"),
+        sliderInput(ns("las_density"), NULL, min = 500L, max = hi, value = cur,
+                    step = 500L, width = "170px", ticks = FALSE),
+        div(class = "ea-wsx-lasctl-n",
+            paste0("of ", format(n, big.mark = ","), " loaded · more = slower")))
+    })
+    observeEvent(input$las_density, {
+      a <- activeLayer(); req(a)
+      if (identical(.las_cap(a), as.integer(input$las_density))) return()
+      lden[[a]] <- as.integer(input$las_density)
+      map_rebuild(map_rebuild() + 1)
+    }, ignoreInit = TRUE)
 
     output$attr <- renderUI({
       act <- activeLayer(); req(act)

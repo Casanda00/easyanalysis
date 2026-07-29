@@ -16,6 +16,8 @@
 # side effects and RNG behave as the user expects.
 # ==========================================================================
 
+# (helpers below are console-local)
+
 # Robust across ggplot2 versions (4.0 renamed is.ggplot -> is_ggplot).
 .is_ggplot <- function(x) isTRUE(tryCatch(ggplot2::is_ggplot(x),
   error = function(e) tryCatch(ggplot2::is.ggplot(x),
@@ -80,7 +82,26 @@ rconsoleCanvasUI <- function(id) {
     ".rc-editor textarea { font-family: var(--mono); font-size: 12.5px; height: 100% !important;",
     "  resize: none; background: var(--sunk); color: var(--ink); border-color: var(--line); }",
     ".rc-actions { flex: none; display: flex; gap: 6px; margin-top: 6px; }",
-    ".rc-plot { flex: none; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }",
+    # Floating plot window: resize grip via CSS `resize`, maximize via a class.
+    # No dock mode on purpose — see the note where it is built.
+    ".rc-plotwin { display: none; position: fixed; right: 26px; bottom: 26px;",
+    "  width: min(46vw, 620px); height: min(46vh, 430px); min-width: 260px; min-height: 180px;",
+    "  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;",
+    "  box-shadow: 0 18px 50px rgba(0,0,0,.45); z-index: 1300;",
+    "  flex-direction: column; overflow: hidden; resize: both; }",
+    ".rc-plotwin.open { display: flex; }",
+    ".rc-plotwin.max { left: 4vw; top: 6vh; right: 4vw; bottom: 6vh;",
+    "  width: auto; height: auto; resize: none; }",
+    ".rc-pw-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px;",
+    "  background: var(--sunk); border-bottom: 1px solid var(--line); cursor: move;",
+    "  font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em;",
+    "  color: var(--bark); }",
+    ".rc-plotwin.max .rc-pw-head { cursor: default; }",
+    ".rc-pw-x { margin-left: auto; display: flex; gap: 2px; }",
+    ".rc-pw-x button { border: none; background: transparent; color: var(--bark); cursor: pointer;",
+    "  font: 600 14px var(--mono); line-height: 1; padding: 0 5px; }",
+    ".rc-pw-x button:hover { color: var(--ink); }",
+    ".rc-pw-body { flex: 1 1 auto; min-height: 0; padding: 8px; background: var(--panel); }",
     sep = "\n")
   tagList(
     tags$style(HTML(css)),
@@ -98,9 +119,20 @@ rconsoleCanvasUI <- function(id) {
       # RIGHT: results (and the plot, only once there is one)
       tags$div(class = "rc-col",
         tags$div(class = "rc-colh", tags$span("Results"), uiOutput(ns("objects_inline"), inline = TRUE)),
-        tags$div(class = "rc-log", id = ns("logbox"), uiOutput(ns("log"))),
-        uiOutput(ns("plotwrap")))
+        tags$div(class = "rc-log", id = ns("logbox"), uiOutput(ns("log"))))
     ),
+    # Plots open in a FLOATING window: resizable and maximizable, deliberately
+    # not dockable — a plot is something you look at next to your code, not a
+    # permanent region competing with the editor for the dock's height.
+    tags$div(id = ns("plotwin"), class = "rc-plotwin",
+      tags$div(class = "rc-pw-head",
+        tags$span("Plot"),
+        tags$span(class = "rc-pw-x",
+          tags$button(type = "button", title = "Maximize / restore",
+            onclick = sprintf("eaPlotWin('%s','max')", ns("plotwin")), HTML("&#9723;")),
+          tags$button(type = "button", title = "Close",
+            onclick = sprintf("eaPlotWin('%s','close')", ns("plotwin")), "×"))),
+      tags$div(class = "rc-pw-body", plotOutput(ns("plot"), height = "100%"))),
     tags$script(HTML(sprintf(
       "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); $('#%s').click(); }});",
       ns("code"), ns("run"))))
@@ -160,11 +192,18 @@ rconsoleServer <- function(id, dataset_pool, active_dataset) {
       h[[length(h) + 1]] <- list(code = code, out = out, status = status,
                                  plotted = !is.null(plot_obj))
       log_r(h)
-      updateTextAreaInput(session, "code", value = "")
+      # The editor deliberately KEEPS its contents: this is a script you iterate
+      # on, not a one-shot prompt, and clearing it threw the user's work away on
+      # every Run. "Clear" empties the log; nothing empties the editor but you.
+      if (!is.null(plot_obj))
+        session$sendCustomMessage("rc_plotwin", session$ns("plotwin"))
     }
 
     observeEvent(input$run, run_code(input$code))
-    observeEvent(input$clear, { log_r(list()); last_plot(NULL) })
+    observeEvent(input$clear, {
+      log_r(list()); last_plot(NULL)
+      session$sendCustomMessage("rc_plotwin_close", session$ns("plotwin"))
+    })
 
     output$log <- renderUI({
       entries <- log_r()
@@ -183,12 +222,6 @@ rconsoleServer <- function(id, dataset_pool, active_dataset) {
         "var b=document.getElementById('%s'); if(b) b.scrollTop=b.scrollHeight;", ns("logbox")))))
     })
 
-    # The plot slot only exists once something has been plotted, so the results
-    # column is not permanently shortened by an empty box.
-    output$plotwrap <- renderUI({
-      if (is.null(last_plot())) return(NULL)
-      tags$div(class = "rc-plot", plotOutput(ns("plot"), height = "150px"))
-    })
     # Compact "df + N datasets" hint in the results header (the old tools panel
     # that carried this is not mounted anywhere — the console lives in the dock).
     output$objects_inline <- renderUI({

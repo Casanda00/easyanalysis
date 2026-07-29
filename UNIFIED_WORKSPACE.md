@@ -406,3 +406,42 @@ orthomosaic that walked the session into `cannot allocate vector` and GDAL block
 failures after a handful of zooms. `.rgb_raster()` caches the finished composite, keyed by
 layer and band mapping. Verified: five pan-away/zoom-to-layers cycles produce **2**
 reprojections total and zero allocation errors.
+
+### Console: the script survives Run; plots open in a window (2026-07-29)
+
+`run_code()` ended with `updateTextAreaInput(session, "code", value = "")` — every Run
+threw away what the user had just written. The console is something you iterate in, so
+the editor now keeps its contents; only "Clear" empties the log, and nothing empties the
+editor but the user.
+
+Plots no longer take space in the results column. They open in a floating window that is
+**resizable** (the browser's own `resize: both` grip) and **maximizable** (a class that
+sets `left/top/right/bottom`), draggable by its header, and deliberately **not dockable** —
+a plot is something you look at beside your code, not a permanent region competing with
+the editor for the dock's height. Maximizing stashes and clears inline geometry first,
+because styles left by dragging would otherwise out-specify the `.max` rules. A
+`ResizeObserver` dispatches a window `resize` so the plot re-renders at the new size —
+the CSS grip fires no event of its own, and Shiny only listens for window resize.
+
+### One map, everything overlays (fixed 2026-07-29)
+
+The automatic fit re-ran whenever the layer signature changed, so **adding a file yanked
+the view away** from whatever the user was looking at. It now fires only for the FIRST
+spatial layer — enough to get off the default world view — and re-framing afterwards is
+on request via Zoom to layers. `fit_sig` is re-armed when the spatial pools empty, so a
+newly opened project still frames itself. Verified: panned to Helsinki, changed the layer
+set, view held at 60.1699 / zoom 11.
+
+### Point clouds are drawn, not just outlined (2026-07-29)
+
+A LAZ layer showed only its footprint. It now draws the cloud itself, height-shaded
+(viridis over Z), as a decimated sample — leaflet creates one DOM element per marker and
+the pool holds up to 500k points, so the full cloud would lock the browser. The footprint
+stays as an outline around it.
+
+Density is user-controlled: a small slider floats over the map, visible **only while a
+point cloud is the selected layer**, from 500 up to `min(50k, points loaded)`. It is its
+own `uiOutput` inside the map container rather than part of `.map_ui()`, so selecting a
+layer does not re-create the leaflet element and rebuild the map. The sample is cached per
+(layer, budget), and the legend states the decimation outright: "showing 4,000 of 500,802
+points". Verified: 4,000 -> 12,000 markers with the view preserved.

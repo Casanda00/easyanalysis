@@ -540,6 +540,19 @@ page_fillable(
     .ea-wsx-tab { font: 600 12.5px var(--ui); border: none; background: transparent; color: var(--bark);
                   padding: 6px 15px; cursor: pointer; }
     .ea-wsx-tab.on { background: var(--forest); color: var(--onbrand); }
+    /* Point-density control, floating over the map (LAZ layers only) */
+    .ea-wsx-lasctl { position: absolute; left: 12px; bottom: 14px; z-index: 620;
+                  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+                  padding: 7px 10px 0; box-shadow: 0 6px 18px rgba(0,0,0,.28); }
+    .ea-wsx-lasctl-h { font: 600 8.5px var(--mono); text-transform: uppercase;
+                  letter-spacing: .08em; color: var(--bark); }
+    .ea-wsx-lasctl-n { font-size: 9.5px; color: var(--bark); margin: -6px 0 6px; }
+    .ea-wsx-lasctl .form-group, .ea-wsx-lasctl .shiny-input-container { margin-bottom: 0; }
+    .ea-wsx-lasctl .irs { min-height: 34px; }
+    .ea-wsx-lasctl .irs-bar, .ea-wsx-lasctl .irs-single { background: var(--forest);
+                  border-color: var(--forest); }
+    .ea-wsx-lasctl .irs-line { background: var(--sunk); }
+    .ea-wsx-lasctl .irs-min, .ea-wsx-lasctl .irs-max { display: none; }
     .ea-wsx-note { font: 500 11px var(--mono); color: var(--bark); margin-left: auto; }
     /* ---- GeoLibre-style menubar (Project | Edit | View | … | Help) ---- */
     .legacy-nav { display: none !important; }
@@ -1501,6 +1514,64 @@ page_fillable(
           c.style.height = '300px'; c.style.minHeight = '300px'; }
         window.dispatchEvent(new Event('resize'));   /* let plots re-measure */
       };
+      /* R Console plot window: open / maximize-restore / close. Resizing is the
+         browser's own grip (CSS `resize`); there is no dock mode by design. */
+      window.eaPlotWin = function(id, mode){
+        var w = document.getElementById(id); if(!w) return;
+        if(mode === 'close'){ w.classList.remove('open','max'); return; }
+        if(mode === 'max'){
+          w.classList.add('open');
+          if(w.classList.contains('max')){        /* restore */
+            w.classList.remove('max');
+            w.style.cssText = w.dataset.prevStyle || '';
+          } else {                                 /* maximize */
+            /* drop any inline geometry from dragging/resizing, else it would
+               out-specify the .max rules and the window would not grow. */
+            w.dataset.prevStyle = w.style.cssText;
+            w.style.cssText = '';
+            w.classList.add('max');
+          }
+        } else { w.classList.add('open'); }
+        window.dispatchEvent(new Event('resize'));
+      };
+      if(window.Shiny){
+        Shiny.addCustomMessageHandler('rc_plotwin',       function(id){ eaPlotWin(id, 'open'); });
+        Shiny.addCustomMessageHandler('rc_plotwin_close', function(id){ eaPlotWin(id, 'close'); });
+      }
+      /* Drag the plot window by its header (not while maximized). */
+      document.addEventListener('mousedown', function(e){
+        var h = e.target.closest ? e.target.closest('.rc-pw-head') : null;
+        if (!h || e.target.tagName === 'BUTTON') return;
+        var win = h.parentNode;
+        if (win.classList.contains('max')) return;
+        var r = win.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
+        /* pin by left/top so dragging is not fought by the right/bottom anchor */
+        win.style.left = r.left + 'px'; win.style.top = r.top + 'px';
+        win.style.right = 'auto'; win.style.bottom = 'auto';
+        win.style.width = r.width + 'px'; win.style.height = r.height + 'px';
+        function mv(ev){
+          win.style.left = Math.max(0, Math.min(window.innerWidth  - 80, r.left + ev.clientX - sx)) + 'px';
+          win.style.top  = Math.max(0, Math.min(window.innerHeight - 40, r.top  + ev.clientY - sy)) + 'px';
+        }
+        function up(){ document.removeEventListener('mousemove', mv);
+                       document.removeEventListener('mouseup', up); }
+        document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+        e.preventDefault();
+      });
+      /* The plot must re-render at the new size when the window is resized by
+         its grip — that grip fires no window 'resize', which Shiny listens for. */
+      if (window.ResizeObserver) {
+        var pwT = null;
+        var pwObs = new ResizeObserver(function(){
+          clearTimeout(pwT);
+          pwT = setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 120);
+        });
+        document.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            document.querySelectorAll('.rc-plotwin').forEach(function(w){ pwObs.observe(w); });
+          }, 1500);
+        });
+      }
       /* Header drag: RESIZE when docked (drag up = taller), MOVE when floating. */
       document.addEventListener('mousedown', function(e){
         var h = e.target.closest ? e.target.closest('.ea-wsx-conh') : null;
