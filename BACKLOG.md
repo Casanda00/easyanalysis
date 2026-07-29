@@ -317,3 +317,221 @@ Items **11, 12** are entangled: settle what actually works before redesigning ar
 
 Items **5, 13** both use the existing `.ea-pop` pattern, so they are cheap once its
 placement rules are agreed.
+
+
+---
+
+# BACKLOG ROUND 2 — reported 2026-07-29 (after the round-1 fixes)
+
+Recorded before any work starts. Reporter's wording first, then my reading, then what has
+to be decided or checked. **Nothing here is done yet.**
+
+Four of these look like they come from my own recent changes; they are marked
+**LIKELY REGRESSION** so they are checked first rather than treated as new features.
+
+---
+
+## A. Theme / colour (same family as round-1 items 3, 8, 10)
+
+### A1. Black on the packages page
+> "black color on the packages page"
+
+The package install/list modal. Round 1 fixed `.bg-light` and the Bootstrap surface
+variables; this is somewhere those did not reach.
+
+### A2. Black in the Project dropdown, including Share project
+> "the share project has the black color thing. check everything in the dropdown under
+> project for that black hardcoded color."
+
+**Explicitly a sweep, not one fix** — check every entry under the Project menu.
+
+### A3. Card and text colour in light mode
+> "dont like the card color and the color of the text in light mode."
+
+A judgement call rather than a defect. **Decide:** what should change — card background,
+body text, or both? Worth a side-by-side before changing tokens that affect every screen.
+
+---
+
+## B. Data & Exploration
+
+### B4. Dataset information missing from the options
+> "in the data & exploration the dataset information is not being seen in the options"
+
+### B5. Tabs do nothing — everything lands on Dataset Overview  **LIKELY REGRESSION**
+> "the tabs in the data & exploration does not working. everything has been placed on
+> dataset overview. column distributions and plot reslationships shows nothing."
+
+Same shape as round-1 item 11 (tabs that looked broken). Check first whether this is the
+lazy-render/repopulate problem again, or something the select-and-split rollout disturbed.
+`mod_data.R` was NOT converted, so it should be untouched — which makes this worth
+diagnosing rather than assuming.
+
+### B6. Separate the commands, but keep them synced
+> "separate the columns in data and exploration each command should now be separate but
+> for course be synced."
+
+Each ETL operation gets its own space rather than sharing one column, while still acting
+on the same dataset. **Decide:** does this mean the select-and-split treatment, or
+something else?
+
+### B7. Batch apply on each data-processing tool
+> "one key thing to add when processing data is batch apply. I think the position should
+> be on each data processing tool."
+
+Apply an operation to several columns/datasets at once, with the control living on each
+tool rather than in one central place.
+
+### B8. Edit data table does not work
+> "edit data table does not work. no editing ability."
+
+The View Data modal is built with `editable = "cell"` and has a `cell_edit` handler, so
+this needs diagnosing rather than building.
+
+---
+
+## C. R Console / scripting
+
+### C9. Working on a NEW dataset every time is wrong
+> "it created a new dataset. creating a new dataset all the time if there is a change is
+> not the best or smartest move. we need it working on the dataset selected."
+
+From the round-1 write-back feature: `vmi9_transformed <- df %>% mutate(...)` correctly
+became a new layer, but the reporter does not want a new dataset per edit. **Decide:**
+should an assignment that transforms `df` UPDATE the active dataset instead of adding a
+layer? That is a real design choice — overwriting loses the original, adding clutters.
+Possibly: update in place when the result replaces `df`, add a layer when it is clearly
+new. Needs a rule stated before code.
+
+### C10. `df` for everything — can data be renamed?
+> "is it possible to rename how the data is called? cus df is for everything."
+
+Expose each dataset under its own name as well as `df` (the console already assigns
+`make.names(name)`), and/or let the user choose the alias.
+
+### C11. Run line-by-line, not the whole buffer
+> "for the console, can we line running instead of running everything everytime we click
+> run?"
+
+Run the current line or the selection, like RStudio's Ctrl+Enter. Pairs with C13.
+
+### C12. Load an R script, visible only in the terminal; editor tabs
+> "is it possible to load r script but should only be visible in the terminal? and can the
+> script editor have tabs?"
+
+Open a `.R` file into the console editor without it becoming a project dataset, and hold
+several scripts as tabs.
+
+### C13. Environment pane as an adjustable third column
+> "in r console, there is an environment view, can we make a third column next to rconsole
+> and where the results are displayed? should also be adjustable."
+
+Editor | Results | Environment, with draggable dividers. The pane-splitter pattern from
+round-1 item 12 already exists and should be reused.
+
+### C14. The toolbar fills for plots but not other commands
+> "the tool bar fills for plots but not for other commands."
+
+Needs clarifying: which toolbar, and what "fills" means.
+
+---
+
+## D. Views and switching
+
+### D15. Active dataset does not change when another is clicked
+> "the active dataset does not change when we click other datasets."
+
+**A core interaction being broken.** High priority: every model screen reads the active
+dataset.
+
+### D16. Tab switching should be complete, and the map view always exists
+> "even though only csv or excel ... the default panel was Maps but the data view was
+> kinda showing there. this should a complete tab switch. and even though there are only
+> text file, it does not mean the map should not be displayed on the map view. the map
+> view is always there. just that when project does not contain the necessary file to be
+> displayed, we simply automically swtich them there."
+
+Two rules: switching views must be complete, not a blend; and the Map view always exists —
+it is the *default choice* that follows the data, not the view's existence.
+
+### D17. Opening a tool must not change the view  **LIKELY REGRESSION**
+> "download spatial data switches the tab if we are in map view we click it. should not be
+> like that. the map view should remain since only the tool box gets displayed."
+
+Picking a tool should load its settings panel and leave the current view alone.
+
+### D18. Spatial & LiDAR screens still carry their own views  **LIKELY REGRESSION**
+> "the point cloud or 3d view opens two views. i thought we dixed that. everything if not
+> all under spatial and lidar still carries their own view. that needs to be fixed. we
+> have the map view and the data view of that."
+
+Round-1 item 4 fixed the **3D view** only; the LiDAR *screens* still render their own
+map+viewer canvases. The rule wanted: modules never bring their own view — the workspace
+map view and data view are the only ones.
+
+---
+
+## E. Model screens
+
+### E19. Variable selection differs per screen
+> "the selection of variables should follow the same pipeline. right now xgboost is
+> different. same for decision tree, and others under machine learning."
+
+### E20. Reuse the existing predictor picker
+> "we had a easier way ... selecting multiple predictors was a drop down with selection
+> shown with checkmark."
+
+E19 and E20 are the same job: one shared variable-selection component, reused everywhere,
+matching the multi-select-with-checkmarks that already exists.
+
+### E21. Move "Select Diagnostics to View:"
+> "change the position of this: Select Diagnostics to View:"
+
+### E22. Separate linear regression from the other regression types
+> "separate linear regression from the other types of regression in there."
+
+The screen currently mixes plain `lm` with glmnet/poisson paths.
+
+---
+
+## F. Tables, reports, chrome
+
+### F23. Table view is unreadable
+> "the scroller for the table view is at the bottom and the header is not sticky. can put
+> the scroller up for left to right to see the other columns or make the header sticky?
+> also, reduce the size of the table, columns are too big and text size is big too."
+
+Sticky header, reachable horizontal scroll, smaller type and tighter columns.
+
+### F24. Replace the placeholder text with the tour
+> "I dont understand this text: Pick a tool above. Its settings load here; spatial ops add
+> a layer, models drop a result (Step 4). remove it and replace it with the tour guide
+> button. but of course it will removed when the tool box gets loaded. and make sure the
+> tour works. show at least 8 parts of the screens in the tour."
+
+Remove the developer-speak placeholder, put the tour button there instead, hide it once a
+tool loads, and **extend the tour to at least 8 steps**.
+
+### F25. Export report as PDF
+> "can export report support pdf too?"
+
+Needs checking what the current export produces and whether a PDF path exists without
+adding a LaTeX dependency (which would break the no-toolchain install).
+
+### F26. Plot appearance appears on every screen  **LIKELY REGRESSION**
+> "the plot appearance looks sticky on all the pages"
+
+From round-1 item 13: it was moved into the result header, which every tool shows —
+including ones with no plot. It should appear only where there is a plot to style.
+
+---
+
+## Suggested order
+
+1. **The likely regressions** — B5, D17, D18, F26. My changes, so mine to check first.
+2. **D15** (active dataset not switching) — a core interaction, and other things depend on it.
+3. **The colour sweep** — A1, A2 together, as in round 1.
+4. **F23** (table readability) and **B8** (table editing) — same surface.
+5. **E19 + E20** — one shared variable picker, then E21, E22.
+6. **The console group** — C11, C13, C12, C10, then C9 once its rule is decided.
+7. **Decisions needed before building:** A3, B6, C9, C14, plus round-1 items 5 and 6.
