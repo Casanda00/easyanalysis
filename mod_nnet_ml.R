@@ -40,11 +40,23 @@ nnetMlToolsUI <- function(id) {
   )
 }
 
+.NNET_VIEWS <- c(performance = "Performance", predictions = "Predictions", network_info = "Network Info")
+
 nnetMlCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Performance",
-      layout_columns(col_widths = c(6, 6),
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .NNET_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+nnetMlServer <- function(id, dataset_pool, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .NNET_VIEWS, function(k, solo) switch(k,
+        performance = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("Metrics"),  verbatimTextOutput(ns("perf_out"))),
         card(card_header("Observed vs Predicted / Confusion"),
              plotOutput(ns("pred_plot"), height = "380px"))
@@ -60,19 +72,12 @@ nnetMlCanvasUI <- function(id) {
           div(style = "height: 280px; padding: 5px;", plotOutput(ns("val_conf_plot"), height = "255px")),
           div(style = "padding: 5px 10px;", tags$b(textOutput(ns("val_acc"))))
         )
-      )
-    ),
-    nav_panel("Predictions",
-      DTOutput(ns("pred_tbl"), height = "500px")
-    ),
-    nav_panel("Network Info",
-      card(verbatimTextOutput(ns("net_info")))
-    )
-  )
-}
+      )),
+        predictions = tagList(DTOutput(ns("pred_tbl"), height = "500px")),
+        network_info = tagList(card(verbatimTextOutput(ns("net_info")))),
+        NULL))
+    })
 
-nnetMlServer <- function(id, dataset_pool, active_dataset) {
-  moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     active_data <- reactive({

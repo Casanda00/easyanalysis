@@ -40,36 +40,39 @@ survivalToolsUI <- function(id) {
   )
 }
 
+.SURV_VIEWS <- c(kaplan_meier = "Kaplan-Meier", cox_ph_model = "Cox PH Model", log_rank_test = "Log-rank Test", survival_table = "Survival Table")
+
 survivalCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Kaplan-Meier",
-      layout_columns(col_widths = c(8, 4),
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .SURV_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+survivalServer <- function(id, dataset_pool, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .SURV_VIEWS, function(k, solo) switch(k,
+        kaplan_meier = tagList(layout_columns(col_widths = c(8, 4),
         card(plotOutput(ns("km_plot"), height = "460px")),
         card(card_header("KM Summary"), verbatimTextOutput(ns("km_summary")))
-      )
-    ),
-    nav_panel("Cox PH Model",
-      layout_columns(col_widths = c(6, 6),
+      )),
+        cox_ph_model = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("Model Summary"), verbatimTextOutput(ns("cox_summary"))),
         tagList(
           card(card_header("Hazard Ratios"), plotOutput(ns("hr_plot"), height = "320px")),
           card(card_header("Proportional Hazards Check"), verbatimTextOutput(ns("ph_test"))),
           card(card_header("Concordance (C-index)"), verbatimTextOutput(ns("concordance_out")))
         )
-      )
-    ),
-    nav_panel("Log-rank Test",
-      card(verbatimTextOutput(ns("logrank_out")))
-    ),
-    nav_panel("Survival Table",
-      DTOutput(ns("surv_table"), height = "500px")
-    )
-  )
-}
+      )),
+        log_rank_test = tagList(card(verbatimTextOutput(ns("logrank_out")))),
+        survival_table = tagList(DTOutput(ns("surv_table"), height = "500px")),
+        NULL))
+    })
 
-survivalServer <- function(id, dataset_pool, active_dataset) {
-  moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     if (!requireNamespace("survival", quietly = TRUE)) {

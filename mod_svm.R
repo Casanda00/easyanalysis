@@ -51,11 +51,23 @@ svmToolsUI <- function(id) {
   )
 }
 
+.SVM_VIEWS <- c(performance = "Performance", support_vector = "Support Vectors", prediction_tab = "Prediction Table")
+
 svmCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Performance",
-      layout_columns(col_widths = c(6, 6),
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .SVM_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+svmServer <- function(id, dataset_pool, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .SVM_VIEWS, function(k, solo) switch(k,
+        performance = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("Metrics"), verbatimTextOutput(ns("perf_out"))),
         card(card_header("Predictions"), plotOutput(ns("pred_plot"), height = "380px"))
       ),
@@ -69,22 +81,15 @@ svmCanvasUI <- function(id) {
           div(style = "height: 280px; padding: 5px;", plotOutput(ns("val_conf_plot"), height = "255px")),
           div(style = "padding: 5px 10px;", tags$b(textOutput(ns("val_acc"))))
         )
-      )
-    ),
-    nav_panel("Support Vectors",
-      layout_columns(col_widths = c(6, 6),
+      )),
+        support_vector = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("SV Summary"), verbatimTextOutput(ns("sv_info"))),
         card(card_header("SV Distribution"), plotOutput(ns("sv_plot"), height = "380px"))
-      )
-    ),
-    nav_panel("Prediction Table",
-      DTOutput(ns("pred_tbl"), height = "500px")
-    )
-  )
-}
+      )),
+        prediction_tab = tagList(DTOutput(ns("pred_tbl"), height = "500px")),
+        NULL))
+    })
 
-svmServer <- function(id, dataset_pool, active_dataset) {
-  moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     if (!requireNamespace("e1071", quietly = TRUE)) {

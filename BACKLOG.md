@@ -263,7 +263,22 @@ diagnostics gives 3 labelled panes and 2 dividers, each with real content (602 c
 146/146/146 to 206/86/146, so it trades height between its two neighbours and leaves the
 third alone.
 
-**Still to do:** the same treatment for the other model screens.
+**Rolled out to the other model screens 2026-07-29.** The pattern lives in `helpers.R` as
+`ea_view_header()` + `ea_view_panes()`, so each screen is a few lines rather than a copy of
+the layout. Converted: **PCA, Decision tree, SVM, XGBoost, Neural network, Survival** —
+six screens, twenty-one tabs gone.
+
+Each keeps its own outputs untouched; only the container changed. A tab whose body was
+rich (the decision tree's Performance tab, with its own cards and tables) was moved across
+whole rather than flattened, so nothing was lost in translation.
+
+Verified in the browser across all six: every picker present with the right options,
+each defaulting to ONE selection, no output errors; and selecting three PCA views gives
+3 labelled panes with 2 dividers, confirming the shared helper works away from the screen
+it was written for.
+
+`mod_linear_regression.R` keeps its own copy because it also has per-view header controls
+(the CSV download, the grid/single switch) that the generic helper does not model.
 
 ## 13. Plot appearance belongs above the plot, and multi-variable handling
 

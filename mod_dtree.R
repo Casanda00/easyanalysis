@@ -38,14 +38,27 @@ dtreeToolsUI <- function(id) {
   )
 }
 
+.DTREE_VIEWS <- c(tree = "Tree diagram", cp = "CP / pruning",
+                  imp = "Variable importance", perf = "Performance")
+
 dtreeCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Tree Diagram",     plotOutput(ns("tree_plot"),    height = "520px")),
-    nav_panel("CP / Pruning",     plotOutput(ns("cp_plot"),      height = "380px")),
-    nav_panel("Variable Importance", plotOutput(ns("imp_plot"),  height = "400px")),
-    nav_panel("Performance",
-      layout_columns(col_widths = c(6, 6),
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .DTREE_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+dtreeServer <- function(id, dataset_pool, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .DTREE_VIEWS, function(k, solo) switch(k,
+        tree = plotOutput(ns("tree_plot"), height = if (solo) "520px" else "100%"),
+        cp   = plotOutput(ns("cp_plot"),   height = if (solo) "380px" else "100%"),
+        imp  = plotOutput(ns("imp_plot"),  height = if (solo) "400px" else "100%"),
+        perf = tagList(layout_columns(col_widths = c(6, 6),
         card(card_header("Summary"), verbatimTextOutput(ns("perf_out"))),
         card(card_header("Confusion / Residuals"), plotOutput(ns("resid_plot"), height = "340px"))
       ),
@@ -59,13 +72,10 @@ dtreeCanvasUI <- function(id) {
           div(style = "height: 280px; padding: 5px;", plotOutput(ns("val_conf_plot"), height = "255px")),
           div(style = "padding: 5px 10px;", tags$b(textOutput(ns("val_acc"))))
         )
-      )
-    )
-  )
-}
+      )),
+        NULL))
+    })
 
-dtreeServer <- function(id, dataset_pool, active_dataset) {
-  moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     if (!requireNamespace("rpart", quietly = TRUE)) {

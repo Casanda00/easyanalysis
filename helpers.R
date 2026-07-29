@@ -582,3 +582,53 @@ ea_fig_title <- function(cex = 1.15) {
   graphics::mtext(t, outer = TRUE, line = 0.4, cex = cex, font = 2)
   invisible(TRUE)
 }
+
+# ==========================================================================
+# SELECT-AND-SPLIT output area (see UNIFIED_WORKSPACE.md, backlog item 12)
+# --------------------------------------------------------------------------
+# Model screens used to show every output at once across several tabs, all
+# competing for the same space. These two helpers give a screen one area whose
+# contents the USER picks: one selection fills it, more than one splits it with
+# a draggable divider.
+#
+# The DEFAULT IS ONE, deliberately. Clutter chosen is fine; clutter by default
+# was the problem. Panes stack rather than sitting side by side, because model
+# output is mostly wide monospace text that wraps badly at half width.
+#
+#   VIEWS <- c(summary = "Model summary", plot = "Diagnostic plots")   # key = label
+#   # UI:      card(card_header(ea_view_header(ns, VIEWS)),
+#   #               div(class = "lm-viewport", uiOutput(ns("view_body"))))
+#   # SERVER:  output$view_body <- renderUI(
+#   #            ea_view_panes(input$view_pick, VIEWS, function(k, solo) switch(k, ...)))
+# ==========================================================================
+
+ea_view_header <- function(ns, views, selected = names(views)[1], tools = TRUE) {
+  div(class = "d-flex justify-content-between align-items-center gap-2",
+    div(class = "d-flex align-items-center gap-2",
+      tags$span(class = "lm-view-label", "Show"),
+      selectizeInput(ns("view_pick"), NULL, width = "330px", multiple = TRUE,
+        choices  = stats::setNames(names(views), unname(views)),
+        selected = selected,
+        options  = list(plugins = list("remove_button"),
+                        placeholder = "Pick one or more"))),
+    if (isTRUE(tools)) uiOutput(ns("view_tools"), inline = TRUE))
+}
+
+# `build(key, solo)` returns the UI for one view. `solo` is TRUE when it has the
+# whole area, so a plot can take a fixed height alone and fill its pane when shared.
+ea_view_panes <- function(picked, views, build) {
+  if (!length(picked)) picked <- names(views)[1]     # never render an empty canvas
+  picked <- picked[picked %in% names(views)]
+  if (!length(picked)) picked <- names(views)[1]
+  if (length(picked) == 1) return(build(picked[[1]], TRUE))
+  panes <- list()
+  for (i in seq_along(picked)) {
+    k <- picked[[i]]
+    if (i > 1)
+      panes[[length(panes) + 1]] <- div(class = "lm-split", title = "Drag to resize")
+    panes[[length(panes) + 1]] <- div(class = "lm-pane",
+      div(class = "lm-pane-h", unname(views[[k]])),
+      div(class = "lm-pane-b", build(k, FALSE)))
+  }
+  div(class = "lm-panes", panes)
+}

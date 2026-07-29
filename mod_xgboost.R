@@ -42,32 +42,37 @@ xgboostToolsUI <- function(id) {
   )
 }
 
+.XGB_VIEWS <- c(training_curve = "Training Curve", feature_import = "Feature Importance", predictions = "Predictions")
+
 xgboostCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Training Curve",
-      layout_columns(col_widths = c(8, 4),
-        card(plotOutput(ns("cv_plot"), height = "400px")),
-        card(card_header("Performance"), verbatimTextOutput(ns("perf_out")))
-      )
-    ),
-    nav_panel("Feature Importance",
-      layout_columns(col_widths = c(8, 4),
-        card(plotOutput(ns("imp_plot"), height = "440px")),
-        card(card_header("Top Variables"), DTOutput(ns("imp_tbl")))
-      )
-    ),
-    nav_panel("Predictions",
-      layout_columns(col_widths = c(7, 5),
-        card(plotOutput(ns("pred_plot"), height = "400px")),
-        card(card_header("Prediction Table"), DTOutput(ns("pred_tbl")))
-      )
-    )
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .XGB_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
 xgboostServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .XGB_VIEWS, function(k, solo) switch(k,
+        training_curve = tagList(layout_columns(col_widths = c(8, 4),
+        card(plotOutput(ns("cv_plot"), height = "400px")),
+        card(card_header("Performance"), verbatimTextOutput(ns("perf_out")))
+      )),
+        feature_import = tagList(layout_columns(col_widths = c(8, 4),
+        card(plotOutput(ns("imp_plot"), height = "440px")),
+        card(card_header("Top Variables"), DTOutput(ns("imp_tbl")))
+      )),
+        predictions = tagList(layout_columns(col_widths = c(7, 5),
+        card(plotOutput(ns("pred_plot"), height = "400px")),
+        card(card_header("Prediction Table"), DTOutput(ns("pred_tbl")))
+      )),
+        NULL))
+    })
+
     ns <- session$ns
 
     if (!requireNamespace("xgboost", quietly = TRUE)) {

@@ -47,18 +47,29 @@ pcaToolsUI <- function(id) {
   )
 }
 
+.PCA_VIEWS <- c(main = "Main plot", scree = "Scree / variance",
+                loadings = "Loadings", table = "Summary table")
+
 pcaCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-    nav_panel("Main Plot",     plotOutput(ns("main_plot"),     height = "500px")),
-    nav_panel("Scree / Var",   plotOutput(ns("scree_plot"),    height = "400px")),
-    nav_panel("Loadings",      plotOutput(ns("loadings_plot"), height = "500px")),
-    nav_panel("Summary Table", DTOutput(ns("summary_tbl"),     height = "500px"))
+  # Select-and-split (helpers.R): one selection fills the area, several split it.
+  card(
+    card_header(ea_view_header(ns, .PCA_VIEWS, tools = FALSE)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
 pcaServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_body <- renderUI({
+      ea_view_panes(input$view_pick, .PCA_VIEWS, function(k, solo) switch(k,
+        main     = plotOutput(session$ns("main_plot"),     height = if (solo) "500px" else "100%"),
+        scree    = plotOutput(session$ns("scree_plot"),    height = if (solo) "400px" else "100%"),
+        loadings = plotOutput(session$ns("loadings_plot"), height = if (solo) "500px" else "100%"),
+        table    = DTOutput(session$ns("summary_tbl")),
+        NULL))
+    })
+
     ns <- session$ns
     fit_r <- reactiveVal(NULL)
 
