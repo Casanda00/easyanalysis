@@ -534,11 +534,27 @@ trees — i.e. the chaining through the pool works. `testServer` on the runner: 
 a hint instead of a blank picker, a run writes the layer, a second run makes `DTM_2` rather
 than overwriting, an explicit name is honoured.
 
-**Part 2 — still open.** (a) Port the other bundled operations: `mod_raster.R` (crop / clip /
-mosaic / reproject / resample / band calc / zonal stats), `mod_terrain.R`, `mod_hydro.R`, and
-the vector ops. (b) `pointcloud` and `metrics` still dock into the centre; their leftover
-non-map outputs (LAS summary, elevation/intensity histograms, model-evaluation scatter) need
-to move into the tool panel so those two become `map_based` too.
+**Part 2 — the last two LiDAR screens (done).** `pointcloud` and `metrics` are now
+`map_based` with `canvas = NULL`, and all three canvas functions are deleted:
+
+- `lidarPointcloudCanvasUI` carried its own leaflet basemap **and** its own copy of the 3D
+  viewer, static snapshot and `snap_pts` slider — the same output ids `lidar3DOnlyUI` uses, so
+  opening the screen while the 3D view was up would have put duplicate ids in the DOM. The 3D
+  view button is now the only home for those.
+- Non-layer output moved into the tool panels as collapsed accordions: height/intensity
+  histograms + LAS summary under Point cloud / 3D, model evaluation (text + scatter) under
+  LiDAR metrics. The CRS fallback UI moved there too — it used to sit under the basemap.
+- The extracted metrics table was dropped from the panel: it already goes to `dataset_pool`,
+  so it shows up as a table in the **data view**. No reason to render it twice.
+
+Verified with `testServer`: opening `pointcloud`, `metrics` or any `algo_*` tool leaves the map
+in the centre and shows the "results are drawn on the workspace map" note, both panels carry
+their own outputs, and `lidar3DOnlyUI` is the sole holder of the viewer/snapshot ids.
+
+**Part 3 — still open.** Port the other bundled operations to `algorithms.R`: `mod_raster.R`
+(crop / clip / mosaic / reproject / resample / band calc / zonal stats), `mod_terrain.R`
+(slope / aspect / hillshade / …), `mod_hydro.R`, and the vector ops. This is what *"the same is
+true for many other commands"* refers to.
 
 ---
 

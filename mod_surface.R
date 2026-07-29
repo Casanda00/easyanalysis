@@ -1,10 +1,18 @@
 # ==========================================================================
-# MODULE: Surface Models  (canvas + tools contract)
-# Generates DTM / DSM / CHM / nDSM from a point cloud in las_pool.
-# Results are saved to raster_pool for immediate use in Raster Analysis.
-#   surfaceToolsUI(id)   -> right panel controls
-#   surfaceCanvasUI(id)  -> leaflet map showing generated surface
-#   surfaceServer(id, las_pool, raster_pool)
+# MODULE: Surface Models  --  RETIRED, NOT REGISTERED AS A TOOL
+#
+# This bundled DTM / DSM / CHM / nDSM behind one radio button, which meant you
+# had to already know that a DTM lives inside a screen called "Surface models"
+# before you could make one -- and its CHM was the same lidR::pitfree call that
+# mod_lidar.R also had, so CHM existed twice.
+#
+# All four are now separate searchable tools in algorithms.R, run by mod_algo.R.
+# The run logic there was ported from this file unchanged (tin() for DTM, p2r()
+# for DSM, pitfree(thresholds) for CHM, DSM - DTM for nDSM).
+#
+# Kept only so that nothing still referring to surfaceServer/surfaceToolsUI
+# breaks; global.R sources it, mod_workspace.R no longer registers it and
+# server.R no longer binds it. Delete once nothing references it.
 # ==========================================================================
 
 surfaceToolsUI <- function(id) {

@@ -1,11 +1,17 @@
 # ==========================================================================
 # MODULE: Spatial & LiDAR  (canvas + tools contract)
-# Three menu views (pointcloud / chm_itd / metrics) share ONE rv_lidar state,
-# so this is a single module: six UI fns (3 tools + 3 canvas) + one server.
-#   lidarPointcloudToolsUI / lidarPointcloudCanvasUI
-#   lidarMetricsToolsUI    / lidarMetricsCanvasUI
-#   lidarServer(id, dataset_pool)
-# Wire all six with the SAME id ("lidar"); the server binds once.
+# Two menu views (pointcloud / metrics) share ONE rv_lidar state, so this is a
+# single module: two tools UI fns + one server. Wire both with the SAME id
+# ("lidar"); the server binds once.
+#   lidarPointcloudToolsUI  (LAS pre-processing + results)
+#   lidarMetricsToolsUI     (metric extraction + model evaluation)
+#   lidarServer(id, dataset_pool, las_pool, vector_pool)
+#
+# NO CANVAS. Both tools are map_based: the workspace map draws the point cloud
+# and the 3D view has its own button (lidar3DOnlyUI), so a screen of its own
+# meant two or three competing views of the same data (backlog D18). Outputs
+# that are genuinely not map layers -- the LAS summary, the height/intensity
+# histograms, the model-evaluation scatter -- render in the tool panel instead.
 # Extracted plot metrics are written to dataset_pool so the left rail picks them up.
 # ==========================================================================
 
@@ -43,50 +49,27 @@ lidarPointcloudToolsUI <- function(id) {
     uiOutput(ns("filter_class_ui")),
     div(class = "d-flex gap-2 mt-1",
       actionButton(ns("apply_view_filters"), "Apply Filters", class = "btn-sm btn-primary flex-fill"),
-      actionButton(ns("reset_view_filters"), "Reset", class = "btn-sm btn-outline-secondary"))
-  )
-}
-
-lidarPointcloudCanvasUI <- function(id) {
-  ns <- NS(id)
-  div(
-    # Top row: basemap (left) side-by-side with 3D viewer (right)
-    layout_columns(
-      col_widths = c(5, 7),
-      card(
-        card_header(class = "bg-light", "LAS Location (Basemap)"),
-        div(style = "height: 460px;",
-            leafletOutput(ns("location_map"), width = "100%", height = "100%")),
-        uiOutput(ns("manual_coords_ui"))
-      ),
-      card(
-        card_header(class = "bg-light", "Interactive 3D Point Cloud Viewer"),
-        rglwidgetOutput(ns("lidar_3d_viewer"), height = "460px")
-      )
-    ),
-    # Headless static render: works on shinyapps.io (no WebGL screenshot needed),
-    # is downloadable, and is the image the AI Co-Pilot can actually see.
-    card(
-      card_header(class = "d-flex justify-content-between align-items-center bg-light", "Static 3D Snapshot (download / AI view)",
-                  ea_plot_appearance(fields = c("title", "xlab", "ylab"))),
-      div(class = "d-flex align-items-center gap-2 px-2",
-          sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):", min = 10000, max = 5000000, value = 60000, step = 10000, width = "320px")),
-      plotOutput(ns("static_3d"), height = "430px")
-    ),
-    layout_columns(
-      col_widths = c(6, 6),
-      card(card_header(class = "bg-light", "LAS Summary"), verbatimTextOutput(ns("las_summary"))),
-      card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Elevation & Intensity Distributions",
-                       ea_plot_appearance(fields = "title")),   # multi-panel: overall title only
-           plotOutput(ns("las_hists")))
+      actionButton(ns("reset_view_filters"), "Reset", class = "btn-sm btn-outline-secondary")),
+    # CRS fallback. It used to sit under this screen's own basemap; the basemap is
+    # gone, so it lives with the controls.
+    uiOutput(ns("manual_coords_ui")),
+    tags$hr(class = "my-2"),
+    # Results that are NOT layers, so they have nowhere on the map to go.
+    accordion(open = FALSE,
+      accordion_panel("Height & intensity distributions",
+        div(class = "d-flex justify-content-end", ea_plot_appearance(fields = "title")),
+        plotOutput(ns("las_hists"), height = "260px")),
+      accordion_panel("LAS summary",
+        div(style = "max-height:300px; overflow-y:auto;",
+            verbatimTextOutput(ns("las_summary"))))
     )
   )
 }
 
-# The 3D VIEW in the workspace: the cloud and nothing else. The full
-# lidarPointcloudCanvasUI pairs the viewer with a basemap, which makes sense as
-# a screen but not as a "3D view" — asking for 3D and getting a map beside it is
-# not 3D. Same module, same outputs, so the ids and server logic are unchanged.
+# The 3D VIEW in the workspace: the cloud and nothing else, reached from the "3D
+# view" button on the map strip. This is now the ONLY place the 3D viewer and the
+# static snapshot appear — the point-cloud screen used to carry its own copy of
+# both plus a basemap, which is what "opens two views" meant (backlog D18).
 lidar3DOnlyUI <- function(id) {
   ns <- NS(id)
   tagList(
@@ -124,17 +107,18 @@ lidarMetricsToolsUI <- function(id) {
     markdown("**Evaluate Volume Models**"),
     selectInput(ns("eval_target"), "Observed Variable (e.g., v):", choices = NULL),
     selectInput(ns("eval_pred"), "Predicted Variable (e.g., v_itd):", choices = NULL),
-    actionButton(ns("run_eval"), "Calculate Error Metrics", class = "btn-success", width = "100%")
-  )
-}
-
-lidarMetricsCanvasUI <- function(id) {
-  ns <- NS(id)
-  div(
-    card(card_header(class = "bg-light", "Extracted Plot Predictors"), DT::dataTableOutput(ns("metrics_table"))),
-    card(card_header(class = "d-flex justify-content-between align-items-center bg-light", "Model Evaluation (RMSE, Bias)",
-                     ea_plot_appearance()),
-         verbatimTextOutput(ns("eval_metrics_out")), plotOutput(ns("eval_plot")))
+    actionButton(ns("run_eval"), "Calculate Error Metrics", class = "btn-success", width = "100%"),
+    tags$hr(class = "my-2"),
+    # The extracted metrics themselves go to dataset_pool, so they show up as a
+    # table in the DATA view -- no need to repeat them here. Only the evaluation,
+    # which is not a layer, renders in the panel.
+    accordion(open = FALSE,
+      accordion_panel("Model evaluation",
+        div(style = "max-height:220px; overflow-y:auto;",
+            verbatimTextOutput(ns("eval_metrics_out"))),
+        div(class = "d-flex justify-content-end", ea_plot_appearance()),
+        plotOutput(ns("eval_plot"), height = "260px"))
+    )
   )
 }
 

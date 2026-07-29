@@ -1490,8 +1490,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       ntl            = list(nm = "Night-time lights",   grp = "Spatial & LiDAR", tools = ntlToolsUI,          canvas = ntlCanvasUI, map_based = TRUE),
       climate_trend  = list(nm = "Climate trend",       grp = "Spatial & LiDAR", tools = climateTrendToolsUI, canvas = climateTrendCanvasUI, map_based = TRUE),
       wind           = list(nm = "Wind & environment",  grp = "Spatial & LiDAR", tools = windToolsUI,         canvas = windCanvasUI),
-      pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = lidarPointcloudCanvasUI),
-      metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = lidarMetricsCanvasUI),
+      # map_based: the workspace map draws the point cloud and the 3D view has its
+      # own button, so these tools bring no view of their own (backlog D18). Their
+      # non-layer output renders inside the tool panel.
+      pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = NULL, map_based = TRUE),
+      metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = NULL, map_based = TRUE),
       # --- Docs (R console is NOT here: it lives in the bottom dock) ---
       docs           = list(nm = "Documentation",       grp = "More", tools = docsToolsUI,       canvas = docsCanvasUI),
       references     = list(nm = "References",          grp = "More", tools = referencesToolsUI, canvas = referencesCanvasUI)
