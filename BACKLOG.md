@@ -692,8 +692,103 @@ unreachable until D18.
 
 ---
 
+## G. Reported 2026-07-29 — testing the pushed algorithm framework
+
+### G27. An algorithm must not pick its input layer for you — FIXED 2026-07-29
+> "ITD now takes a CHM raster from the project: there should be an option to select the
+> raster data not automatically forced there."
+
+Correct, and it was worse than cosmetic. `selectInput` **auto-selects its first option**, so
+ITD opened already pointing at whatever raster happened to be first in the pool. Press Run
+without looking and you are detecting treetops on a DTM, and it will happily produce points.
+
+Every algorithm input now has an empty `"Choose a layer..."` first option and starts
+unselected; `isTruthy("")` is `FALSE`, so the existing guard in the Run handler refuses with
+"Choose a … first." Multi-layer inputs get a `placeholder` instead. Applies to all 33 tools,
+not just ITD.
+
+### G28. Curvature appears to run forever — PARTLY DIAGNOSED 2026-07-29
+> "the curvature just keeps going on and on loading running in a loop in the terminal."
+
+**What I could rule out by measuring.** The maths is not the problem and there is no reactive
+loop I can find:
+
+| test | result |
+|---|---|
+| in memory, 4 M cells | 2.37 s |
+| disk-backed, 1.44 M cells, with genuinely flat ground | 1.17 s |
+| non-finite output (Inf / NaN poisoning the map) | **none** — 0 Inf, 0 NaN |
+| map display path (downsample + reproject to WGS84) | 0.38 s |
+
+So on the sizes I can generate it finishes quickly and cleanly. **What I have not reproduced
+is the actual symptom**, which means the cause is still open. Most likely candidates, in order:
+the real DEM is far larger than anything tested (5 focal passes plus ~8 full-raster
+temporaries scale linearly, so 40 M cells is tens of seconds, not forever); or terra's own
+progress output redrawing looks like a loop in the terminal; or something in the map rebuild
+re-triggers on the new layer.
+
+**Needed to close it:** the DEM's dimensions (`terra::nrow/ncol`) and what the terminal is
+actually repeating. Without that I would be guessing at a fix.
+
+**One thing tried and rejected — and a correction.** Collapsing the formula into a single
+block-wise `terra::lapp()` pass looks like the obvious fix, since it avoids ~8 full-raster
+temporaries. On a first single run it appeared clearly slower (2.22 s vs 1.17 s), and I said
+so. Re-measured with 3 reps that was **noise**: median 2.76 s arithmetic vs 3.06 s lapp at
+1.4 M cells, and 9.35 s vs 8.74 s at 6.2 M cells — each wins once, ranges overlapping. So the
+combination step is not the bottleneck at all; the five `focal()` passes are. Kept as
+arithmetic only because it reads closer to the formula.
+
+**Useful scale figure that came out of it:** ~9 s at 6.2 M cells, so a 50 M-cell DEM is over a
+minute of real work. That makes "the DEM is simply large" the leading explanation for the
+report, and makes **G29 the actual fix** — the user needs to see progress and be able to stop,
+not to have curvature made 10% faster.
+
+### G29. No way to stop a heavy process from inside the app
+> "i noticed that there are no real way to stop a heavy process in the app wihtout canceling
+> it in the terminal-basically using ctrl c."
+
+Real and structural, not specific to curvature. **Shiny is single-threaded**: while
+`spec$run()` is executing, the session cannot process a click, so a Cancel button rendered
+next to the progress bar could never be reached. `withProgress` only *reports*; it does not
+yield. This affects every long operation in the app — model fits and LAS reads too, not just
+algorithms.
+
+**Constraints established, not assumed:**
+
+- A `terra` SpatRaster is a **C++ pointer**; it cannot cross a process boundary. So the
+  obvious `future`/`ExtendedTask` approach cannot simply be handed the layer.
+- `sf` objects and `LAS` are ordinary R objects and *can* be serialised, though a large point
+  cloud is expensive to copy.
+- The whitebox algorithms already go through files (`writeRaster` → tool → `rast`), so they
+  are trivially portable to another process.
+- The app currently has **no** async infrastructure at all — no `promises`, `future`, `callr`
+  or `ExtendedTask` anywhere.
+
+**Design to build (not started).** Run each algorithm in a background R process with
+`callr::r_bg()`, which is killable, and pass **paths, not objects**:
+
+1. For each raster input use `terra::sources()` when the layer is file-backed, else write it
+   to a temp `.tif` first. Vector inputs serialise directly; LAS passes its path.
+2. Poll the process with `invalidateLater()` while it runs, so the session stays responsive
+   and a **Stop** button in the tool panel is actually clickable.
+3. On completion the worker returns an output path; the main process does
+   `terra::rast(path)` and puts it in the pool exactly as now.
+4. On Stop, `p$kill()` and delete the temp output.
+
+The `run(inp, p)` contract in `algorithms.R` stays as it is — the worker calls it. That is the
+payoff of having made the operations data: cancellation becomes one change in `mod_algo.R`
+rather than 33 changes.
+
+Cost to weigh before building: a second R process pays terra/lidR load time per run, and
+writing an in-memory raster to disk first is a real copy. Probably worth gating on an
+estimated cell count so small jobs stay in-process.
+
+---
+
 ## Suggested order
 
+0. **G29** (no way to stop a heavy process) — structural, affects everything, and G28 may
+   turn out to be a symptom of having no way to see or stop a long run.
 1. **The likely regressions** — B5, D17, D18, F26. My changes, so mine to check first.
 2. **D15** (active dataset not switching) — a core interaction, and other things depend on it.
 3. **The colour sweep** — A1, A2 together, as in round 1.

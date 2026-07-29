@@ -244,6 +244,17 @@ ea_algorithms <- function() {
      2 * (z$D * z$H^2 + z$E * z$G^2 - z$F * z$G * z$H) / denom
   # Curvature is undefined on a perfectly flat cell (zero gradient): report 0
   # rather than letting the division produce NaN across flat ground.
+  #
+  # On the combination step: rewriting this as one block-wise terra::lapp() pass
+  # to avoid the ~8 full-raster temporaries makes NO reliable difference. Median
+  # of 3 reps on disk-backed DEMs: 1.4 M cells 2.76 s arithmetic vs 3.06 s lapp;
+  # 6.2 M cells 9.35 s vs 8.74 s -- each wins once and the ranges overlap, so the
+  # cost is dominated by the five focal() passes, not by how they are combined.
+  # Left as arithmetic because it is the clearer expression of the formula. If
+  # curvature needs to get genuinely faster, attack the focal passes.
+  #
+  # For scale when reading a bug report about this being slow: ~9 s at 6.2 M
+  # cells, so a 50 M-cell DEM is over a minute. Slow, but finite.
   terra::ifel(denom < 1e-12, 0, r)
 }
 

@@ -66,12 +66,28 @@ algoServer <- function(id, spec, pools) {
         if (!length(nms))
           return(div(class = "ea-hint",
             sprintf("No %s layer in this project yet.", i$pool)))
+        # Keep what the user picked. This block re-renders whenever the pool
+        # changes, and a run ADDS to the pool -- so without this, running an
+        # algorithm cleared its own input and you had to re-pick the layer before
+        # you could run it again with a different parameter. isolate() because we
+        # depend on the pool here, never on our own selection.
+        prev <- isolate(input[[paste0("in_", i$key)]])
+        keep <- if (length(prev)) prev[prev %in% nms] else character(0)
         tagList(
           if (isTRUE(i$multiple))
             selectizeInput(ns(paste0("in_", i$key)), i$label, choices = nms,
-                           multiple = TRUE,
-                           options = list(plugins = list("remove_button")))
-          else selectInput(ns(paste0("in_", i$key)), i$label, choices = nms),
+                           selected = keep, multiple = TRUE,
+                           options = list(plugins = list("remove_button"),
+                                          placeholder = "Choose layers"))
+          else
+            # An empty first choice, so the tool NEVER picks a layer for you. A
+            # plain selectInput auto-selects its first option, which meant ITD
+            # silently pointed at whatever raster happened to be first in the
+            # pool -- run it without looking and you would be detecting treetops
+            # on a DTM. Run refuses until something is chosen.
+            selectInput(ns(paste0("in_", i$key)), i$label,
+                        choices = c(stats::setNames("", "Choose a layer..."), nms),
+                        selected = if (length(keep)) keep[1] else ""),
           if (!is.null(i$hint)) tags$p(class = "text-muted small mt-n1 mb-2", i$hint))
       })
     })
