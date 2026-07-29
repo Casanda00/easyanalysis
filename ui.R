@@ -1529,12 +1529,9 @@ page_fillable(
       });
       /* Workspace Map/Data tab: toggle the .on class client-side (the click also
          sets input$wsview, which swaps the canvas server-side). */
-      document.addEventListener('click', function(e){
-        var t = e.target.closest ? e.target.closest('.ea-wsx-tab') : null;
-        if (!t) return;
-        var box = t.parentNode;
-        [].forEach.call(box.querySelectorAll('.ea-wsx-tab'), function(b){ b.classList.toggle('on', b === t); });
-      });
+      /* The view tabs are rendered from wsview() on the server now, so the old
+         client-side highlighter is gone: two sources of truth for which tab is
+         lit is exactly how the tab and the view came to disagree. */
       /* Workspace pop-out mini-screens: drag by the header (client-side; CSS handles resize). */
       document.addEventListener('mousedown', function(e){
         var ph = e.target.closest ? e.target.closest('.ea-wsx-ph') : null;

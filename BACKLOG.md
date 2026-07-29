@@ -438,13 +438,19 @@ Needs clarifying: which toolbar, and what "fills" means.
 
 ## D. Views and switching
 
-### D15. Active dataset does not change when another is clicked
+### D15. Active dataset does not change when another is clicked — FIXED 2026-07-29
 > "the active dataset does not change when we click other datasets."
 
-**A core interaction being broken.** High priority: every model screen reads the active
-dataset.
+**Cause:** the layer row set only the workspace's own `activeLayer`. The app-level
+`active_ds` — which every model screen, the status bar and the data view read — was never
+touched, so the click highlighted a row and nothing downstream moved. Confirmed by the
+reporter: "when we changed the data or selected another in the panel, the view in the
+lower tab did not change."
 
-### D16. Tab switching should be complete, and the map view always exists
+**Fix:** clicking a **table** layer now also sets the app-level `active_dataset`.
+Verified live: active dataset went from the CSV to `second_table` on click.
+
+### D16. Tab switching should be complete — PARTLY FIXED 2026-07-29 (tab/view desync)
 > "even though only csv or excel ... the default panel was Maps but the data view was
 > kinda showing there. this should a complete tab switch. and even though there are only
 > text file, it does not mean the map should not be displayed on the map view. the map
@@ -453,6 +459,16 @@ dataset.
 
 Two rules: switching views must be complete, not a blend; and the Map view always exists —
 it is the *default choice* that follows the data, not the view's existence.
+
+**Half of this is fixed: the tab and the view could disagree.** The strip toggled its own
+`.on` class in JS while `wsview()` lived on the server, so anything that changed the view
+server-side — opening a map tool, the canvas following the data — left the old tab lit.
+That is what "the data view was kinda showing there" described. The strip is now rendered
+from `wsview()`, so there is one source of truth. Verified: a server-driven switch to the
+data view moved the lit tab with it.
+
+**Still open:** the map view must exist regardless of what the project holds, with the
+default choice following the data.
 
 ### D17. Opening a tool must not change the view  **LIKELY REGRESSION**
 > "download spatial data switches the tab if we are in map view we click it. should not be

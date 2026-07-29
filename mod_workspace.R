@@ -20,17 +20,12 @@ workspaceCanvasUI <- function(id) {
       fileInput("ws_import_file", NULL, accept = c(".eap", ".zip"), width = "1px")),
 
     div(class = "ea-wsx-bar",
-      div(class = "ea-wsx-tabs",
-        tags$button(id = ns("tab_map"), class = "ea-wsx-tab on", type = "button",
-          onclick = sprintf("Shiny.setInputValue('%s','map',{priority:'event'});", ns("wsview")),
-          "Map view"),
-        tags$button(id = ns("tab_data"), class = "ea-wsx-tab", type = "button",
-          onclick = sprintf("Shiny.setInputValue('%s','data',{priority:'event'});", ns("wsview")),
-          "Data view"),
-        tags$button(id = ns("tab_split"), class = "ea-wsx-tab", type = "button",
-          onclick = sprintf("Shiny.setInputValue('%s','split',{priority:'event'});", ns("wsview")),
-          "Split"),
-      ),
+      # Rendered from wsview() rather than toggling its own classes in JS. With a
+      # client-side highlight the server could switch the view -- opening a map
+      # tool, or the canvas following the data -- while the tab stayed lit on the
+      # old one. Two sources of truth for which tab is active is exactly how the
+      # tab and the view came to disagree.
+      uiOutput(ns("view_tabs"), inline = TRUE),
       # M7: the old tool dropdown is retired — tools are launched from the
       # Analysis menu in the top bar. This shows the ACTIVE tool instead.
       div(class = "ea-wsx-active-tool", uiOutput(ns("active_tool_label")))
@@ -220,7 +215,17 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                       title = if (vis) "Hide layer" else "Show layer",
                       tags$span(class = "knob")),
             tags$span(class = "ea-wsx-sw", style = paste0("background:", l$col, ";")),
-            tags$span(class = "ea-wsx-nm", title = l$nm, onclick = .fire("ws_active", l$nm), l$nm),
+            # Clicking a TABLE also sets the app-level active dataset. Setting only
+            # the workspace's own activeLayer left every model screen, the status
+            # bar and the data view pointing at the previous dataset -- the click
+            # looked like it worked while nothing downstream moved.
+            tags$span(class = "ea-wsx-nm", title = l$nm,
+              onclick = if (identical(l$kind, "table"))
+                  paste0(.fire("ws_active", l$nm),
+                         sprintf("Shiny.setInputValue('active_dataset', %s, {priority:'event'});",
+                                 jsonlite::toJSON(l$nm, auto_unbox = TRUE)))
+                else .fire("ws_active", l$nm),
+              l$nm),
             tags$span(class = "ea-wsx-ty", l$type),
             # remove the layer from the project (app-level handler in server.R)
             tags$span(class = "ea-wsx-del", title = paste0("Remove '", l$nm, "'"),
@@ -1247,6 +1252,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!identical(sig, fit_sig())) map_rebuild(map_rebuild() + 1)
     }, ignoreInit = FALSE)
 
+
+    output$view_tabs <- renderUI({
+      v <- wsview()
+      mk <- function(key, label) tags$button(
+        id = ns(paste0("tab_", key)),
+        class = paste("ea-wsx-tab", if (identical(v, key)) "on" else ""),
+        type = "button",
+        onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'});",
+                          ns("wsview"), key),
+        label)
+      div(class = "ea-wsx-tabs",
+        mk("map", "Map view"), mk("data", "Data view"), mk("split", "Split"))
+    })
 
     .active_is_lidar <- reactive({
       a <- activeLayer()
