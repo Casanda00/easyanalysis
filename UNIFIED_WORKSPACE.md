@@ -628,5 +628,20 @@ change.
 - `df` under the name `df`: it is an alias for the ACTIVE dataset, so a modified `df` is
   written back under the real dataset name rather than creating a stray layer.
 
-Verified end-to-end: with the orthomosaic loaded, a crop script produced a `clipped`
-raster layer in the panel and **two rasters drawn on the map**, with the alias skipped.
+- **Intermediates**, detected by parsing the script. An intermediate is by definition
+  *consumed*: in
+  `step1 <- crop(r, box)` / `step2 <- aggregate(step1, 4)` / `clipped <- step2 * 1`,
+  `step1` and `step2` appear on the right-hand side of a LATER assignment and `clipped`
+  does not — so only `clipped` is an output. Crucially, merely *looking* at a value
+  (`plot(clipped)`, `print(clipped)`, a bare `clipped`) is not an assignment, so it never
+  disqualifies the real output. When a script cannot be parsed, or contains no
+  assignments, nothing is filtered — the fallback is to keep, not to lose work.
+
+So **a clip yields exactly one layer**, which is what the user means by clipping.
+
+Verified end-to-end: with the orthomosaic loaded, a three-step chain (`r` alias,
+`step1`, `step2`, `clipped`, then `plot(clipped)`) added a single `clipped` layer —
+alias and both intermediates skipped — and drew it on the map. `.script_outputs()` is
+unit-checked over eight scripts: simple clip, a 3-link chain, output-then-plotted,
+output-then-printed, two genuine outputs, an intermediate reused twice, an unparseable
+script and one with no assignments.

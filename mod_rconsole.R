@@ -202,6 +202,39 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
     # options(ea.console_sync = "ask").
     pending <- reactiveVal(list())
 
+    # Which names a script actually PRODUCES, as opposed to passes through.
+    # An intermediate is consumed: in
+    #   r1 <- crop(r, box); r2 <- mask(r1, poly); final <- project(r2, crs)
+    # r1 and r2 appear on the right-hand side of a LATER assignment, final does
+    # not — so only `final` is an output. Usage that merely looks at a value
+    # (print(final), plot(final), a bare `final`) is not an assignment and so
+    # does not count, which is what keeps the real output from being filtered.
+    # Returns NULL when the script cannot be parsed, meaning "do not filter".
+    .script_outputs <- function(code) {
+      ex <- tryCatch(parse(text = code), error = function(e) NULL)
+      if (is.null(ex) || !length(ex)) return(NULL)
+      assigns <- list(); rhs <- list()
+      for (i in seq_along(ex)) {
+        e <- ex[[i]]
+        if (is.call(e) && length(e) >= 3 &&
+            as.character(e[[1]])[1] %in% c("<-", "=", "<<-")) {
+          tgt <- e[[2]]
+          if (is.symbol(tgt)) assigns[[as.character(tgt)]] <- i
+          rhs[[as.character(i)]] <- tryCatch(all.vars(e[[3]]), error = function(err) character(0))
+        }
+      }
+      if (!length(assigns)) return(NULL)
+      keep <- character(0)
+      for (nm in names(assigns)) {
+        i <- assigns[[nm]]; consumed <- FALSE
+        for (j in names(rhs)) {
+          if (as.integer(j) > i && nm %in% rhs[[j]]) { consumed <- TRUE; break }
+        }
+        if (!consumed) keep <- c(keep, nm)
+      }
+      if (length(keep)) keep else NULL
+    }
+
     .classify <- function(x) {
       if (is.data.frame(x))            "table"
       else if (inherits(x, "SpatRaster")) "raster"
@@ -214,12 +247,15 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
       lidar = las_pool, NULL)
 
     # Eligible objects that are NEW or CHANGED since we copied the pools in.
-    .harvest <- function(e) {
+    .harvest <- function(e, code = NULL) {
       inj <- injected()
       ad  <- tryCatch(active_dataset(), error = function(err) NULL)
+      outs <- if (is.null(code)) NULL else .script_outputs(code)
       out <- list()
       for (nm in ls(e)) {
         if (startsWith(nm, ".")) next
+        # keep only what the script produced, not what it passed through
+        if (!is.null(outs) && !(nm %in% outs) && !identical(nm, "df")) next
         x <- tryCatch(get(nm, envir = e), error = function(err) NULL)
         kind <- .classify(x)
         if (is.null(kind)) next
@@ -292,7 +328,7 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
         session$sendCustomMessage("rc_plotwin", session$ns("plotwin"))
 
       # Anything the script produced joins the project.
-      items <- tryCatch(.harvest(e), error = function(err) list())
+      items <- tryCatch(.harvest(e, code), error = function(err) list())
       if (length(items)) {
         if (identical(sync_mode, "auto")) {
           added <- .commit(items)
