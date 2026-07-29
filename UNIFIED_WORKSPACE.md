@@ -667,7 +667,7 @@ reply goes to the chat, not to Shiny. `ea_agent_ui` then sequences the steps, wa
 each to land: panels render server-side, and a select's CHOICES arrive after its element
 does, so `eaWaitForOption()` waits for the option itself rather than just the element.
 
-**BLOCKED on a pre-existing bug.** The sequence works — dataset switches, the Linear
+**Was blocked on a pre-existing bug — now fixed; see below.** Original note: The sequence works — dataset switches, the Linear
 Regression screen opens, the formula box fills, Run is pressed — but `#lm-y` (Response)
 has **no options at all**, so the run has nothing to fit. `mod_linear_regression.R:408`
 populates it with `updateSelectInput` from `active_data()`, and with `trees` active
@@ -675,3 +675,28 @@ populates it with `updateSelectInput` from `active_data()`, and with `trees` act
 with the panel already open. This is NOT caused by the agent work: a user opening
 Linear Regression by hand gets the same empty dropdown. That has to be fixed before the
 last step of this feature can be verified, and it is worth fixing regardless.
+
+### Empty selectors on the model screens (fixed 2026-07-29)
+
+Linear regression, ANOVA and Random forest all opened with **empty Response dropdowns**,
+so those screens could not be run at all — by the agent or by hand. `descriptive` was
+fine, and that contrast is the whole diagnosis: it builds its selectors with `renderUI`,
+while the others fill theirs with `updateSelectInput`.
+
+The workspace renders a module's tools panel **lazily**, when its tool is opened. The
+population observer runs off `active_dataset()` long before that, so `updateSelectInput`
+targets an element that does not exist yet and Shiny silently drops the message. Nothing
+retries, because the dataset itself never changed afterwards — which is also why
+re-triggering the same dataset appeared to do nothing (a `reactiveVal` set to its current
+value does not invalidate).
+
+Fix: `active_dataset()` now takes a dependency on `ds_refresh`, and `server.R` bumps it
+whenever the workspace opens a tool (`workspace_ctx$tool_open`). The population observers
+therefore re-run against a panel that exists. One handle fixes every module of this shape
+rather than rewriting ~15 screens.
+
+Verified: before, `lm y:[]`, `anova y:[] x:[]`, `rf target:[] predictors:[]`; after,
+`lm y:[dbh_cm]`, `anova y:[dbh_cm] x:[site]`, `rf predictors:[dbh_cm|height_m|age_yr|site]`.
+With that fixed, the agent chain completes end to end: it opened Linear regression, set
+the response to `height_m` and the formula to `dbh_cm + age_yr`, pressed Run, and the
+screen now shows a fitted `lm()` with coefficients, both predictors and R-squared.

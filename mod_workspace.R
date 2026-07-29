@@ -1705,6 +1705,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     })
 
     list(context  = reactive("Unified workspace (beta scaffold)."),
-         plot_ctx = reactive({ t <- current_tool(); if (is.null(t)) "workspace" else t }))
+         plot_ctx  = reactive({ t <- current_tool(); if (is.null(t)) "workspace" else t }),
+         # server.R watches this to re-arm module selector population when a
+         # screen is opened; its panel only exists from that moment.
+         tool_open = reactive(current_tool()))
   })
 }

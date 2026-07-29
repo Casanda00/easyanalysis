@@ -52,6 +52,15 @@ server <- function(input, output, session) {
   }
 
   active_dataset <- reactive({
+    # ds_refresh is a deliberate invalidation handle. Module screens fill their
+    # selectors with updateSelectInput() driven off this reactive, but the
+    # workspace renders a module's panel LAZILY, when its tool is opened. The
+    # update therefore fires while the element does not yet exist, Shiny drops
+    # it, and nothing re-runs because the dataset itself never changed — which
+    # is why Linear regression, ANOVA and Random forest opened with empty
+    # Response dropdowns. Bumping ds_refresh when a tool opens re-runs those
+    # observers against a panel that now exists.
+    ds_refresh()
     ds <- active_ds()
     if (!isTruthy(ds) || !(ds %in% names(dataset_pool))) return(NULL)
     ds
@@ -881,6 +890,11 @@ server <- function(input, output, session) {
 
   # UNIFIED workspace: hosts every module's real UI (their servers are bound once
   # above, unchanged). `tool_request` lets a menubar click select a tool in it.
+  # Opening a tool re-arms the module selector population (see active_dataset).
+  observeEvent(workspace_ctx$tool_open(), {
+    ds_refresh(isolate(ds_refresh()) + 1)
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
   workspace_ctx  <- workspaceServer("workspace", dataset_pool, raster_pool,
                                     las_pool, vector_pool, active_dataset,
                                     tool_request = reactive(input$current_view),
