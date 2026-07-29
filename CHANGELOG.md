@@ -8,6 +8,47 @@ breaking changes. Newest first.
 
 ---
 
+## v0.8.1 — 2026-07-29
+
+### Fixed
+- **Model screens opened with empty variable selectors.** Linear regression, ANOVA and
+  Random forest could not be run at all — by hand or by the Co-Analyst — because the
+  workspace renders a module's panel lazily and `updateSelectInput` fired before the
+  element existed. `active_dataset()` now depends on `ds_refresh`, bumped when a tool
+  opens. (CLAUDE.md gotcha 18.)
+- **Raster invisible on the map** although the view zoomed to it: layers were added by
+  `leafletProxy` after the map element had been re-created. Tiles, view and layers are
+  built in one pass now. Reprojection also ran at full resolution before downsampling
+  (18.1 s, and a `warp failure` under memory pressure that `tryCatch` swallowed) — it is
+  downsampled first, memoised, and the fit comes from the extent alone.
+- **Zoom to layer** was wired to the same input as Zoom to layers, so it always framed
+  everything; it now targets one layer and reports honestly when there is nothing to
+  zoom to.
+- **Adding a file yanked the map view.** The automatic fit now applies only to the first
+  spatial layer; everything after overlays.
+- **Dark surfaces on the light colour sets** (data tables, accordions, the R console,
+  buttons) — Bootstrap's component variables restated from the tokens. (Gotcha 22.)
+- **The R console cleared your script on every Run.** It keeps it now.
+
+### Added
+- **R console write-back.** Objects a script produces become project layers by class
+  (data.frame, SpatRaster, sf, LAS), so a clip appears in the Layers panel and on the map.
+  Only genuine OUTPUTS: consumed intermediates and aliases of loaded layers are skipped.
+  Modes `auto` (default) and `ask` via `options(ea.console_sync)`.
+- **Plot appearance app-wide** — title, axis labels and colour on every screen, stored per
+  screen. ggplot via a `renderPlot` wrapper; base-R plots per call site, with multi-panel
+  diagnostic grids taking only an overall title.
+- **`.ea-pop`**, a reusable hover panel behind one icon; plot appearance is its first user.
+- **Co-Analyst `run_in_app`** — opens the real screen, fills it and presses Run. Every name
+  is verified against the loaded data; near-misses and case differences are refused, never
+  substituted. Linear regression only so far.
+- **True-colour RGB** for multi-band rasters with a per-layer band mapping (detected from
+  the file, never guessed), point clouds drawn and a density slider reaching the file's
+  full point count, a 3D view button, a dockable/floatable R console with line numbers,
+  and a guided tour that now runs inside the workspace.
+
+---
+
 ## v0.8.0 — 2026-07-27
 
 **The unified workspace.** The ~35 separate analysis screens are now one workspace:

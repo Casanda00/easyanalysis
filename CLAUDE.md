@@ -144,6 +144,45 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+18. **Module panels render LAZILY in the workspace, so `updateSelectInput` is dropped.**
+    A module's tools panel only exists once its tool is opened, but its population observer
+    runs off `active_dataset()` long before that — the update targets a non-existent element
+    and Shiny silently discards it. Nothing retries, because the dataset never changed
+    afterwards. This is why **Linear regression, ANOVA and Random forest all opened with
+    EMPTY Response dropdowns and could not be run at all**, by hand or by the agent.
+    `descriptive` was fine because it builds its selectors with `renderUI` instead.
+    Fix: `active_dataset()` depends on `ds_refresh`, and server.R bumps it whenever the
+    workspace opens a tool (`workspace_ctx$tool_open`). Any NEW module that fills selectors
+    with `update*Input` inherits the fix; one that uses `renderUI` never needed it.
+19. **A `reactiveVal` set to its CURRENT value does not invalidate.** Re-selecting the same
+    dataset to "refresh" a screen does nothing at all. This masked gotcha 18 for a while —
+    the obvious test looked like it disproved the diagnosis.
+20. **`print.ggplot` is NOT a reliable seam.** Overriding it in the global env does restyle
+    a plot when you call `print()` yourself, but Shiny's render path does not dependably
+    dispatch to it — plots rendered unstyled while the same function worked when called
+    directly. Style inside a `renderPlot` wrapper instead (`helpers.R`), which is also
+    where the reactive dependency has to be taken: reading options at print time restyles
+    nothing on change, because printing happens outside the reactive context.
+21. **A panel must never depend on the store its own inputs write to.** The plot-appearance
+    controls read `plot_opts` reactively from inside the panel holding them, so every
+    keystroke invalidated the panel, rebuilt it and wiped the field mid-edit. Read with
+    `isolate()`; if the control needs to reflect state, do it CLIENT-SIDE.
+22. **Bootstrap component variables are declared ON the component class, not `:root`.**
+    bslib compiles the theme once from the default (dark) palette, so `--bs-table-bg`,
+    `--bs-accordion-bg`, `--bs-btn-bg` etc. keep dark values that `html[data-ea-theme]`
+    never reaches. A `:root` override cannot win — restate them per component
+    (`.table`, `.accordion`, `.card`, `.modal`, `.dropdown-menu`, `.nav-tabs`, `.btn`).
+    Inputs compile to literal hex with no variable at all, so state those outright.
+23. **leafletProxy calls are LOST when the map element is re-created.** The canvas
+    re-renders on view/basemap change, silently discarding pending proxy calls — this is
+    why a raster zoomed but never drew. Build tiles, view and layers in ONE pass inside
+    `renderLeaflet`. Bounds should come from the extent alone (`.rast_bbox()`), never from
+    a projected copy: tying the zoom to a full reprojection means a slow or failed warp
+    silently skips the fit.
+24. **Measuring in a non-compositing browser pane lies.** `requestAnimationFrame` does not
+    fire, so leaflet tiles all read `opacity: 0` (basemap included) and `openSettings()`
+    never opens. Check `_tiles` and canvas pixel data instead, and force a reflow before
+    reading computed styles after `eaSetTheme()`.
 14. **`reactiveValues[[k]] <- NULL` does NOT delete the key.** The name stays in `names()` with a NULL
     value, so anything counting/looping over pool names must filter NULLs (`.pool_names()` in server.R).
     This is the root cause of the older `ds_refresh` workaround too.
