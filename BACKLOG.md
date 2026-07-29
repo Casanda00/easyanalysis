@@ -86,16 +86,29 @@ Fixed once in CSS rather than 51 times in R: `.bg-light`, `.bg-white`, `.bg-dark
 looked at. Verified on the LiDAR screen: 5 bars, 0 mismatched — light theme
 `rgb(238,241,234)`, forest `rgb(19,24,19)`.
 
-## 4. 3D view should be 3D only, and the toggle should be obvious
+## 4. 3D view should be 3D only, and the toggle should be obvious — FIXED 2026-07-29
 
 > "3d view should remove the two pane, map and 3d. 3d is only 3d not map view on 3d. there
 > is no way to switch back from 3d to the map view, perhaps, that 3d view should act as a
 > toggle. yeah, the button does it but it is not clear."
 
-- Drop the split: the 3D view shows **only** the cloud, no map pane.
-- Getting back to the map is unclear. The button *is* a toggle already, but it does not
-  read as one. Make the state obvious (label/icon changes to "Back to map", clear active
-  styling), rather than relying on the user discovering it.
+**Split dropped.** The 3D view rendered `lidarPointcloudCanvasUI`, which pairs the viewer
+with a basemap — sensible as a *screen*, wrong as a *view*: asking for 3D and getting a map
+beside it is not 3D. A new `lidar3DOnlyUI()` renders the viewer and its static snapshot and
+nothing else. Same module, same output ids, so no server logic changed and the basemap
+still belongs to the LiDAR screen where it makes sense.
+
+**Toggle now states itself.** Relying on the user guessing that a button labelled "3D view"
+also *leaves* 3D is a puzzle, not a toggle. Label, icon and active styling all change:
+
+| state | label | icon | tooltip |
+|---|---|---|---|
+| on the map | 3D view | cube | Open the 3D point cloud |
+| in 3D | **Back to map** | map-location-dot | Return to the map view |
+
+Verified both ways: entering 3D removes the map pane (`lidar-location_map` absent) and
+keeps the viewer; the button flips to "Back to map" with active styling; clicking it
+returns to Map view with the map present and the label back to "3D view".
 
 ## 5. One button on the map housing its controls
 

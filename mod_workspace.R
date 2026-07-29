@@ -733,7 +733,8 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(class = "ea-wsx-maptop", tags$span("3D view"),
             tags$span(class = "ea-wsx-mapsub", "Drag to rotate · scroll to zoom"),
             uiOutput(ns("tab_three_ui"), inline = TRUE)),
-        div(class = "ea-wsx-threewrap", lidarPointcloudCanvasUI("lidar")))
+        # 3D only — no map pane. The basemap belongs to the LiDAR screen.
+        div(class = "ea-wsx-threewrap", lidar3DOnlyUI("lidar")))
     }
     .map_ui <- function() {
       act <- activeLayer(); vis <- Filter(function(l) .vis(l$nm) && l$kind != "table", layers())
@@ -1251,12 +1252,16 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     output$tab_three_ui <- renderUI({
       if (!.active_is_lidar()) return(NULL)
       on3d <- identical(wsview(), "three")
+      # The button IS the way back, so it has to say so. Relying on the user
+      # guessing that a button labelled "3D view" also leaves 3D is not a toggle,
+      # it is a puzzle. Label, icon and active styling all change with the state.
       tags$button(id = ns("tab_three"),
         class = paste("ea-wsx-3dbtn", if (on3d) "on" else ""), type = "button",
-        title = if (on3d) "Back to the map" else "Open the 3D point cloud",
+        title = if (on3d) "Return to the map view" else "Open the 3D point cloud",
         onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'});",
                           ns("wsview"), if (on3d) "map" else "three"),
-        icon("cube"), " 3D view")
+        icon(if (on3d) "map-location-dot" else "cube"),
+        if (on3d) " Back to map" else " 3D view")
     })
     # Selecting a non-cloud layer takes the 3D tab away, so do not strand the
     # user on a view that no longer has a tab.

@@ -82,6 +82,29 @@ lidarPointcloudCanvasUI <- function(id) {
   )
 }
 
+# The 3D VIEW in the workspace: the cloud and nothing else. The full
+# lidarPointcloudCanvasUI pairs the viewer with a basemap, which makes sense as
+# a screen but not as a "3D view" — asking for 3D and getting a map beside it is
+# not 3D. Same module, same outputs, so the ids and server logic are unchanged.
+lidar3DOnlyUI <- function(id) {
+  ns <- NS(id)
+  tagList(
+    card(
+      card_header("Interactive 3D point cloud"),
+      rglwidgetOutput(ns("lidar_3d_viewer"), height = "560px")
+    ),
+    card(
+      card_header(class = "d-flex justify-content-between align-items-center",
+                  "Static snapshot (download / AI view)"),
+      div(class = "d-flex align-items-center gap-2 px-2",
+          sliderInput(ns("snap_pts"), "Max display points (both 3D viewers):",
+                      min = 10000, max = 5000000, value = 60000, step = 10000,
+                      width = "320px")),
+      plotOutput(ns("static_3d"), height = "430px")
+    )
+  )
+}
+
 # ---- CHM & ITD ----
 lidarChmToolsUI <- function(id) {
   ns <- NS(id)
