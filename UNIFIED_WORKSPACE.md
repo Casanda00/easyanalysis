@@ -544,3 +544,29 @@ not a plot call.
 Files touched: helpers.R (shared engines, so this covers several screens at once),
 clustering, da, data, descriptive, hydro, land_classify, raster, suitability, svm,
 terrain, timeseries, workspace, lidar, lme, ntl, linear_regression.
+
+### Wiring the plot options end-to-end (2026-07-29)
+
+Three real bugs, none of which the R-level tests could have caught — they only showed up
+driving the actual UI with a project that has a table:
+
+1. **`object 'plot_opts' not found`.** The store lives in server.R but the module
+   referenced it directly. It broke the **entire Data view**, not just the controls.
+   `plot_opts` is now a `workspaceServer` argument, and the accessors tolerate `NULL`
+   for tests/standalone use.
+2. **The controls rebuilt themselves on every keystroke.** `.popt()` read the store
+   reactively from inside `.data_ui()` — the very panel holding the controls — so typing
+   invalidated the panel, rebuilt it and wiped the box mid-edit. The reads are now
+   `isolate()`d; the plot still updates because the dependency is taken in `renderPlot`.
+3. **`print.ggplot` was the wrong seam.** `ea_style_gg()` worked when called directly in
+   the live session, yet plots rendered unstyled — Shiny's render path does not reliably
+   dispatch to an S3 method defined in the global env. Styling now happens explicitly
+   inside the `renderPlot` wrapper, alongside `ea_plot_dep()`. No S3 override remains.
+   patchwork objects inherit `"ggplot"` but are composites, so they are skipped.
+
+Verified in the browser against a seeded project: setting title/X/Y/colour changed the
+rendered PNG, with 1,271 pixels of the chosen `#B4531F` and 645 pixels of title ink in
+the top band, and the inputs held their values throughout.
+
+A **"Plot options test"** project (180 rows: dbh_cm, height_m, age_yr, site) is seeded
+locally for exercising this.

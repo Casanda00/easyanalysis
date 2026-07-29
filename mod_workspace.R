@@ -78,7 +78,7 @@ workspaceToolsUI <- function(id) {
 
 workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool, active_dataset,
                             tool_request = reactive(NULL), layer_style = NULL,
-                            src_paths = NULL) {
+                            src_paths = NULL, plot_opts = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     wsview <- reactiveVal("map")
@@ -609,12 +609,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # (plot_opts), so they drive every screen's plot through print.ggplot and
     # ea_opt() rather than being wired per module.
     .pkey <- function() { t <- current_tool(); if (is.null(t)) "workspace" else t }
+    # ISOLATED on purpose. These controls live inside .data_ui() / the tool
+    # panel, which are renderUI-built; a reactive read here would make the panel
+    # depend on the very store the controls write to, so every keystroke would
+    # rebuild the panel and wipe the box being typed in. The plot still updates,
+    # because ea_plot_dep() takes the dependency inside renderPlot instead.
     .popt <- function(nm, dflt = "") {
-      o <- plot_opts[[.pkey()]]
+      if (is.null(plot_opts)) return(dflt)
+      o <- isolate(plot_opts[[.pkey()]])
       v <- if (is.list(o)) o[[nm]] else NULL
       if (is.null(v)) dflt else v
     }
     .set_popt <- function(nm, val) {
+      if (is.null(plot_opts)) return(invisible(NULL))
       k <- .pkey(); o <- plot_opts[[k]]; if (!is.list(o)) o <- list()
       o[[nm]] <- val; plot_opts[[k]] <- o
     }

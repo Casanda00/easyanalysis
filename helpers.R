@@ -509,7 +509,7 @@ ea_style_gg <- function(p) {
   if (!is.null(ttl)) p <- p + ggplot2::labs(title = ttl)
   if (!is.null(xl))  p <- p + ggplot2::labs(x = xl)
   if (!is.null(yl))  p <- p + ggplot2::labs(y = yl)
-  if (!is.null(col)) {
+  if (!is.null(col) && is.list(p$layers) && length(p$layers)) {
     # Recolour the layers that carry a FIXED colour/fill. Layers mapped to a
     # variable are left alone — overriding those would destroy the encoding.
     p$layers <- lapply(p$layers, function(L) {
@@ -525,10 +525,37 @@ ea_style_gg <- function(p) {
   p
 }
 
-# THE seam. Must call ggplot2's own method explicitly or this recurses.
-print.ggplot <- function(x, ...) {
-  x <- tryCatch(ea_style_gg(x), error = function(e) x)
-  getFromNamespace("print.ggplot", "ggplot2")(x, ...)
+# Registering the DEPENDENCY is a separate problem from applying the style.
+# ea_style_gg() runs at print time, and Shiny prints the plot outside the
+# reactive context that built it — so reading the options there restyles the
+# plot but never invalidates the output, and nothing re-renders when a setting
+# changes. Touching the store INSIDE the render expression is what creates the
+# dependency, so renderPlot is wrapped below to do exactly that.
+ea_plot_dep <- function() {
+  rv <- .EA_PLOTOPTS$rv
+  if (is.null(rv)) return(invisible(NULL))
+  invisible(tryCatch(rv[[ea_plot_ctx()]], error = function(e) NULL))
+}
+
+# THE seam: shadow shiny::renderPlot for every module (they call it unqualified,
+# and global.R sources this file first), so no module needs changing.
+#
+# Styling is applied HERE rather than through a print.ggplot override. Shiny's
+# render path does not reliably reach an S3 method defined in the global env —
+# ea_style_gg() worked when called directly while plots rendered unstyled — so
+# the object is styled explicitly on the way out. ea_plot_dep() in the same
+# expression is what makes the output re-render when a setting changes.
+renderPlot <- function(expr, ..., env = parent.frame(), quoted = FALSE) {
+  fn <- shiny::exprToFunction(expr, env, quoted)
+  shiny::renderPlot({
+    ea_plot_dep()
+    v <- fn()
+    # patchwork and friends inherit "ggplot" but are composites: styling them
+    # as a single plot is wrong, so leave them to their module.
+    if (inherits(v, "ggplot") && !inherits(v, "patchwork"))
+      v <- tryCatch(ea_style_gg(v), error = function(e) v)
+    v
+  }, ...)
 }
 
 # --- Base-R plots -----------------------------------------------------------
