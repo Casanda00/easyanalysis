@@ -701,7 +701,47 @@ With that fixed, the agent chain completes end to end: it opened Linear regressi
 the response to `height_m` and the formula to `dbh_cm + age_yr`, pressed Run, and the
 screen now shows a fitted `lm()` with coefficients, both predictors and R-squared.
 
-### Plot labels: buttons, not permanent text boxes (2026-07-29)
+### `.ea-pop` — a hover panel behind one icon (REUSABLE PATTERN)
+
+**Use this anywhere a group of occasional settings would otherwise take a whole row.**
+It is deliberately generic; plot appearance is simply its first user.
+
+```
+div.ea-pop
+  button.ea-pop-btn[onclick="eaPop(this)"]     <- the icon (add .set when a value is held)
+  div.ea-pop-body                              <- the panel
+    div.ea-pop-h        title row
+    div.ea-pop-row      label(icon + text) + one control
+    div.ea-pop-note     optional hint
+```
+
+Behaviour, all in `ui.R`:
+
+- **Hover opens it**, and a `::before` bridge spans the gap so moving the pointer from
+  the icon into the panel does not close it.
+- **Clicking the icon PINS it open**, and focuses the first field. Hover alone is wrong
+  for a panel holding inputs: the moment you move to type, the pointer can leave and the
+  panel would vanish mid-edit.
+- **Escape, or a click outside, closes it.** Opening one closes any other.
+- `.ea-pop.block` stacks it full-width instead of floating right — used in the tool panel.
+
+**The icon's `.set` state is applied CLIENT-SIDE**, by an `input` listener on
+`.ea-pop-body`. That is not laziness: the panel must NOT depend on the store it writes
+to, because that dependency is exactly what previously made it rebuild and wipe the field
+being typed in. So the server never re-renders it, and the icon updates itself.
+
+### Plot appearance is its first user (2026-07-29)
+
+Title, X label, Y label and colour now live behind one palette icon instead of three text
+boxes (which ate the bar) or three Rename buttons (better, but still three controls).
+Each row carries an icon, and a hint says an empty field means the default.
+
+Verified: the chart bar went from **83 px to 39 px — one line, with Static/Interactive
+back on it**; the panel is hidden by default; clicking pins it; typing does not close it;
+Escape closes it; the title reaches the plot (645 px of title ink); and the icon turns
+"set" when a field has a value and back when cleared.
+
+### Plot labels: buttons (2026-07-29, SUPERSEDED by .ea-pop above)
 
 Three always-visible text inputs took most of the chart bar for something used
 occasionally. They are now three small buttons — **Rename title / Rename X / Rename Y** —

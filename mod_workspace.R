@@ -629,35 +629,42 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     observeEvent(input$po_xlab,   .set_popt("xlab",   input$po_xlab),   ignoreInit = TRUE)
     observeEvent(input$po_ylab,   .set_popt("ylab",   input$po_ylab),   ignoreInit = TRUE)
     observeEvent(input$po_colour, .set_popt("colour", input$po_colour), ignoreInit = TRUE)
-    # Three always-visible text boxes ate most of the chart bar for something
-    # used occasionally. They are buttons now: the label shows what is currently
-    # set, and clicking opens a small prompt. A set label is highlighted, so the
-    # bar also tells you at a glance what has been overridden.
-    .rename_btn <- function(key, label, noun) {
-      cur <- .popt(key)
-      tags$button(type = "button",
-        class = paste("ea-wsx-rnbtn", if (nzchar(cur)) "set" else ""),
-        title = if (nzchar(cur)) paste0(noun, ": ", cur, "  (click to change)")
-                else paste0("Set the ", noun),
-        onclick = sprintf("eaRename(this, '%s', %s, %s)",
-                          ns(paste0("po_", key)),
-                          jsonlite::toJSON(noun, auto_unbox = TRUE),
-                          jsonlite::toJSON(cur, auto_unbox = TRUE)),
-        icon("pen"), paste0(" ", label))
-    }
+    # PLOT APPEARANCE — one icon that opens a small panel on hover.
+    # Three permanent text boxes ate most of the chart bar for something used
+    # occasionally; three Rename buttons were better but still three controls.
+    # This is one icon, and the panel it opens houses the whole group. The
+    # generic .ea-pop wrapper (ui.R) is reusable anywhere the app wants a
+    # hover panel: hover opens it, click pins it, Escape or a click outside
+    # closes it, so it never vanishes while you are typing in it.
+    .pop_row <- function(ico, label, control) div(class = "ea-pop-row",
+      tags$label(icon(ico), tags$span(label)), control)
+
     .plot_opts_ui <- function(inline = FALSE) {
-      cls <- if (inline) "ea-wsx-popts inline" else "ea-wsx-popts"
-      div(class = cls,
-        if (!inline) div(class = "ea-wsx-lgh", "Plot appearance"),
-        div(class = "ea-wsx-rnrow",
-          .rename_btn("title", "Rename title", "plot title"),
-          .rename_btn("xlab",  "Rename X",     "X axis label"),
-          .rename_btn("ylab",  "Rename Y",     "Y axis label"),
-          tags$input(type = "color", id = ns("po_colour"), class = "ea-wsx-colpick",
-                     title = "Plot colour",
-                     value = .popt("colour", "#2E7D32"),
-                     onchange = sprintf(
-                       "Shiny.setInputValue('%s', this.value, {priority:'event'})", ns("po_colour")))))
+      set <- any(nzchar(c(.popt("title"), .popt("xlab"), .popt("ylab"))))
+      div(class = paste("ea-pop", if (inline) "" else "block"),
+        tags$button(type = "button",
+          class = paste("ea-pop-btn", if (set) "set" else ""),
+          title = "Plot appearance - title, axis labels, colour",
+          onclick = "eaPop(this)",
+          icon("palette"), if (!inline) tags$span(" Plot appearance")),
+        div(class = "ea-pop-body",
+          div(class = "ea-pop-h", icon("palette"), tags$span("Plot appearance")),
+          .pop_row("heading", "Title",
+            textInput(ns("po_title"), NULL, value = .popt("title"),
+                      placeholder = "auto", width = "100%")),
+          .pop_row("arrows-left-right", "X label",
+            textInput(ns("po_xlab"), NULL, value = .popt("xlab"),
+                      placeholder = "auto", width = "100%")),
+          .pop_row("arrows-up-down", "Y label",
+            textInput(ns("po_ylab"), NULL, value = .popt("ylab"),
+                      placeholder = "auto", width = "100%")),
+          .pop_row("droplet", "Colour",
+            tags$input(type = "color", id = ns("po_colour"), class = "ea-wsx-colpick",
+                       value = .popt("colour", "#2E7D32"),
+                       onchange = sprintf(
+                         "Shiny.setInputValue('%s', this.value, {priority:'event'})",
+                         ns("po_colour")))),
+          div(class = "ea-pop-note", "Leave a field empty to use the default.")))
     }
 
     # Panels here are renderUI-built, so ANY dependency change (render mode, a

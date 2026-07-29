@@ -548,18 +548,40 @@ page_fillable(
     .ea-wsx-popts .shiny-input-container { margin-bottom: 0; width: 100% !important; }
     .ea-wsx-popts.inline { display: contents; }
     .ea-wsx-popts.inline label { display: inline-block; margin: 0 0 0 4px; }
-    /* rename buttons: right-hand end of the chart bar, on the selectors' line */
-    .ea-wsx-rnrow { display: flex; align-items: center; gap: 5px; margin-left: auto; }
-    .ea-wsx-popts.inline .ea-wsx-rnrow { margin-left: auto; }
-    .ea-wsx-popts:not(.inline) .ea-wsx-rnrow { margin-left: 0; flex-wrap: wrap; margin-top: 6px; }
-    .ea-wsx-rnbtn { font: 500 10.5px var(--ui); border: 1px solid var(--line);
+    /* ---- .ea-pop : a hover panel behind one icon (REUSABLE) ----------------
+       Use anywhere a group of occasional settings would otherwise take a whole
+       row. Hover opens it; clicking the icon PINS it open (so it cannot vanish
+       mid-edit); Escape or a click outside closes it. Markup:
+         div.ea-pop > button.ea-pop-btn[onclick=eaPop(this)] + div.ea-pop-body  */
+    .ea-pop { position: relative; display: inline-flex; margin-left: auto; }
+    .ea-pop.block { display: block; margin-left: 0; margin-top: 10px; }
+    .ea-pop-btn { font: 500 11px var(--ui); border: 1px solid var(--line);
                   background: var(--panel); color: var(--bark); border-radius: 6px;
-                  padding: 2px 7px; cursor: pointer; white-space: nowrap;
-                  display: inline-flex; align-items: center; gap: 4px; }
-    .ea-wsx-rnbtn:hover { border-color: var(--forest); color: var(--forest); }
-    .ea-wsx-rnbtn.set { border-color: var(--forest); color: var(--forest);
+                  padding: 4px 9px; cursor: pointer; white-space: nowrap;
+                  display: inline-flex; align-items: center; gap: 6px; }
+    .ea-pop-btn:hover { border-color: var(--forest); color: var(--forest); }
+    .ea-pop-btn.set  { border-color: var(--forest); color: var(--forest);
                   background: color-mix(in srgb, var(--forest) 12%, transparent); }
-    .ea-wsx-rnbtn svg, .ea-wsx-rnbtn .fa { font-size: 9px; }
+    .ea-pop-body { display: none; position: absolute; top: calc(100% + 6px); right: 0;
+                  z-index: 1400; width: 232px; padding: 10px 11px 9px;
+                  background: var(--panel); border: 1px solid var(--line);
+                  border-radius: 9px; box-shadow: 0 14px 34px rgba(0,0,0,.32); }
+    .ea-pop.block .ea-pop-body { left: 0; right: auto; width: 100%; }
+    /* a hover bridge, so moving the pointer to the panel does not close it */
+    .ea-pop-body::before { content: ''; position: absolute; top: -8px; left: 0;
+                  right: 0; height: 8px; }
+    .ea-pop:hover .ea-pop-body, .ea-pop.open .ea-pop-body { display: block; }
+    .ea-pop-h { font: 600 8.5px var(--mono); text-transform: uppercase;
+                  letter-spacing: .08em; color: var(--bark); margin-bottom: 8px;
+                  display: flex; align-items: center; gap: 6px; }
+    .ea-pop-row { margin-bottom: 7px; }
+    .ea-pop-row > label { display: flex; align-items: center; gap: 5px;
+                  font: 500 10.5px var(--ui); color: var(--bark); margin-bottom: 2px; }
+    .ea-pop-row .shiny-input-container { margin-bottom: 0; width: 100% !important; }
+    .ea-pop-row .form-control { font-size: 11.5px; padding: 3px 7px;
+                  background: var(--sunk); color: var(--ink); border-color: var(--line); }
+    .ea-pop-row svg, .ea-pop-row .fa, .ea-pop-h svg, .ea-pop-h .fa { font-size: 9px; }
+    .ea-pop-note { font-size: 9.5px; color: var(--bark); margin-top: 6px; }
     .ea-wsx-colpick { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line);
                   border-radius: 6px; background: var(--panel); cursor: pointer; }
     .ea-wsx-chartbar .shiny-input-container { margin-bottom: 0; }
@@ -1626,25 +1648,43 @@ page_fillable(
           });
         }, 400);
       });
-      /* Rename buttons for the plot labels. A prompt keeps the chart bar free of
-         three permanent text boxes; empty input clears the override so the plot
-         falls back to the column name. */
-      window.eaRename = function(btn, inputId, noun, current){
-        /* the button remembers its own current value, so no attribute rewriting */
-        var now = (btn && btn.dataset.cur !== undefined) ? btn.dataset.cur : (current || '');
-        var v = window.prompt('Set the ' + noun + '  (leave empty to use the default)', now);
-        if (v === null) return;                 /* cancelled: change nothing */
-        Shiny.setInputValue(inputId, v, {priority: 'event'});
-        /* Reflect it on the button here rather than re-rendering the bar: the
-           panel deliberately does NOT depend on the option store, because that
-           dependency is what made it rebuild and wipe itself mid-edit. */
-        if (btn){
-          btn.dataset.cur = v;
-          var set = v.length > 0;
-          btn.classList.toggle('set', set);
-          btn.title = set ? (noun + ': ' + v + '  (click to change)') : ('Set the ' + noun);
+      /* .ea-pop behaviour. Hover alone is not enough for a panel holding
+         inputs: the moment focus moves the pointer can leave and the panel
+         would close mid-edit. So clicking the icon PINS it, Escape closes it,
+         and a click outside closes it. Reusable for any hover panel. */
+      window.eaPop = function(btn){
+        var pop = btn.closest('.ea-pop');
+        if (!pop) return;
+        var wasOpen = pop.classList.contains('open');
+        document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
+        if (!wasOpen) {
+          pop.classList.add('open');
+          var first = pop.querySelector('.ea-pop-body input[type=text]');
+          if (first) setTimeout(function(){ first.focus(); }, 30);
         }
       };
+      document.addEventListener('click', function(e){
+        if (e.target.closest && e.target.closest('.ea-pop')) return;
+        document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
+      });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape')
+          document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
+      });
+      /* Mark the icon when the panel holds a value, so a closed panel still
+         shows that something was overridden. Done here rather than server-side
+         because the panel must NOT depend on the store it writes to — that
+         dependency is what previously made it rebuild and wipe itself. */
+      document.addEventListener('input', function(e){
+        var body = e.target.closest ? e.target.closest('.ea-pop-body') : null;
+        if (!body) return;
+        var pop = body.closest('.ea-pop'), btn = pop.querySelector('.ea-pop-btn');
+        var any = false;
+        body.querySelectorAll('input[type=text]').forEach(function(i){
+          if (i.value && i.value.length) any = true;
+        });
+        btn.classList.toggle('set', any);
+      });
       /* Line numbers for the R Console editor. A gutter div beside the textarea
          rather than a code-editor library: no external dependency (the CSP
          blocks them anyway), and it stays a plain Shiny textarea so Ctrl+Enter,
