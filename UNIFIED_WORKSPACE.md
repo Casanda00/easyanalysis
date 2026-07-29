@@ -645,3 +645,33 @@ alias and both intermediates skipped — and drew it on the map. `.script_output
 unit-checked over eight scripts: simple clip, a 3-link chain, output-then-plotted,
 output-then-printed, two genuine outputs, an intermediate reused twice, an unparseable
 script and one with no assignments.
+
+## Co-Analyst driving the real UI (2026-07-29, partially blocked)
+
+`run_analysis` fits models in the agent's own code and answers in text; nothing appears on
+screen. `run_in_app` instead drives the app: switch dataset, open the screen, fill the
+controls, press the screen's own Run. The user sees every setting and can change it and
+re-run, which is why this is better than a text answer they have to trust.
+
+**Nothing is inferred.** Every name is checked against the loaded data, and the tool
+REFUSES rather than substituting: no case-insensitive matching, no nearest-name guess.
+A refusal lists the real columns and tells the model to ask the user which they meant.
+Verified over nine cases — exact names succeed; `height` when the column is `height_m`,
+and `Height_m` differing only in case, are both refused; an unknown predictor is named;
+a factor response is refused with the numeric columns listed; response-as-its-own-
+predictor, no predictors, unknown dataset and unsupported method are each refused.
+
+The action reaches the browser through a side channel (`.EA_AGENT_UI`), because a tool
+that drives the screen cannot return its instruction to the model as text — the model's
+reply goes to the chat, not to Shiny. `ea_agent_ui` then sequences the steps, waiting for
+each to land: panels render server-side, and a select's CHOICES arrive after its element
+does, so `eaWaitForOption()` waits for the option itself rather than just the element.
+
+**BLOCKED on a pre-existing bug.** The sequence works — dataset switches, the Linear
+Regression screen opens, the formula box fills, Run is pressed — but `#lm-y` (Response)
+has **no options at all**, so the run has nothing to fit. `mod_linear_regression.R:408`
+populates it with `updateSelectInput` from `active_data()`, and with `trees` active
+(180 x 4, per the status bar) it stays empty, including after re-triggering the dataset
+with the panel already open. This is NOT caused by the agent work: a user opening
+Linear Regression by hand gets the same empty dropdown. That has to be fixed before the
+last step of this feature can be verified, and it is worth fixing regardless.

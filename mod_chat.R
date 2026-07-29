@@ -200,18 +200,21 @@
   msgs[[length(msgs) + 1]] <- list(role = "user", content = user_content)
 
   actions <- character(0)
+  .EA_AGENT_UI$action <- NULL      # side channel: one request, one action
   tools <- .agent_tools_spec()
 
   for (round in seq_len(max_rounds)) {
     .say(if (round == 1) "Thinking…" else "Thinking it through…")
     msg <- .chat_completion(msgs, key, tools = tools)
-    if (!is.null(msg$.error)) return(list(text = paste0("Error: ", msg$.error), actions = actions))
+    if (!is.null(msg$.error))
+      return(list(text = paste0("Error: ", msg$.error), actions = actions,
+                  ui_action = .EA_AGENT_UI$action))
 
     tool_calls <- msg$tool_calls
     if (is.null(tool_calls) || !length(tool_calls)) {
       txt <- msg$content %||% "(no answer)"
       if (is.list(txt)) txt <- paste(vapply(txt, function(p) p$text %||% "", character(1)), collapse = "")
-      return(list(text = txt, actions = actions))
+      return(list(text = txt, actions = actions, ui_action = .EA_AGENT_UI$action))
     }
 
     # Record the assistant turn (with its tool_calls) verbatim, then run each tool.
@@ -228,7 +231,7 @@
     }
   }
   list(text = "Error: Reached the analysis step limit without a final answer. Try a more specific request.",
-       actions = actions)
+       actions = actions, ui_action = .EA_AGENT_UI$action)
 }
 
 chatUI <- function(id) {
@@ -453,6 +456,9 @@ chatServer <- function(id, dataset_pool, active_dataset, current_view, module_ct
       })
       h <- chat_state()
       h[[length(h) + 1]] <- list(role = "assistant", content = res$text, actions = res$actions)
+      # Drive the real screen: switch dataset, open the tool, fill it, press Run.
+      if (!is.null(res$ui_action))
+        session$sendCustomMessage("ea_agent_ui", res$ui_action)
       chat_state(h)
     }
 

@@ -72,9 +72,35 @@
           k          = list(type = "integer", description = "Number of clusters for clustering (default 3)"),
           ntree      = list(type = "integer", description = "Trees for random forest (default 500)")),
         required = list("method", "dataset"))
+    )),
+    list(type = "function", `function` = list(
+      name = "run_in_app",
+      description = paste(
+        "Open the app's own analysis SCREEN, fill in the settings and press Run, so the result appears",
+        "on screen in the results dock exactly as if the user had done it by hand.",
+        "Prefer this over run_analysis whenever the user asks you to RUN or DO an analysis, because the",
+        "user can then see and change every setting. Currently supports method 'lm' (linear regression).",
+        "Column names must be EXACT: call describe_dataset first and use the names it returns.",
+        "If a name the user gave does not match a column exactly, do NOT substitute a similar one —",
+        "this tool will refuse and list the real columns, and you must ask the user which they meant."),
+      parameters = list(type = "object",
+        properties = list(
+          method     = list(type = "string", enum = list("lm")),
+          dataset    = list(type = "string", description = "Exact dataset name"),
+          response   = list(type = "string", description = "Exact response column name"),
+          predictors = list(type = "array", items = list(type = "string"),
+                            description = "Exact predictor column names")),
+        required = list("method", "dataset", "response", "predictors"))
     ))
   )
 }
+
+# Side channel for UI actions. A tool that drives the SCREEN cannot return the
+# instruction to the model as text — the model's reply goes to the chat, not to
+# Shiny. So the tool records the action here and .ask_openai_agent() picks it up
+# after the loop. Cleared at the start of every request.
+.EA_AGENT_UI <- new.env(parent = emptyenv())
+.EA_AGENT_UI$action <- NULL
 
 # ---- helpers ---------------------------------------------------------------
 .agent_fail <- function(msg) paste0("ERROR: ", msg,
@@ -175,6 +201,8 @@
       paste0(meth, " correlations in '", args$dataset, "' (strongest first):\n",
              paste(lines, collapse = "\n"),
              "\n\nFull matrix:\n", .agent_capture(print(round(m, 3))))
+    } else if (name == "run_in_app") {
+      return(.agent_run_in_app(args, dataset_pool))
     } else if (name == "run_analysis") {
       return(.agent_run_analysis(args, dataset_pool))
     } else {
@@ -304,4 +332,64 @@
   }
 
   .agent_fail(paste0("Unknown method '", method, "'."))
+}
+
+# ---- run_in_app: drive the real screen -------------------------------------
+# EVERYTHING here is verified against the loaded data, nothing is inferred. No
+# case-insensitive matching, no nearest-name guessing, no silent substitution:
+# if a name does not match a column exactly, the tool refuses and lists the real
+# columns so the model has to go back and ask the user which they meant. Running
+# a regression on a quietly-substituted variable is a mistake nobody notices.
+.agent_run_in_app <- function(args, dataset_pool) {
+  method <- args$method %||% ""
+  if (!identical(method, "lm"))
+    return(.agent_fail(paste0("run_in_app does not support method '", method,
+                              "' yet. Supported: lm.")))
+
+  pools <- tryCatch(names(dataset_pool), error = function(e) character(0))
+  pools <- pools[!vapply(pools, function(n) is.null(dataset_pool[[n]]), logical(1))]
+  ds <- args$dataset %||% ""
+  if (!nzchar(ds) || !(ds %in% pools))
+    return(.agent_fail(paste0("No dataset named '", ds, "'. Loaded datasets: ",
+                              if (length(pools)) paste(pools, collapse = ", ") else "(none)")))
+
+  df <- dataset_pool[[ds]]
+  if (!is.data.frame(df)) return(.agent_fail(paste0("'", ds, "' is not a table.")))
+  cols <- names(df)
+
+  resp <- args$response %||% ""
+  if (!nzchar(resp) || !(resp %in% cols))
+    return(.agent_fail(paste0("'", resp, "' is not a column of '", ds,
+      "'. Do NOT pick a similar name — ask the user which of these they meant: ",
+      paste(cols, collapse = ", "))))
+
+  preds <- args$predictors
+  if (is.null(preds) || !length(preds))
+    return(.agent_fail("No predictors given. Ask the user which columns to use as predictors."))
+  preds <- as.character(preds)
+  missing <- setdiff(preds, cols)
+  if (length(missing))
+    return(.agent_fail(paste0("These are not columns of '", ds, "': ",
+      paste(missing, collapse = ", "),
+      ". Do NOT substitute similar names — ask the user which of these they meant: ",
+      paste(cols, collapse = ", "))))
+  if (resp %in% preds)
+    return(.agent_fail(paste0("'", resp, "' is both the response and a predictor. Ask the user to clarify.")))
+
+  # Linear regression needs a numeric response; refuse rather than coerce.
+  if (!is.numeric(df[[resp]]))
+    return(.agent_fail(paste0("Response '", resp, "' is ", class(df[[resp]])[1],
+      ", not numeric, so linear regression does not apply. Numeric columns are: ",
+      paste(cols[vapply(df, is.numeric, logical(1))], collapse = ", "))))
+
+  .EA_AGENT_UI$action <- list(
+    kind = "run_model", method = "lm", dataset = ds,
+    response = resp, predictors = preds,
+    formula = paste(preds, collapse = " + "))
+
+  paste0("Opened the Linear Regression screen on '", ds, "', set the response to '", resp,
+         "' and the predictors to ", paste(preds, collapse = " + "),
+         ", and pressed Run. The fitted model and its diagnostics are now on the user's screen. ",
+         "Tell the user briefly what was run; do NOT invent any coefficients or statistics, ",
+         "because this tool does not return them.")
 }

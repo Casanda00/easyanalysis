@@ -1552,6 +1552,68 @@ page_fillable(
           c.style.height = '300px'; c.style.minHeight = '300px'; }
         window.dispatchEvent(new Event('resize'));   /* let plots re-measure */
       };
+      /* The Co-Analyst driving the real UI. It does not run anything behind the
+         user's back: it switches to the dataset, opens the screen, fills the
+         controls and presses the screen's own Run button, so every setting is
+         visible and can be changed and re-run by hand. Each step waits for the
+         previous one to actually land, because the panels render server-side. */
+      function eaWaitFor(sel, cb, tries){
+        tries = tries || 60;
+        var el = document.querySelector(sel);
+        if (el) { cb(el); return; }
+        if (tries <= 0) return;
+        setTimeout(function(){ eaWaitFor(sel, cb, tries - 1); }, 100);
+      }
+      /* A select's choices are filled in by the server AFTER its panel appears,
+         so setting a value too early is silently dropped. Wait for the option
+         itself, not just the element. */
+      function eaWaitForOption(sel, value, cb, tries){
+        tries = tries || 80;
+        var el = document.querySelector(sel);
+        if (el) {
+          var has = false, i;
+          if (el.selectize) {
+            has = !!(el.selectize.options && el.selectize.options[value]);
+          } else {
+            for (i = 0; i < el.options.length; i++)
+              if (el.options[i].value === value) { has = true; break; }
+          }
+          if (has) { cb(el); return; }
+        }
+        if (tries <= 0) { console.warn('ea: option not found for ' + sel + ' = ' + value); return; }
+        setTimeout(function(){ eaWaitForOption(sel, value, cb, tries - 1); }, 100);
+      }
+      function eaSetInputEl(el, value){
+        /* selectize replaces the <select>, so drive it through its API when present */
+        if (el.selectize) { el.selectize.setValue(value, false); return; }
+        el.value = value;
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        if (window.$) $(el).trigger('change');
+      }
+      if (window.Shiny) Shiny.addCustomMessageHandler('ea_agent_ui', function(a){
+        if (!a || a.kind !== 'run_model') return;
+        var ds = Array.isArray(a.dataset) ? a.dataset[0] : a.dataset;
+        var resp = Array.isArray(a.response) ? a.response[0] : a.response;
+        var frm  = Array.isArray(a.formula)  ? a.formula[0]  : a.formula;
+        Shiny.setInputValue('active_dataset', ds, {priority:'event'});
+        Shiny.setInputValue('current_view', 'workspace', {priority:'event'});
+        setTimeout(function(){
+          Shiny.setInputValue('workspace-tool_pick', a.method, {priority:'event'});
+          /* the module's panel is rendered by the server; wait for its controls */
+          eaWaitForOption('#lm-y', resp, function(y){
+            eaSetInputEl(y, resp);
+            eaWaitFor('#lm-formula_text', function(f){
+              eaSetInputEl(f, frm);
+              /* let Shiny receive both values before pressing Run */
+              setTimeout(function(){
+                var b = document.getElementById('lm-run_model');
+                if (b) b.click();
+              }, 500);
+            });
+          });
+        }, 400);
+      });
       /* Line numbers for the R Console editor. A gutter div beside the textarea
          rather than a code-editor library: no external dependency (the CSP
          blocks them anyway), and it stays a plain Shiny textarea so Ctrl+Enter,
