@@ -219,7 +219,7 @@ hydroServer <- function(id, raster_pool) {
       plot = function() {
         res <- result_r()
         if (is.null(res)) return(invisible())
-        terra::plot(res$raster, col = .hydro_pal(res$op), main = res$name)
+        terra::plot(res$raster, col = .hydro_pal(res$op), main = ea_main(res$name))
       }
     )
   })

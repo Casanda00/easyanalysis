@@ -224,7 +224,7 @@ landClassifyServer <- function(id, raster_pool) {
         res <- result_r()
         if (is.null(res)) return(invisible())
         pal <- .class_pal(res$k)
-        terra::plot(res$raster, col = pal, type = "classes", main = res$name,
+        terra::plot(res$raster, col = pal, type = "classes", main = ea_main(res$name),
                     levels = paste("Class", seq_len(res$k)))
       }
     )

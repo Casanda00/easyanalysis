@@ -1107,7 +1107,7 @@ rasterServer <- function(id, dataset_pool, active_dataset,
           rl <- rast_lys[[first_nm]]
           bi <- max(1L, min(as.integer(rl$band %||% 1L), terra::nlyr(rl$data)))
           pal <- .pal_colors(rl$palette %||% "viridis")
-          terra::plot(rl$data[[bi]], col = pal, main = first_nm,
+          terra::plot(rl$data[[bi]], col = pal, main = ea_main(first_nm),
                       mar = c(3.5, 3.5, 2, 7))
           for (i in seq_along(rast_lys)[-1]) {
             rl2 <- rast_lys[[i]]

@@ -181,7 +181,7 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
     output$raw_plot <- renderPlot({
       y_ts <- tryCatch(ts_data(), error = function(e) NULL)
       if (is.null(y_ts)) { show_placeholder("Select a variable and run analysis."); return() }
-      plot(y_ts, main = paste("Time Series:", input$y_var %||% ""),
+      plot(y_ts, main = ea_main(paste("Time Series:", input$y_var %||% "")),
            xlab = "Time", ylab = input$y_var %||% "Value",
            col = "#2e7d32", lwd = 1.5, type = "l")
       grid(col = "grey90")
@@ -336,7 +336,7 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
       plot = function() {
         y_ts <- isolate(tryCatch(ts_data(), error = function(e) NULL))
         if (is.null(y_ts)) return(invisible())
-        plot(y_ts, main = isolate(input$y_var) %||% "Time Series", col = "#2e7d32", lwd = 1.5)
+        plot(y_ts, main = ea_main(isolate(input$y_var) %||% "Time Series"), col = "#2e7d32", lwd = 1.5)
       }
     )
   })

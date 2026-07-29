@@ -1595,7 +1595,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                                       Bias = sprintf("%.3f", ev$Bias), RRMSE = sprintf("%.1f%%", ev$RRMSE)) else character(0)
           img <- .plot_b64(function() {
             op <- par(mar = c(4,4,2.4,1)); on.exit(par(op))
-            plot(y, pred, xlab = paste("observed", resp), ylab = "predicted",
+            plot(y, pred, xlab = ea_xlab(paste("observed", resp)), ylab = ea_ylab("predicted"),
                  main = spec$nm, pch = 19, col = "#2E7D32")
             abline(0, 1, col = "#B08F5C", lwd = 2, lty = 2)
           })

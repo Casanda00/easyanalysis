@@ -318,7 +318,7 @@ svmServer <- function(id, dataset_pool, active_dataset) {
              main = paste("Support Vectors (", nrow(res$fit$SV), ")"))
         grid(col = "grey92")
       } else {
-        hist(as.numeric(res$fit$SV[, 1]), col = "#4caf5088", main = "Support Vectors",
+        hist(as.numeric(res$fit$SV[, 1]), col = "#4caf5088", main = ea_main("Support Vectors"),
              xlab = "SV values", border = "white")
       }
     })

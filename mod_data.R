@@ -850,13 +850,13 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       vec <- rv$working_data[[input$eng_view_col]]
       if (is.numeric(vec)) {
         par(mar = c(4.5, 4.5, 2, 1))
-        boxplot(vec, horizontal = TRUE, main = paste("Distribution of", input$eng_view_col), xlab = input$eng_view_col, col = "lightgray", outline = TRUE)
+        boxplot(vec, horizontal = TRUE, main = ea_main(paste("Distribution of", input$eng_view_col)), xlab = ea_xlab(input$eng_view_col), col = "lightgray", outline = TRUE)
         stripchart(vec, method = "jitter", add = TRUE, pch = 16, col = rgb(0,0,0,0.25), cex = 0.8)
       } else {
         if (is.factor(vec)) vec <- droplevels(vec)
         par(mar = c(4.5, 12, 2, 1))
         counts <- rev(sort(table(vec)))
-        barplot(counts, horiz = TRUE, las = 1, main = paste("Frequencies of", input$eng_view_col), col = "lightgray", cex.names = 0.9, xlab = "Count")
+        barplot(counts, horiz = TRUE, las = 1, main = ea_main(paste("Frequencies of", input$eng_view_col)), col = "lightgray", cex.names = 0.9, xlab = ea_xlab("Count"))
       }
     }
 

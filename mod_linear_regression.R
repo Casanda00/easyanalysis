@@ -635,7 +635,7 @@ lmServer <- function(id, dataset_pool, active_dataset) {
         return()
       }
       if (res$type == "glmnet") {
-        par(mfrow = c(1, if (!is.null(res$cv_fit)) 2L else 1L))
+        ea_multi_par(mfrow = c(1, if (!is.null(res$cv_fit)) 2L else 1L))
         if (!is.null(res$cv_fit)) {
           plot(res$cv_fit, main = "CV Curve: Lambda vs MSE")
           abline(v = log(res$lambda), col = "#2e7d32", lwd = 2, lty = 2)
@@ -643,6 +643,7 @@ lmServer <- function(id, dataset_pool, active_dataset) {
         plot(res$glmnet_fit, xvar = "lambda",
              main = "Coefficient Regularisation Path")
         abline(v = log(res$lambda), col = "#2e7d32", lwd = 2, lty = 2)
+        ea_fig_title()
         par(mfrow = c(1, 1))
       } else {
         df <- active_data(); req(df)
@@ -770,7 +771,7 @@ lmServer <- function(id, dataset_pool, active_dataset) {
         res <- fitted_model_r()
         if (is.null(res) || is.character(res)) return(invisible())
         if (res$type == "glmnet") {
-          par(mfrow = c(1, if (!is.null(res$cv_fit)) 2L else 1L))
+          ea_multi_par(mfrow = c(1, if (!is.null(res$cv_fit)) 2L else 1L))
           if (!is.null(res$cv_fit)) plot(res$cv_fit)
           plot(res$glmnet_fit, xvar = "lambda")
           par(mfrow = c(1, 1))

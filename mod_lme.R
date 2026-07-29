@@ -229,8 +229,8 @@ lmeServer <- function(id, dataset_pool, active_dataset) {
     diag_fn <- function() {
       obj <- model_obj()
       if (is.null(obj)) { show_placeholder("Fit a model to see diagnostics."); return() }
-      old_par <- par(mfrow = c(1, 2), mar = c(5, 5, 4, 2))
-      on.exit(par(old_par))
+      old_par <- ea_multi_par(mfrow = c(1, 2), mar = c(5, 5, 4, 2))
+      on.exit({ ea_fig_title(); par(old_par) })
       fit_vals <- fitted(obj$model)
       res_vals <- resid(obj$model, type = "pearson")
       plot(fit_vals, res_vals, main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Standardized Residuals", pch = 16, col = rgb(0.2, 0.5, 0.8, 0.5), cex.lab = 1.2)

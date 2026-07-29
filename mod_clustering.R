@@ -197,7 +197,7 @@ clusteringServer <- function(id, dataset_pool, active_dataset) {
             phy <- ape::as.phylo(c_data$obj)
             colors <- if (input$k <= 8) palette()[1:input$k] else rainbow(input$k)
             old_par <- par(mar = c(1, 1, 3, 1)); on.exit(par(old_par))
-            plot(phy, type = "fan", tip.color = colors[c_data$vector], cex = 0.8, font = 2, no.margin = TRUE, main = paste("Circular Phylogenetic Tree (k =", input$k, ")"))
+            plot(phy, type = "fan", tip.color = colors[c_data$vector], cex = 0.8, font = 2, no.margin = TRUE, main = ea_main(paste("Circular Phylogenetic Tree (k =", input$k, ")")))
           }
         }
       }, error = function(e) show_placeholder(paste("Plot Error:", e$message)))

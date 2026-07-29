@@ -478,9 +478,10 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
 
     hists_fn <- function() {
       req(rv_lidar$las)
-      par(mfrow = c(1, 2))
+      ea_multi_par(mfrow = c(1, 2))
       hist(rv_lidar$las$Z, main = "Height (Z)", col = "lightblue", xlab = "Z")
       hist(rv_lidar$las$Intensity, main = "Intensity", col = "lightgreen", xlab = "Intensity")
+      ea_fig_title()
     }
     output$las_hists <- renderPlot({ hists_fn() })
     

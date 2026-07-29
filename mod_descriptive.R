@@ -132,11 +132,11 @@ descriptiveServer <- function(id, dataset_pool, active_dataset) {
       x <- as.numeric(df[[v]]); x <- x[!is.na(x)]; req(length(x) > 1)
       pt <- input$plot_type %||% "hist"
       if (pt == "hist") {
-        hist(x, col = "#4caf5088", border = "white", main = v, xlab = v, freq = FALSE,
+        hist(x, col = "#4caf5088", border = "white", main = ea_main(v), xlab = ea_xlab(v), freq = FALSE,
              breaks = "Sturges")
         lines(density(x), col = "#2e7d32", lwd = 2)
       } else if (pt == "density") {
-        d <- density(x); plot(d, main = v, xlab = v, col = "#2e7d32", lwd = 2)
+        d <- density(x); plot(d, main = ea_main(v), xlab = ea_xlab(v), col = "#2e7d32", lwd = 2)
         polygon(d, col = "#4caf5033", border = NA)
       } else if (pt %in% c("box", "dot")) {
         stripchart(x, method = "jitter", vertical = TRUE, pch = 16,
@@ -148,7 +148,7 @@ descriptiveServer <- function(id, dataset_pool, active_dataset) {
       v <- input$plot_var; req(isTruthy(v))
       df <- active_data(); req(!is.null(df))
       x <- as.numeric(df[[v]]); x <- x[!is.na(x)]; req(length(x) > 1)
-      boxplot(x, col = "#4caf5088", border = "#2e7d32", main = v, ylab = v, notch = FALSE)
+      boxplot(x, col = "#4caf5088", border = "#2e7d32", main = ea_main(v), ylab = ea_ylab(v), notch = FALSE)
       stripchart(x, method = "jitter", add = TRUE, vertical = TRUE,
                  col = "#2e7d3255", pch = 16, cex = 0.6)
     })
@@ -230,7 +230,7 @@ descriptiveServer <- function(id, dataset_pool, active_dataset) {
         df <- isolate(active_data()); if (is.null(df)) return(invisible())
         x <- as.numeric(df[[v]]); x <- x[!is.na(x)]
         if (length(x) < 2) return(invisible())
-        hist(x, col = "#4caf5088", border = "white", main = v, xlab = v, freq = FALSE)
+        hist(x, col = "#4caf5088", border = "white", main = ea_main(v), xlab = ea_xlab(v), freq = FALSE)
         lines(density(x), col = "#2e7d32", lwd = 2)
       }
     )

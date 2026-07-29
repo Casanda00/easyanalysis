@@ -280,7 +280,7 @@ ntlServer <- function(id, dataset_pool, active_dataset, vector_pool = NULL) {
       preds <- intersect(preds, names(df))
       req(nzchar(resp), resp %in% names(df), length(preds) > 0)
       n <- length(preds)
-      par(mfrow=c(ceiling(n/2), min(n,2)), mar=c(4,4,2.5,1))
+      ea_multi_par(mfrow=c(ceiling(n/2), min(n,2)), mar=c(4,4,2.5,1))
       for (p in preds) {
         if (!is.numeric(df[[p]]) || !is.numeric(df[[resp]])) next
         plot(df[[p]], df[[resp]], xlab=p, ylab=resp,
@@ -288,6 +288,7 @@ ntlServer <- function(id, dataset_pool, active_dataset, vector_pool = NULL) {
              cex.main=0.9)
         abline(lm(df[[resp]] ~ df[[p]], na.action=na.exclude), col="#1b5e20", lwd=1.5)
       }
+      ea_fig_title()
     })
 
     # ---- Outputs ------------------------------------------------------------

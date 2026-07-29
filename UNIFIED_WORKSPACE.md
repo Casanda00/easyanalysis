@@ -517,3 +517,30 @@ arguments. Deliberately not applied wholesale: most base plots here are **multi-
 diagnostic grids** (`plot_lm_diagnostics` and friends), where one shared title and axis
 pair across every panel would be actively wrong — each panel means something different.
 Single-panel base plots are the sensible candidates; that pass is still open.
+
+### Base-R plots: the per-call-site pass (2026-07-29)
+
+The `print.ggplot` seam cannot reach base graphics — `main`/`xlab`/`ylab` are baked in at
+draw time — so the 43 base call sites were done by hand. They split two ways, and the
+split is the whole point:
+
+**Single-panel (22 sites)** take the options directly:
+`hist(x, main = ea_main("Distribution of x"), xlab = ea_xlab("x"), col = ea_col("#4caf50"))`.
+`ea_main()/ea_xlab()/ea_ylab()/ea_col()` return the module's own default whenever the
+user has set nothing, so an untouched plot is byte-identical to before.
+
+**Multi-panel (21 sites)** deliberately do NOT take per-panel labels. A diagnostic grid
+is Residuals, Residuals-vs-Fitted and a Q-Q side by side; stamping one title and one axis
+pair across all three would be wrong for every panel. They get an **overall figure title**
+instead: `ea_multi_par()` reserves an outer margin *only when a title is set* (`oma`
+0,0,2.2,0 vs 0,0,0,0 untouched), and the title is drawn inside the existing
+`on.exit({ ea_fig_title(); par(old_par) })` — before the reset, while the margin still
+exists. Verified visually: panels keep "Residuals" / "Residuals vs Fitted" / "Normal Q-Q"
+with the overall title above them, and the untitled version wastes no space.
+
+One site was reverted: `mod_rconsole.R`'s example chip is sample code shown to the user,
+not a plot call.
+
+Files touched: helpers.R (shared engines, so this covers several screens at once),
+clustering, da, data, descriptive, hydro, land_classify, raster, suitability, svm,
+terrain, timeseries, workspace, lidar, lme, ntl, linear_regression.

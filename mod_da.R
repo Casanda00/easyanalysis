@@ -355,7 +355,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
         old_par <- par(mar = c(2, 2, 2, 2)); on.exit(par(old_par))
         num_preds <- m$predictors[sapply(m$data[, m$predictors, drop = FALSE], is.numeric)]
         if (length(num_preds) < 2) { show_placeholder("Need at least 2 numeric predictors for pairs plot."); return() }
-        pairs(m$data[, num_preds, drop = FALSE], main = paste("Pairs Plot -", m$method_name), col = as.numeric(m$data[[m$target_var]]), pch = 16)
+        pairs(m$data[, num_preds, drop = FALSE], main = ea_main(paste("Pairs Plot -", m$method_name)), col = as.numeric(m$data[[m$target_var]]), pch = 16)
       } else if (plot_name == "Stacked Histogram") {
         if (isTRUE(m$has_ld) && !is.null(m$ld_scores) && ncol(m$ld_scores) >= 1) {
           df_plot <- data.frame(Class = m$data[[m$target_var]], LD1 = m$ld_scores[, 1])

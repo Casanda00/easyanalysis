@@ -195,7 +195,7 @@ suitabilityServer <- function(id, raster_pool) {
         show_placeholder("Add criteria and click Compute Suitability.")
         return()
       }
-      terra::plot(res$raster, col = .suit_pal, main = res$name,
+      terra::plot(res$raster, col = .suit_pal, main = ea_main(res$name),
                   range = c(1, 5), mar = c(3.5, 3.5, 2, 7))
     })
 
@@ -242,7 +242,7 @@ suitabilityServer <- function(id, raster_pool) {
         if (fmt == "pdf")      pdf(file, width = pw, height = ph)
         else if (fmt == "jpg") jpeg(file, width=pw*dpi, height=ph*dpi, res=dpi, quality=95)
         else                   png(file, width=pw*dpi, height=ph*dpi, res=dpi)
-        terra::plot(res$raster, col = .suit_pal, main = res$name,
+        terra::plot(res$raster, col = .suit_pal, main = ea_main(res$name),
                     range = c(1, 5), mar = c(3.5, 3.5, 2, 7))
         dev.off()
       }
@@ -258,7 +258,7 @@ suitabilityServer <- function(id, raster_pool) {
       plot = function() {
         res <- result_r()
         if (is.null(res)) return(invisible())
-        terra::plot(res$raster, col = .suit_pal, main = res$name, range = c(1, 5))
+        terra::plot(res$raster, col = .suit_pal, main = ea_main(res$name), range = c(1, 5))
       }
     )
   })

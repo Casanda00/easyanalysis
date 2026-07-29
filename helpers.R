@@ -277,8 +277,8 @@ plot_relationships <- function(df, num1, num2, cat_var, view_mode = "Grid View",
 
   if (view_mode == "Grid View") {
     rows <- 1 + ceiling(num_levels / 3)
-    old_par <- par(mfrow = c(rows, 3), mar = c(6, 5, 4, 1) + 0.1, mgp = c(3, 1, 0))
-    on.exit(par(old_par))
+    old_par <- ea_multi_par(mfrow = c(rows, 3), mar = c(6, 5, 4, 1) + 0.1, mgp = c(3, 1, 0))
+    on.exit({ ea_fig_title(); par(old_par) })
 
     form1 <- as.formula(paste(safe_num1, "~", safe_cat))
     boxplot(form1, data = plot_df, main = paste(num1, "by", cat_var), ylab = num1, col = "lightblue",
@@ -361,8 +361,8 @@ plot_aov_diagnostics <- function(model, view_mode, target) {
   }
 
   if (view_mode == "Grid View") {
-    old_par <- par(mfrow = c(1, 2), mar = c(6, 6, 5, 2) + 0.1, mgp = c(4, 1.2, 0))
-    on.exit(par(old_par))
+    old_par <- ea_multi_par(mfrow = c(1, 2), mar = c(6, 6, 5, 2) + 0.1, mgp = c(4, 1.2, 0))
+    on.exit({ ea_fig_title(); par(old_par) })
     plot(model, which = 1, cex.lab = 1.3, cex.main = 1.5)
     plot(model, which = 2, cex.lab = 1.3, cex.main = 1.5)
   } else {
@@ -415,8 +415,8 @@ plot_lm_diagnostics <- function(model, dataset, y_var, view_mode, target) {
   }
 
   if (view_mode == "Grid View") {
-    old_par <- par(mfrow = c(1, 3), mar = c(6, 6, 5, 2) + 0.1, mgp = c(4, 1.2, 0))
-    on.exit(par(old_par))
+    old_par <- ea_multi_par(mfrow = c(1, 3), mar = c(6, 6, 5, 2) + 0.1, mgp = c(4, 1.2, 0))
+    on.exit({ ea_fig_title(); par(old_par) })
     plot(model$fitted.values, model$model[[1]], main = "Actual vs. Fitted", xlab = "Fitted Values", ylab = "Actual Data", pch = 16, col = rgb(0.2, 0.5, 0.8, 0.5), cex.lab=1.3, cex.main=1.5)
     abline(0, 1, col = "red", lwd = 2, lty = 2)
     plot(model$fitted.values, resid(model), main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals", pch = 16, col = rgb(0.3, 0.3, 0.3, 0.5), cex.lab=1.3, cex.main=1.5)
@@ -529,4 +529,29 @@ ea_style_gg <- function(p) {
 print.ggplot <- function(x, ...) {
   x <- tryCatch(ea_style_gg(x), error = function(e) x)
   getFromNamespace("print.ggplot", "ggplot2")(x, ...)
+}
+
+# --- Base-R plots -----------------------------------------------------------
+# Base graphics bake main/xlab/ylab in at draw time, so there is no seam like
+# print.ggplot. Call sites pass their defaults through these instead:
+#   plot(x, y, main = ea_main("Residuals"), xlab = ea_xlab("Fitted"))
+ea_main <- function(default = NULL) ea_opt("title",  default)
+ea_xlab <- function(default = NULL) ea_opt("xlab",   default)
+ea_ylab <- function(default = NULL) ea_opt("ylab",   default)
+ea_col  <- function(default = NULL) ea_opt("colour", default)
+
+# MULTI-PANEL figures (diagnostic grids) are different: one title and one axis
+# pair repeated across panels that each mean something different would be
+# actively wrong. So only an OVERALL title applies, drawn in the outer margin —
+# and the margin is only reserved when the user actually set one.
+ea_multi_par <- function(...) {
+  a <- list(...)
+  if (!is.null(ea_opt("title")) && is.null(a$oma)) a$oma <- c(0, 0, 2.2, 0)
+  do.call(graphics::par, a)
+}
+ea_fig_title <- function(cex = 1.15) {
+  t <- ea_opt("title")
+  if (is.null(t)) return(invisible(FALSE))
+  graphics::mtext(t, outer = TRUE, line = 0.4, cex = cex, font = 2)
+  invisible(TRUE)
 }

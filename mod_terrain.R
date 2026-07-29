@@ -137,7 +137,7 @@ terrainServer <- function(id, raster_pool) {
       pal <- if (res$op == "hillshade") grey.colors(256)
              else if (res$op == "aspect") rainbow(256)
              else terrain.colors(256)
-      terra::plot(res$raster, col = pal, main = res$name,
+      terra::plot(res$raster, col = pal, main = ea_main(res$name),
                   mar = c(3.5, 3.5, 2, 7))
     })
 
@@ -193,7 +193,7 @@ terrainServer <- function(id, raster_pool) {
         pal <- if (res$op == "hillshade") grey.colors(256)
                else if (res$op == "aspect") rainbow(256)
                else terrain.colors(256)
-        terra::plot(res$raster, col = pal, main = res$name, mar = c(3.5, 3.5, 2, 7))
+        terra::plot(res$raster, col = pal, main = ea_main(res$name), mar = c(3.5, 3.5, 2, 7))
         dev.off()
       }
     )
@@ -208,7 +208,7 @@ terrainServer <- function(id, raster_pool) {
         res <- result_r()
         if (is.null(res)) return(invisible())
         pal <- if (res$op == "hillshade") grey.colors(256) else terrain.colors(256)
-        terra::plot(res$raster, col = pal, main = res$name)
+        terra::plot(res$raster, col = pal, main = ea_main(res$name))
       }
     )
   })
