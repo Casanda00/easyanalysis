@@ -534,11 +534,29 @@ tool loads, and **extend the tour to at least 8 steps**.
 Needs checking what the current export produces and whether a PDF path exists without
 adding a LaTeX dependency (which would break the no-toolchain install).
 
-### F26. Plot appearance appears on every screen  **LIKELY REGRESSION**
+### F26. Plot appearance appears on every screen — FIXED 2026-07-29
 > "the plot appearance looks sticky on all the pages"
 
 From round-1 item 13: it was moved into the result header, which every tool shows —
-including ones with no plot. It should appear only where there is a plot to style.
+including ones with no plot.
+
+**Decision taken:** show it only on genuinely plot-bearing screens, and **in the plot
+section** rather than the screen header.
+
+Counting `plotOutput` per module made the first half almost moot: **every screen except
+SEM has plots**, so a screen-level whitelist would filter nothing. The real fix was
+placement — it now appears beside the plot, only while a plot view is on screen.
+
+`ea_plot_appearance()` (helpers.R) is markup any module can drop next to its plot; it
+writes straight to the workspace-level `po_*` inputs, so there is still ONE store behind
+it and no per-module server wiring. `ea_is_plot_view()` decides which view keys are plots.
+
+Wired into Linear regression and the six select-and-split screens. Verified on LM: with
+"Model summary" selected the control is absent from both the screen header and the view
+tools; adding "Diagnostic plots" makes it appear in the view tools.
+
+**Not yet wired:** screens that still have their own layouts rather than the
+select-and-split picker. They currently show no appearance control at all.
 
 ---
 

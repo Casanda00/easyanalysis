@@ -57,13 +57,18 @@ svmCanvasUI <- function(id) {
   ns <- NS(id)
   # Select-and-split (helpers.R): one selection fills the area, several split it.
   card(
-    card_header(ea_view_header(ns, .SVM_VIEWS, tools = FALSE)),
+    card_header(ea_view_header(ns, .SVM_VIEWS)),
     div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
 svmServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.SVM_VIEWS)[1]
+      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+    })
     output$view_body <- renderUI({
       ns <- session$ns
       ea_view_panes(input$view_pick, .SVM_VIEWS, function(k, solo) switch(k,

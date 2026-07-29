@@ -397,7 +397,9 @@ lmServer <- function(id, dataset_pool, active_dataset) {
           downloadButton(ns("dl_coefs"), "CSV", class = "btn-sm btn-outline-secondary"),
         if ("diag" %in% picked)
           div(class = "d-flex align-items-center gap-2",
-              uiOutput(ns("diag_mode_ui")), uiOutput(ns("single_selector"))))
+              uiOutput(ns("diag_mode_ui")), uiOutput(ns("single_selector"))),
+        # only when a plot is actually on screen
+        if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance())
     })
 
     active_data <- reactive({

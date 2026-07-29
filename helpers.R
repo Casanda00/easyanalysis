@@ -632,3 +632,38 @@ ea_view_panes <- function(picked, views, build) {
   }
   div(class = "lm-panes", panes)
 }
+
+# ---- Plot appearance control, placed WITH the plot --------------------------
+# It used to sit in the workspace's result header, which every screen shows, so
+# it appeared on screens where there was no plot in view. It belongs in the plot
+# section instead.
+#
+# The inputs are workspace-level (`workspace-po_*`) and this writes to them
+# directly, so a module can drop the control next to its plot without any
+# server wiring of its own — there is still exactly one store behind it.
+ea_plot_appearance <- function() {
+  fld <- function(key, ico, label) div(class = "ea-pop-row",
+    tags$label(icon(ico), tags$span(label)),
+    tags$input(type = "text", class = "form-control", placeholder = "auto",
+      oninput = sprintf(
+        "Shiny.setInputValue('workspace-po_%s', this.value, {priority:'event'});", key)))
+  div(class = "ea-pop",
+    tags$button(type = "button", class = "ea-pop-btn",
+      title = "Plot appearance - title, axis labels, colour",
+      onclick = "eaPop(this)", icon("palette")),
+    div(class = "ea-pop-body",
+      div(class = "ea-pop-h", icon("palette"), tags$span("Plot appearance")),
+      fld("title", "heading", "Title"),
+      fld("xlab", "arrows-left-right", "X label"),
+      fld("ylab", "arrows-up-down", "Y label"),
+      div(class = "ea-pop-row",
+        tags$label(icon("droplet"), tags$span("Colour")),
+        tags$input(type = "color", class = "ea-wsx-colpick", value = "#2E7D32",
+          onchange = "Shiny.setInputValue('workspace-po_colour', this.value, {priority:'event'});")),
+      div(class = "ea-pop-note", "Leave a field empty to use the default.")))
+}
+
+# Which view keys in a select-and-split screen are PLOTS. Used to show the
+# appearance control only when a plot is actually on screen.
+ea_is_plot_view <- function(k)
+  grepl("plot|diag|tree|curve|import|scree|loading|km|kaplan|main", k, ignore.case = TRUE)

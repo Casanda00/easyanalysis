@@ -54,13 +54,18 @@ pcaCanvasUI <- function(id) {
   ns <- NS(id)
   # Select-and-split (helpers.R): one selection fills the area, several split it.
   card(
-    card_header(ea_view_header(ns, .PCA_VIEWS, tools = FALSE)),
+    card_header(ea_view_header(ns, .PCA_VIEWS)),
     div(class = "lm-viewport", uiOutput(ns("view_body")))
   )
 }
 
 pcaServer <- function(id, dataset_pool, active_dataset) {
   moduleServer(id, function(input, output, session) {
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.PCA_VIEWS)[1]
+      if (any(vapply(picked, ea_is_plot_view, logical(1)))) ea_plot_appearance()
+    })
     output$view_body <- renderUI({
       ea_view_panes(input$view_pick, .PCA_VIEWS, function(k, solo) switch(k,
         main     = plotOutput(session$ns("main_plot"),     height = if (solo) "500px" else "100%"),

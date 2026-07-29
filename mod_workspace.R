@@ -794,9 +794,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         return(tagList(
           div(class = "ea-wsx-resulthead",
             span(class = "ea-wsx-toolnm", mi$nm),
-            # Plot appearance belongs WITH THE PLOT, not across the screen in the
-            # tool panel: it changes what you are looking at, so it sits above it.
-            .plot_opts_ui(inline = TRUE),
+            # NOT here: the result header shows on every screen, so the control
+            # appeared where there was no plot. It lives with the plot now —
+            # each screen shows it beside its plot view (ea_plot_appearance()).
             tags$button(class = "ea-wsx-backbtn", type = "button",
               onclick = sprintf("Shiny.setInputValue('%s','',{priority:'event'})", ns("tool_pick")),
               "← back")),
