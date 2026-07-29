@@ -213,7 +213,24 @@ server <- function(input, output, session) {
             # A shapefile is several files; copy every sibling part too.
             .keep_source(fname, shp_path, fname,
                          extra = list.files(shp_tmpdir, full.names = TRUE))
-            showNotification(paste0("Shapefile '", fname, "' added to the project."), type = "message")
+            # A shapefile carries its ATTRIBUTES in the .dbf. Uploading only the
+            # .shp still yields a perfectly good geometry layer, so the app used
+            # to accept it silently and the attribute table then looked broken.
+            # Say so at the point the information is lost.
+            ncols <- tryCatch(ncol(sf::st_drop_geometry(vec)), error = function(e) NA_integer_)
+            parts <- tolower(tools::file_ext(list.files(shp_tmpdir)))
+            if (!is.na(ncols) && ncols == 0) {
+              showNotification(HTML(paste0(
+                "<b>", fname, "</b> loaded with geometry only — no attributes.<br>",
+                "A shapefile keeps its attributes in the <b>.dbf</b> file, which was not ",
+                "included. Select every part together (.shp, .dbf, .shx, .prj) and add it again.")),
+                type = "warning", duration = 14)
+            } else if (!("dbf" %in% parts)) {
+              showNotification(paste0("Shapefile '", fname, "' added, but its .dbf was missing."),
+                               type = "warning", duration = 10)
+            } else {
+              showNotification(paste0("Shapefile '", fname, "' added to the project."), type = "message")
+            }
           }
 
         } else {

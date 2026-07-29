@@ -91,14 +91,32 @@ Context menus. **Needs scoping before building** — on what, and offering what?
 candidates: a layer in the Layers panel (zoom to, rename, remove, export), the map canvas
 (clip here, add marker), a results card. Ask before implementing.
 
-## 7. Vector attribute table not working
+## 7. Vector attribute table not working — FIXED 2026-07-29
 
 > "the vector attribute table isnt working really. I am trying to see the attribute table
 > of a vector layer but nothing."
 
-Selecting a vector layer shows no attributes. Note this area was changed once already
-(attribute table now comes from the vector layer's own `st_drop_geometry`, not from the
-loaded CSVs), so check whether that path regressed or never worked for this case. **Bug.**
+**The table was working; the data had no attributes.** A seeded GeoJSON rendered 6 rows
+fine, while `ars_plots.shp` rendered blank. The file is 33 features with **0 attribute
+columns**, and the project folder held only `ars_plots.shp` and `.shx` — no `.dbf`.
+
+A shapefile keeps its attributes in the **.dbf**. Only the `.shp` had been uploaded;
+`SHAPE_RESTORE_SHX=YES` let GDAL rebuild the index, so the layer loaded and drew
+perfectly with no hint that the attributes were gone. The ingest code does copy every
+sibling part — the parts simply never arrived.
+
+**Fix — at both ends, since the information is lost at upload but noticed much later:**
+
+- **At ingest:** a shapefile that loads with zero attribute columns now raises a warning
+  naming the `.dbf` and telling the user to re-add it with every part selected. A missing
+  `.dbf` among the uploaded parts warns even when columns did survive.
+- **In the attribute dock:** a vector with geometry but no attribute columns states that
+  plainly, with the feature count and the `.dbf` explanation, instead of rendering an
+  empty grid that reads as a broken table.
+
+Attributes that were never uploaded cannot be recovered — the file has to be added again
+with its parts. Verified: the shapefile now explains itself ("33 features but no attribute
+columns…"), and a proper vector still shows its real table (6 rows, plot_id/species/stems).
 
 ## 8. Linear regression colours, including black
 

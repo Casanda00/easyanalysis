@@ -1296,7 +1296,22 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # attributes (st_drop_geometry), NOT an unrelated CSV that happens to be in
       # the project. A table layer is not drawn on the map, so it has no
       # attribute table here; it belongs in the Data view.
-      if (identical(lay$kind, "vector")) return(DT::dataTableOutput(ns("attr_dt")))
+      if (identical(lay$kind, "vector")) {
+        # A vector with geometry but NO attribute columns rendered as a blank
+        # table, which reads as "the attribute table is broken". It is not —
+        # there is genuinely nothing to show, and the usual cause is a shapefile
+        # uploaded without its .dbf. Say that instead of showing an empty grid.
+        nc <- tryCatch(ncol(sf::st_drop_geometry(vector_pool[[act]])),
+                       error = function(e) NA_integer_)
+        n  <- tryCatch(nrow(vector_pool[[act]]), error = function(e) NA_integer_)
+        if (!is.na(nc) && nc == 0)
+          return(div(class = "ea-wsx-attrinfo",
+            tags$b(act), " has ", format(n), " features but no attribute columns.",
+            tags$br(),
+            "A shapefile stores its attributes in the ", tags$b(".dbf"), " file. If you added ",
+            "only the .shp, add it again with every part selected (.shp, .dbf, .shx, .prj)."))
+        return(DT::dataTableOutput(ns("attr_dt")))
+      }
       if (identical(lay$kind, "table"))
         return(div(class = "ea-wsx-attrinfo",
           "'", act, "' is a table, not a map layer — open it in ", tags$b("Data view"),
