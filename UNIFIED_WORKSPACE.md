@@ -587,3 +587,46 @@ in lockstep.
 breaks the JS string it sits in — silently, taking the whole script block with it
 (`window.eaCodeGutter` was simply undefined). The fix is `String.fromCharCode(10)`, which
 has no backslash for R to eat. Prefer that over `\n` in any JS embedded this way.
+
+## R Console write-back: scripts produce real layers (2026-07-29)
+
+The console used to be a **read-only scratchpad**. Pools were copied in before each run
+and nothing ever came back, so `clipped <- terra::crop(r, box)` lived and died inside the
+console: it never reached `raster_pool`, never appeared in the Layers panel, never drew
+on the map, and was never saved with the project. Same for a table read from disk.
+
+Now every eligible object a script produces is routed to the pool for its type:
+
+| class in the console | pool | shows up as |
+|---|---|---|
+| `data.frame` | `dataset_pool` | table layer, usable by every model screen |
+| `SpatRaster` | `raster_pool` | raster layer, drawn on the map |
+| `sf`         | `vector_pool` | vector layer, drawn on the map |
+| `LAS`        | `las_pool`    | point cloud |
+
+The spatial pools are also copied **in** now, so a script can clip a raster it can
+actually see by name.
+
+### Two modes — `options(ea.console_sync = ...)`
+
+**`"auto"` (current default)** — everything eligible joins the project on every Run, with
+a notification naming what was added. Nothing to click; the cost is that a script leaving
+several eligible objects behind adds all of them.
+
+**`"ask"`** — the same objects are collected into `pending()` and a strip above the
+results offers *Add to project* / *Dismiss*. Nothing enters the project until the user
+says so. The UI for this is already built and wired; switching is one option, no code
+change.
+
+### What is deliberately NOT written back
+
+- Objects **identical to something already loaded**, under any name. `r <- my_raster` is
+  an alias, not a new layer — verified: a clip script defining both `r` and `clipped` adds
+  only `clipped`.
+- Anything that is not one of the four classes above (`SpatExtent`, numbers, strings,
+  models, ...), so `e`, `w`, `h` and friends are ignored.
+- `df` under the name `df`: it is an alias for the ACTIVE dataset, so a modified `df` is
+  written back under the real dataset name rather than creating a stray layer.
+
+Verified end-to-end: with the orthomosaic loaded, a crop script produced a `clipped`
+raster layer in the panel and **two rasters drawn on the map**, with the alias skipped.

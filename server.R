@@ -806,7 +806,8 @@ server <- function(input, output, session) {
   climate_ctx    <- climateTrendServer("climate_trend", raster_pool)
   wind_ctx       <- windServer("wind", dataset_pool, active_dataset)
   gam_ctx        <- gamServer("gam", dataset_pool, active_dataset)
-  rconsole_ctx   <- rconsoleServer("rconsole", dataset_pool, active_dataset)
+  rconsole_ctx   <- rconsoleServer("rconsole", dataset_pool, active_dataset,
+                                   raster_pool, las_pool, vector_pool)
   # ---- Workspace File menu (ids are app-level, not module-namespaced) ----
   # "Save project as .eap": the .ea-eap-save JS turns this into a native
   # save-location dialog; otherwise it is a normal browser download.

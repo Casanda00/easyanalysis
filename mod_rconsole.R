@@ -94,6 +94,10 @@ rconsoleCanvasUI <- function(id) {
     "  white-space: pre; overflow-wrap: normal; overflow-x: auto; }",
     ".rc-editor textarea:focus { box-shadow: none; outline: none; }",
     ".rc-actions { flex: none; display: flex; gap: 6px; margin-top: 6px; }",
+    ".rc-sync { flex: none; display: flex; align-items: center; gap: 8px; margin-bottom: 6px;",
+    "  padding: 6px 8px; font-size: 11.5px; color: var(--ink);",
+    "  background: var(--sunk); border: 1px solid var(--line); border-radius: 6px; }",
+    ".rc-sync > span { flex: 1 1 auto; min-width: 0; }",
     # Floating plot window: resize grip via CSS `resize`, maximize via a class.
     # No dock mode on purpose — see the note where it is built.
     ".rc-plotwin { display: none; position: fixed; right: 26px; bottom: 26px;",
@@ -132,6 +136,7 @@ rconsoleCanvasUI <- function(id) {
       # RIGHT: results (and the plot, only once there is one)
       tags$div(class = "rc-col",
         tags$div(class = "rc-colh", tags$span("Results"), uiOutput(ns("objects_inline"), inline = TRUE)),
+        uiOutput(ns("sync_bar")),
         tags$div(class = "rc-log", id = ns("logbox"), uiOutput(ns("log"))))
     ),
     # Plots open in a FLOATING window: resizable and maximizable, deliberately
@@ -153,22 +158,96 @@ rconsoleCanvasUI <- function(id) {
   )
 }
 
-rconsoleServer <- function(id, dataset_pool, active_dataset) {
+rconsoleServer <- function(id, dataset_pool, active_dataset,
+                           raster_pool = NULL, las_pool = NULL, vector_pool = NULL,
+                           sync_mode = getOption("ea.console_sync", "auto")) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     log_r     <- reactiveVal(list())
     last_plot <- reactiveVal(NULL)
     cenv      <- reactiveVal(NULL)
 
+    # What get_env() last copied IN, so the write-back can tell a user-made
+    # object from one of ours that came along for the ride.
+    injected <- reactiveVal(list())
+
     # One persistent env per session; datasets refreshed each run (user vars kept).
     get_env <- function() {
       e <- cenv()
       if (is.null(e)) { e <- new.env(parent = globalenv()); cenv(e) }
+      inj <- list()
+      .put <- function(nm, val) { assign(nm, val, envir = e); inj[[nm]] <<- val }
       nms <- tryCatch(names(dataset_pool), error = function(err) character(0))
-      for (nm in nms) try(assign(make.names(nm), dataset_pool[[nm]], envir = e), silent = TRUE)
+      for (nm in nms) try(.put(make.names(nm), dataset_pool[[nm]]), silent = TRUE)
+      # spatial pools too, so a script can clip a raster it can actually see
+      for (pl in list(raster_pool, las_pool, vector_pool)) {
+        if (is.null(pl)) next
+        for (nm in tryCatch(names(pl), error = function(err) character(0)))
+          try(.put(make.names(nm), pl[[nm]]), silent = TRUE)
+      }
       ad <- tryCatch(active_dataset(), error = function(err) NULL)
-      if (!is.null(ad) && ad %in% nms) assign("df", dataset_pool[[ad]], envir = e)
+      if (!is.null(ad) && ad %in% nms) .put("df", dataset_pool[[ad]])
+      injected(inj)
       e
+    }
+
+    # ---- Write-back: console objects become project layers --------------------
+    # The console used to be a READ-ONLY scratchpad: pools were copied in, and
+    # nothing ever came back, so a clipped raster lived and died in the console.
+    # Now every eligible object it produces is routed to the pool for its type,
+    # which puts it in the Layers panel and on the map like any other layer.
+    #
+    # sync_mode is "auto" (write back on every run) or "ask" (collect them and
+    # let the user add them explicitly). See UNIFIED_WORKSPACE.md; switch with
+    # options(ea.console_sync = "ask").
+    pending <- reactiveVal(list())
+
+    .classify <- function(x) {
+      if (is.data.frame(x))            "table"
+      else if (inherits(x, "SpatRaster")) "raster"
+      else if (inherits(x, "sf"))         "vector"
+      else if (inherits(x, "LAS"))        "lidar"
+      else NULL
+    }
+    .pool_for <- function(kind) switch(kind,
+      table = dataset_pool, raster = raster_pool, vector = vector_pool,
+      lidar = las_pool, NULL)
+
+    # Eligible objects that are NEW or CHANGED since we copied the pools in.
+    .harvest <- function(e) {
+      inj <- injected()
+      ad  <- tryCatch(active_dataset(), error = function(err) NULL)
+      out <- list()
+      for (nm in ls(e)) {
+        if (startsWith(nm, ".")) next
+        x <- tryCatch(get(nm, envir = e), error = function(err) NULL)
+        kind <- .classify(x)
+        if (is.null(kind)) next
+        # Skip anything that IS one of the objects we copied in — under its own
+        # name (untouched) or under a new one. `r <- my_raster` is an alias, not
+        # a new layer, and adding it would duplicate what is already loaded.
+        same <- FALSE
+        for (w in inj) {
+          if (isTRUE(tryCatch(identical(w, x), error = function(err) FALSE))) { same <- TRUE; break }
+        }
+        if (same) next
+        # `df` is an ALIAS for the active dataset; write it back under the real
+        # name rather than creating a stray layer called "df".
+        target <- if (identical(nm, "df") && !is.null(ad)) ad else nm
+        out[[target]] <- list(kind = kind, value = x)
+      }
+      out
+    }
+
+    .commit <- function(items) {
+      done <- character(0)
+      for (nm in names(items)) {
+        it <- items[[nm]]; pool <- .pool_for(it$kind)
+        if (is.null(pool)) next
+        try({ pool[[nm]] <- it$value; done <- c(done, paste0(nm, " (", it$kind, ")")) },
+            silent = TRUE)
+      }
+      done
     }
 
     output$objects <- renderUI({
@@ -211,6 +290,19 @@ rconsoleServer <- function(id, dataset_pool, active_dataset) {
       # every Run. "Clear" empties the log; nothing empties the editor but you.
       if (!is.null(plot_obj))
         session$sendCustomMessage("rc_plotwin", session$ns("plotwin"))
+
+      # Anything the script produced joins the project.
+      items <- tryCatch(.harvest(e), error = function(err) list())
+      if (length(items)) {
+        if (identical(sync_mode, "auto")) {
+          added <- .commit(items)
+          if (length(added))
+            showNotification(paste0("Added to the project: ", paste(added, collapse = ", ")),
+                             type = "message", duration = 6)
+        } else {
+          pending(items)
+        }
+      }
     }
 
     observeEvent(input$run, run_code(input$code))
@@ -218,6 +310,27 @@ rconsoleServer <- function(id, dataset_pool, active_dataset) {
       log_r(list()); last_plot(NULL)
       session$sendCustomMessage("rc_plotwin_close", session$ns("plotwin"))
     })
+
+    # Only ever shown in "ask" mode; in "auto" mode `pending` stays empty.
+    output$sync_bar <- renderUI({
+      items <- pending()
+      if (!length(items)) return(NULL)
+      tags$div(class = "rc-sync",
+        tags$span(paste0(length(items), " object",
+                         if (length(items) == 1) "" else "s", " ready: ",
+                         paste(names(items), collapse = ", "))),
+        actionButton(ns("sync_add"), "Add to project",
+                     class = "btn-success btn-sm", icon = icon("plus")),
+        actionButton(ns("sync_skip"), "Dismiss",
+                     class = "btn-outline-secondary btn-sm"))
+    })
+    observeEvent(input$sync_add, {
+      added <- .commit(pending()); pending(list())
+      if (length(added))
+        showNotification(paste0("Added to the project: ", paste(added, collapse = ", ")),
+                         type = "message", duration = 6)
+    })
+    observeEvent(input$sync_skip, { pending(list()) })
 
     output$log <- renderUI({
       entries <- log_r()
