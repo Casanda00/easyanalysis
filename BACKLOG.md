@@ -178,15 +178,35 @@ map to `--forest` / `--warn` / `--danger` / `--canopy`.
 Verified across light, forest and midnight: body text luminance flips 0.08 -> 0.92 -> 0.93
 against page 0.97 -> 0.07 -> 0.00, and the tint itself shifts with the theme's green.
 
-## 11. Results / Diagnostics / Assumptions tabs that may do nothing
+## 11. Results / Diagnostics / Assumptions tabs that may do nothing — VERIFIED, they work
 
 > "why do we have results tab, disgnostics, and assumptions if that regression does not
 > do it?"
 
-**Verify before acting.** Either those tabs are genuinely empty/broken (a bug), or they
-work and were never reachable because the Response dropdown was empty until v0.8.1 (in
-which case re-test now that the screen runs). Do not remove anything until this is
-established.
+**All three work. Nothing here should be removed.** They only ever looked empty because
+the screen could not be run at all — the Response dropdown had no options (item fixed in
+`81a6782`), so there was never a fitted model behind the tabs.
+
+Fitting `height_m ~ dbh_cm + age_yr` on 180 rows:
+
+| tab | what it produced |
+|---|---|
+| Results | plain-English reading (`explains 76.0% of variance … R² = 0.760, RMSE = 1.473, 1 predictor significant`), Model Summary, Performance Metrics, LOOCV, ANOVA table |
+| Diagnostics | the diagnostic plot, with its Grid / Single switch |
+| Assumptions | Shapiro-Wilk `W = 0.9966, p = 0.9591`, homoscedasticity by Spearman, and the rest |
+
+**A second bug found and fixed while verifying.** The v0.8.1 repopulate fix was
+timing-fragile: it bumped `ds_refresh` when a tool was *picked*, but if the panel had not
+rendered at that instant the update was dropped again and nothing bumped a second time —
+so the dropdown came up empty whenever a project was still loading. The bump now happens
+in `session$onFlushed` **after the panel has been sent**, so the update message is
+processed after the insert. Message ORDER is what guarantees the element exists.
+
+Verified: all four columns present (`dbh_cm, height_m, age_yr, site`) on a single tool
+open, with no repeat picks needed.
+
+**Consequence for item 12:** that redesign is now a layout change over working content,
+not a way to hide broken panes.
 
 ## 12. Stop competing for space — one view with a dropdown
 

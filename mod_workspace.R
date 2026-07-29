@@ -608,6 +608,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # Title / axis labels / colour. These write to the SHARED store in server.R
     # (plot_opts), so they drive every screen's plot through print.ggplot and
     # ea_opt() rather than being wired per module.
+    # Bumped once a module's tools panel has actually been delivered; server.R
+    # watches it to re-arm the selector population.
+    tool_rendered <- reactiveVal(0)
+
     .pkey <- function() { t <- current_tool(); if (is.null(t)) "workspace" else t }
     # ISOLATED on purpose. These controls live inside .data_ui() / the tool
     # panel, which are renderUI-built; a reactive read here would make the panel
@@ -1557,6 +1561,16 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                  div(class = "ea-hint", paste0("Could not load '", op, "'.")) else body)
       }
       mi <- MODUI[[t]]
+      if (!is.null(mi)) {
+        # Signal AFTER this panel has been sent to the browser. Bumping on
+        # tool_pick alone was timing-fragile: the module's repopulate ran while
+        # the panel still did not exist, the update was dropped, and nothing
+        # bumped again. onFlushed fires once the flush carrying this UI is out,
+        # so the update message that follows is processed AFTER the insert —
+        # message order is what guarantees the element is there.
+        session$onFlushed(function() tool_rendered(isolate(tool_rendered()) + 1),
+                          once = TRUE)
+      }
       if (!is.null(mi)) return(tagList(
         if (isTRUE(mi$map_based))
           div(class = "ea-wsx-mapnote2", icon("map-location-dot"),
@@ -1739,8 +1753,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
 
     list(context  = reactive("Unified workspace (beta scaffold)."),
          plot_ctx  = reactive({ t <- current_tool(); if (is.null(t)) "workspace" else t }),
-         # server.R watches this to re-arm module selector population when a
-         # screen is opened; its panel only exists from that moment.
-         tool_open = reactive(current_tool()))
+         # server.R watches this to re-arm module selector population. It counts
+         # PANEL RENDERS, not tool picks: the panel has to exist before the
+         # repopulate is worth sending.
+         tool_open = reactive(tool_rendered()))
   })
 }
