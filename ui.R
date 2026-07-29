@@ -2016,47 +2016,68 @@ page_fillable(
          String.fromCharCode(39) for the single-quote split and only single
          quotes throughout, so nothing here breaks the R HTML() string. */
       (function(){
-        var Q = String.fromCharCode(39);
-        var idx = null;
+        /* Tool search. It used to scrape the OLD menubar for items whose onclick
+           set `current_view`; the unified workspace builds its menu from .gm-item
+           and sets `workspace-tool_pick`, so the index came back empty and every
+           query found nothing. Index the real menu instead, and activate
+           a hit by replaying the item's OWN click — the menu already knows how to
+           open each thing, so the search never has to model that itself.
+           Rebuilt per query on purpose: the menubar is a uiOutput, so a cached
+           index would hold references to elements that no longer exist. */
         function buildIndex(){
           var out = [];
-          var links = document.querySelectorAll('.app-topbar .app-menu, .app-topbar .dropdown-item');
-          links.forEach(function(a){
-            var oc = a.getAttribute('onclick') || '';
-            var parts = oc.split(Q);
-            var ci = parts.indexOf('current_view');
-            if(ci < 0 || !parts[ci+2]) return;
-            var view  = parts[ci+2];
+          document.querySelectorAll('.gm-item').forEach(function(a){
+            if (a.classList.contains('disabled')) return;
+            /* A fly-out PARENT is itself a .gm-item and contains the whole
+               submenu, so its textContent is every child concatenated. Index
+               leaves only. */
+            if (a.querySelector('.gm-item')) return;
             var label = (a.textContent || '').replace(/\\s+/g, ' ').trim();
-            if(!label) return;
-            var grp = '';
-            var dd = a.closest('.dropdown');
-            if(dd){ var tog = dd.querySelector('.dropdown-toggle'); if(tog) grp = (tog.textContent||'').trim(); }
-            out.push({ label: label, view: view, group: grp });
+            if (!label) return;
+            var grp = '', menu = a.closest('.gm');
+            if (menu){
+              var btn = menu.querySelector('.gm-btn span');
+              if (btn) grp = (btn.textContent || '').trim();
+            }
+            var fly = a.closest('.gm-fly');            /* nested fly-out group */
+            if (fly){
+              var head = fly.previousElementSibling;
+              if (head) {
+                var sub = (head.textContent || '').replace(/[\\u25b8>]/g, '').trim();
+                if (sub) grp = grp ? (grp + ' / ' + sub) : sub;
+              }
+            }
+            out.push({ label: label, group: grp, el: a });
           });
           return out;
         }
         function box(){ return document.getElementById('tool_search_results'); }
         window.eaToolSearch = function(q){
-          if(!idx) idx = buildIndex();
-          var b = box(); if(!b) return; b.innerHTML = ''; q = (q||'').trim().toLowerCase();
+          var b = box(); if(!b) return;
+          b.innerHTML = ''; q = (q||'').trim().toLowerCase();
           if(!q){ b.classList.remove('open'); return; }
-          var hits = idx.filter(function(t){
-            return t.label.toLowerCase().indexOf(q) > -1 || (t.group && t.group.toLowerCase().indexOf(q) > -1);
+          var hits = buildIndex().filter(function(t){
+            return t.label.toLowerCase().indexOf(q) > -1 ||
+                   (t.group && t.group.toLowerCase().indexOf(q) > -1);
           }).slice(0, 14);
           if(!hits.length){
             var none = document.createElement('div'); none.className = 'none';
-            none.textContent = 'No tools match: ' + q; b.appendChild(none); b.classList.add('open'); return;
+            none.textContent = 'No tools match: ' + q; b.appendChild(none);
+            b.classList.add('open'); return;
           }
           hits.forEach(function(h){
             var a = document.createElement('a'); a.href = '#';
             a.appendChild(document.createTextNode(h.label));
-            if(h.group){ var g = document.createElement('span'); g.className = 'grp'; g.textContent = h.group; a.appendChild(g); }
+            if(h.group){
+              var g = document.createElement('span'); g.className = 'grp';
+              g.textContent = h.group; a.appendChild(g);
+            }
             a.addEventListener('click', function(e){
               e.preventDefault(); e.stopPropagation();
-              if(window.Shiny) Shiny.setInputValue('current_view', h.view, {priority:'event'});
               b.classList.remove('open'); b.innerHTML = '';
               var inp = document.getElementById('tool_search'); if(inp) inp.value = '';
+              document.querySelectorAll('.gm.open').forEach(function(x){ x.classList.remove('open'); });
+              h.el.click();                    /* let the menu item do its own job */
             });
             b.appendChild(a);
           });
