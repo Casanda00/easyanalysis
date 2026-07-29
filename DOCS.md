@@ -13,6 +13,7 @@ a new session or after a context reset) to find where everything lives.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical structure: the persistent shell, the four typed data pools, the module contract, the Co-Analyst agent, and **§9 Memory management**. |
 | [DESIGN.md](DESIGN.md) | Product & UX: audience, the GeoLibre north star, the **menu-free project → workspace flow**, the non-negotiable UX rules, Co-Analyst UX, visual language (no emojis). |
 | [MEMORY.md](MEMORY.md) | Decision log, project timeline, and hard-won gotchas (quotes-in-`HTML()`, LAS/CRS traps, etc.). Human-facing — distinct from Claude's private per-session memory. |
+| [BACKLOG.md](BACKLOG.md) | **Open items reported after v0.8.1 testing** — 13 items, each with the reporter's own wording, what it implies, and what still has to be decided or verified. Read before starting any of them; several are entangled and two need scoping first. Also records that voice input is ruled out. |
 | [UNIFIED_WORKSPACE.md](UNIFIED_WORKSPACE.md) | **Build spec for the one-workspace rebuild, and the record of every fix made in it** — including the `.ea-pop` reusable hover panel, the plot-appearance mechanism, R console write-back, the Co-Analyst driving the real screens, and the empty-selector fix — the two views (Map view + Data view), tool-as-panel contract, and the staged build plan. Read before building the unified workspace. |
 | [DEPLOY.md](DEPLOY.md) | **Hosting**: the two Vercel projects, why there is no app zip, and how to verify a deploy. |
 
