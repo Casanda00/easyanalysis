@@ -130,7 +130,15 @@ rconsoleCanvasUI <- function(id) {
           textAreaInput(ns("code"), NULL, width = "100%",
                         placeholder = "Type R here, e.g.  summary(df)")),
         tags$div(class = "rc-actions",
-          actionButton(ns("run"), "Run", class = "btn-success btn-sm", icon = icon("play")),
+          # Run sends the textarea's CURRENT contents, rather than relying on
+          # input$code. A Shiny text input is debounced, so typing and clicking
+          # Run quickly used to run the PREVIOUS command with no sign anything
+          # was wrong — and on the first command there was nothing to re-run, so
+          # it looked like Run did nothing at all.
+          actionButton(ns("run"), "Run", class = "btn-success btn-sm", icon = icon("play"),
+            onclick = sprintf(
+              "Shiny.setInputValue('%s', document.getElementById('%s').value, {priority:'event'});",
+              ns("run_code"), ns("code"))),
           actionButton(ns("clear"), "Clear", class = "btn-outline-secondary btn-sm",
                        icon = icon("eraser")))),
       # RIGHT: results (and the plot, only once there is one)
@@ -152,9 +160,9 @@ rconsoleCanvasUI <- function(id) {
             onclick = sprintf("eaPlotWin('%s','close')", ns("plotwin")), "×"))),
       tags$div(class = "rc-pw-body", plotOutput(ns("plot"), height = "100%"))),
     tags$script(HTML(sprintf(
-      "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); $('#%s').click(); }});
+      "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); Shiny.setInputValue('%s', this.value, {priority:'event'}); }});
        eaCodeGutter('%s','%s');",
-      ns("code"), ns("run"), ns("code"), ns("gutter"))))
+      ns("code"), ns("run_code"), ns("code"), ns("gutter"))))
   )
 }
 
@@ -341,7 +349,8 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
       }
     }
 
-    observeEvent(input$run, run_code(input$code))
+    # Driven by run_code (the exact text at click time), not input$run.
+    observeEvent(input$run_code, run_code(input$run_code))
     observeEvent(input$clear, {
       log_r(list()); last_plot(NULL)
       session$sendCustomMessage("rc_plotwin_close", session$ns("plotwin"))

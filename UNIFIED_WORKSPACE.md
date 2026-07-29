@@ -760,3 +760,29 @@ box being typed in.
 
 Verified: text inputs gone; all three buttons share the selectors' row; a click applies
 the title to the plot (645 px of title ink) and flips the button to its "set" state.
+
+### R Console: Run used the wrong text (fixed 2026-07-29)
+
+Reported as "I tested `print("hello")` and it didn't work". It is worse than not working.
+
+`observeEvent(input$run, run_code(input$code))` read `input$code`, and a Shiny text input
+is **debounced**. Type and click Run quickly and the server still holds the PREVIOUS
+contents, so it silently re-runs the last command and prints its output as though it were
+yours. On the very first command there is nothing to re-run, `req(nzchar(code))` aborts,
+and Run appears to do nothing at all.
+
+Reproduced before fixing: setting the box to `print("typed fast")` and clicking Run added
+a log entry whose output was the previous command's `summary()`.
+
+Run (and Ctrl+Enter) now send the textarea's **current** value to a dedicated
+`run_code` input, so what executes is exactly what is on screen at the moment you click.
+
+Verified after: the first command of a session, typed and Run clicked immediately, gives
+`> print("hello")` -> `[1] "hello"`.
+
+### Base-R plotting in the console works normally
+
+Checked, since the console draws to a `pdf(NULL)` device and replays a `recordPlot()`:
+a simple `plot()`, an incremental `plot()` + `abline()` + `points()`, a `par(mfrow=c(1,2))`
+two-panel figure, and a plot with `main`/`xlab`/`legend` all render in the plot window.
+Text output is unaffected: `print()`, a bare expression, `cat()` and `summary()` all print.
