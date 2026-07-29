@@ -35,13 +35,25 @@ cache keyed by path+mtime would be sound. Caching spatial objects has a memory c
 LAS OOM history (CLAUDE.md, `.read_las_capped`) is the cautionary tale, so a cache needs a
 bound and probably a size check.
 
-## 2. Search bar returns nothing
+## 2. Search bar returns nothing — FIXED 2026-07-29
 
 > "the search bar shows no result. maybe it is not wired properly"
 
-The tool search (`eaToolSearch`) finds nothing. Likely unwired or searching the wrong
-registry — note the app has **two** registries, `MODUI` (real screens) and `TOOLS` (two
-spatial scaffolds); searching only the latter would explain empty results. **Bug.**
+**Cause:** the index scraped the OLD menubar for items whose `onclick` set `current_view`.
+The unified workspace builds its menu from `.gm-item` and sets `workspace-tool_pick`, so
+the index came back empty and every query found nothing. (The guess about `MODUI` vs
+`TOOLS` was wrong — it was the menu markup, not the registry.)
+
+**Fix:** index the real menu, and activate a hit by replaying the item's **own** click —
+the menu already knows how to open each thing, so the search never models that itself and
+cannot drift from it again. Rebuilt per query rather than cached, because the menubar is a
+`uiOutput` and a cached index would hold dead element references. Fly-out *parents* are
+skipped: a parent is itself a `.gm-item` containing the whole submenu, so its text is
+every child concatenated.
+
+Verified: 114 menu items indexed; "regression" returns Linear regression and Logistic
+regression, "raster" and "lidar" return their screens, nonsense returns "No tools match";
+clicking a hit opens the tool, closes the results, clears the box and closes the menus.
 
 ## 3. Black bar in the 3D view
 
