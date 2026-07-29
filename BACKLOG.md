@@ -549,14 +549,41 @@ placement — it now appears beside the plot, only while a plot view is on scree
 
 `ea_plot_appearance()` (helpers.R) is markup any module can drop next to its plot; it
 writes straight to the workspace-level `po_*` inputs, so there is still ONE store behind
-it and no per-module server wiring. `ea_is_plot_view()` decides which view keys are plots.
+it and no per-module server wiring.
 
 Wired into Linear regression and the six select-and-split screens. Verified on LM: with
 "Model summary" selected the control is absent from both the screen header and the view
 tools; adding "Diagnostic plots" makes it appear in the view tools.
 
-**Not yet wired:** screens that still have their own layouts rather than the
-select-and-split picker. They currently show no appearance control at all.
+#### Completing it across the remaining screens — DONE 2026-07-29
+
+The twelve screens that still had their own layouts showed no control at all. Now:
+
+- **Time series, GAM, Wind, Bayesian** — were plain `navset_card_tab`, so they were
+  converted to select-and-split and pick the control up the same way the other six do.
+- **Data, Descriptive, Tests, Logistic, LME, RF, Clustering, Classification, ANOVA, DA,
+  LiDAR (3 canvases)** — keep their layouts; the control sits in the header of the card
+  holding the plot.
+
+**`ea_is_plot_view()` is gone.** It decided "is this view a plot?" from the view KEY, and
+was wrong on most screens — it missed `posterior`, `performance`, `wind_rose`,
+`cox_ph_model`, `cp`/`imp`/`perf` and every timeseries plot. No name rule could work:
+`predictions` is a plot on XGBoost and a table on the neural-net screen. Each screen now
+declares `.<TAG>_VIEWS_PLOT`, derived from the bodies it actually renders, and
+**`check_plot_views.R`** re-derives it from the parse tree and fails on drift.
+
+`ea_plot_appearance(fields = ...)` now offers only what a plot honours. Raster previews
+pass `fields = "title"`: they draw a map with a data-driven palette, so axis labels and
+colour would do nothing.
+
+Also wired plots that were half-connected — hydrology and land classification read the
+title override on export but not in the preview; the LiDAR snapshot, CHM and evaluation
+plots read none of it.
+
+**Still dormant:** terrain, hydrology, suitability, land classification and night-time
+lights are `map_based` in the workspace registry (mod_workspace.R:1480-1488), so their
+canvas is never mounted — they draw on the map instead. Their control is in place but
+unreachable until D18.
 
 ---
 
