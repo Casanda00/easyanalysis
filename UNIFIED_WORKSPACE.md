@@ -570,3 +570,20 @@ the top band, and the inputs held their values throughout.
 
 A **"Plot options test"** project (180 rows: dbh_cm, height_m, age_yr, site) is seeded
 locally for exercising this.
+
+### Menu rename + editor line numbers (2026-07-29)
+
+`Processing` is now **`Analysis`** in the menu bar (and in the copy that points at it).
+
+The R Console editor has a **line-number gutter**: a plain div beside the textarea rather
+than a code-editor library — no external dependency (the CSP blocks them anyway) and it
+stays an ordinary Shiny textarea, so Ctrl+Enter, the example chips and value persistence
+all keep working. Wrapping is turned off (`white-space: pre`) and the gutter shares the
+textarea's font and line-height, so one number is always exactly one line; the two scroll
+in lockstep.
+
+**Gotcha 1 struck again, in a new place.** `'\n'` written inside the JS of an
+`HTML("...")` block is consumed by R and arrives in the browser as a REAL newline, which
+breaks the JS string it sits in — silently, taking the whole script block with it
+(`window.eaCodeGutter` was simply undefined). The fix is `String.fromCharCode(10)`, which
+has no backslash for R to eat. Prefer that over `\n` in any JS embedded this way.

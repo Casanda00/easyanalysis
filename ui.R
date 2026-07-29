@@ -1552,6 +1552,34 @@ page_fillable(
           c.style.height = '300px'; c.style.minHeight = '300px'; }
         window.dispatchEvent(new Event('resize'));   /* let plots re-measure */
       };
+      /* Line numbers for the R Console editor. A gutter div beside the textarea
+         rather than a code-editor library: no external dependency (the CSP
+         blocks them anyway), and it stays a plain Shiny textarea so Ctrl+Enter,
+         the example chips and value persistence keep working. Wrapping is off
+         in the textarea, so one number is always exactly one line. */
+      window.eaCodeGutter = function(taId, gutId){
+        var ta = document.getElementById(taId), g = document.getElementById(gutId);
+        if (!ta || !g || ta.dataset.eaGutter) return;
+        ta.dataset.eaGutter = '1';
+        /* NL via fromCharCode on purpose: a literal backslash-n inside this
+           HTML() string is consumed by R and arrives here as a REAL newline,
+           which breaks the JS string it sits in (CLAUDE.md gotcha 1). */
+        var NL = String.fromCharCode(10);
+        function paint(){
+          var n = ta.value.split(NL).length;
+          if (g.dataset.n !== String(n)){
+            var out = [];
+            for (var i = 1; i <= n; i++) out.push(i);
+            g.textContent = out.join(NL);
+            g.dataset.n = String(n);
+          }
+          g.scrollTop = ta.scrollTop;   /* keep the two in step */
+        }
+        ta.addEventListener('input',  paint);
+        ta.addEventListener('keyup',  paint);
+        ta.addEventListener('scroll', function(){ g.scrollTop = ta.scrollTop; });
+        paint();
+      };
       /* R Console plot window: open / maximize-restore / close. Resizing is the
          browser's own grip (CSS `resize`); there is no dock mode by design. */
       window.eaPlotWin = function(id, mode){
@@ -2298,7 +2326,7 @@ page_fillable(
         { target:'.ea-wsx-left', title:'Your data lives here',
           body:'Every table, raster, point cloud and vector layer in the project. Click one to make it active; the toggle controls what the map draws.' },
         { target:'[data-tour=menu]', title:'Every tool is in these menus',
-          body:'Statistics, machine learning, spatial analysis and LiDAR — all of it under Processing and its neighbours. Nothing is exported to another program.' },
+          body:'Statistics, machine learning, spatial analysis and LiDAR — all of it under Analysis and its neighbours. Nothing is exported to another program.' },
         { target:'.ea-wsx-tabs', title:'Map, data, or both',
           body:'Spatial layers open on the map; tables open in the data view. Split shows them side by side so a model and its map stay in view together.' },
         { target:'.ea-wsx-right', title:'Tool settings appear here',

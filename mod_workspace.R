@@ -32,7 +32,7 @@ workspaceCanvasUI <- function(id) {
           "Split"),
       ),
       # M7: the old tool dropdown is retired — tools are launched from the
-      # Processing menu in the top bar. This shows the ACTIVE tool instead.
+      # Analysis menu in the top bar. This shows the ACTIVE tool instead.
       div(class = "ea-wsx-active-tool", uiOutput(ns("active_tool_label")))
     ),
     div(class = "ea-wsx-grid",
@@ -270,7 +270,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     .setTool <- function(k) sprintf("Shiny.setInputValue('%s', '%s', {priority:'event'})", ns("tool_pick"), k)
 
     output$menubar <- renderUI({
-      # Processing = OUR tools, grouped exactly like GeoLibre's submenu list.
+      # Analysis = OUR tools, grouped exactly like GeoLibre's submenu list.
       # Each group is a ▸ FLY-OUT (GeoLibre style): hover the group, its tools
       # open in a nested panel to the side.
       grps <- unique(vapply(MODUI, function(t) t$grp, character(1)))
@@ -353,7 +353,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .msep(),
           .mi("Download spatial data", .setTool("rs_search"))
         )),
-        .menu("Processing", "gears", tagList(
+        .menu("Analysis", "gears", tagList(
           .mi("AI Assistant", "document.getElementById('chat-panel').classList.add('open')"),
           .msep(),
           proc_items,
@@ -1501,11 +1501,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             onclick = sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("tool_dock")),
             "Dock it back"))
     })
-    # Shows which tool is open (launched from Processing) + a way to close it.
+    # Shows which tool is open (launched from Analysis) + a way to close it.
     output$active_tool_label <- renderUI({
       t <- current_tool()
       if (is.null(t)) return(span(class = "ea-wsx-atl-none", "No tool open — use ",
-                                  tags$b("Processing"), " in the menu bar"))
+                                  tags$b("Analysis"), " in the menu bar"))
       nm <- .tool_title() %||% t     # strips the internal "dataop:" prefix
       tagList(
         span(class = "ea-wsx-atl", icon("gears"), nm),

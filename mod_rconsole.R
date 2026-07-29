@@ -76,11 +76,23 @@ rconsoleCanvasUI <- function(id) {
     ".rc-log pre.rc-err { color: var(--danger); }",
     ".rc-note { color: var(--canopy); font-size: 11px; }",
     ".rc-empty { color: var(--bark); font-style: italic; }",
-    ".rc-editor { flex: 1 1 auto; min-height: 0; display: flex; }",
+    ".rc-editor { flex: 1 1 auto; min-height: 0; display: flex;",
+    "  border: 1px solid var(--line); border-radius: 6px; overflow: hidden;",
+    "  background: var(--sunk); }",
+    # Line-number gutter. Scrolls in lockstep with the textarea; both use the
+    # same font metrics and line-height, and wrapping is OFF so one number is
+    # always one line.
+    ".rc-gutter { flex: none; width: 34px; padding: 6px 6px 6px 0; overflow: hidden;",
+    "  text-align: right; font: 12.5px/1.5 var(--mono); color: var(--bark);",
+    "  background: var(--sunk); border-right: 1px solid var(--line);",
+    "  user-select: none; white-space: pre; }",
     ".rc-editor .shiny-input-container { flex: 1 1 auto; min-height: 0; display: flex;",
     "  margin-bottom: 0; width: 100% !important; }",
-    ".rc-editor textarea { font-family: var(--mono); font-size: 12.5px; height: 100% !important;",
-    "  resize: none; background: var(--sunk); color: var(--ink); border-color: var(--line); }",
+    ".rc-editor textarea { font: 12.5px/1.5 var(--mono); height: 100% !important;",
+    "  resize: none; background: var(--sunk); color: var(--ink);",
+    "  border: none; border-radius: 0; padding: 6px 8px;",
+    "  white-space: pre; overflow-wrap: normal; overflow-x: auto; }",
+    ".rc-editor textarea:focus { box-shadow: none; outline: none; }",
     ".rc-actions { flex: none; display: flex; gap: 6px; margin-top: 6px; }",
     # Floating plot window: resize grip via CSS `resize`, maximize via a class.
     # No dock mode on purpose — see the note where it is built.
@@ -110,6 +122,7 @@ rconsoleCanvasUI <- function(id) {
       tags$div(class = "rc-col",
         tags$div(class = "rc-colh", tags$span("Code"), tags$span("Ctrl+Enter to run")),
         tags$div(class = "rc-editor",
+          tags$div(class = "rc-gutter", id = ns("gutter"), "1"),
           textAreaInput(ns("code"), NULL, width = "100%",
                         placeholder = "Type R here, e.g.  summary(df)")),
         tags$div(class = "rc-actions",
@@ -134,8 +147,9 @@ rconsoleCanvasUI <- function(id) {
             onclick = sprintf("eaPlotWin('%s','close')", ns("plotwin")), "×"))),
       tags$div(class = "rc-pw-body", plotOutput(ns("plot"), height = "100%"))),
     tags$script(HTML(sprintf(
-      "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); $('#%s').click(); }});",
-      ns("code"), ns("run"))))
+      "$(document).on('keydown', '#%s', function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); $('#%s').click(); }});
+       eaCodeGutter('%s','%s');",
+      ns("code"), ns("run"), ns("code"), ns("gutter"))))
   )
 }
 
