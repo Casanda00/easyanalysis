@@ -1043,18 +1043,6 @@ server <- function(input, output, session) {
   # Project ▸ Open Recent ▸ <project>
   observeEvent(input$ws_open_recent, { open_project(input$ws_open_recent) })
 
-  # Keep-alive session heartbeat ping observer
-  observeEvent(input$ea_heartbeat, {
-    # Lightweight ping receiver: keeps WebSocket active and resets idle timers
-  }, ignoreInit = TRUE)
-
-  # Clear R memory and refresh reactive session pools
-  observeEvent(input$ws_clear_memory, {
-    gc(full = TRUE)
-    ds_refresh(ds_refresh() + 1)
-    showNotification("R memory cleared and session pools refreshed successfully.", type = "message")
-  })
-
   # Project ▸ Export report (HTML) — a self-contained snapshot of the project.
   output$ws_report <- downloadHandler(
     filename = function() {

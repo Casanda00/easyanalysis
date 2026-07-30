@@ -970,26 +970,7 @@ page_fillable(
     .ea-wsx-ty { margin-left: auto; font: 400 9px var(--mono); text-transform: uppercase; color: var(--bark); }
     .ea-wsx-mapnote, .ea-wsx-chartnote { border: 1px dashed var(--line); border-radius: 10px; padding: 16px;
                   color: var(--bark); font-size: 13px; line-height: 1.6; background: var(--panel); margin-bottom: 12px; }
-    /* Session Health & Connection Indicator */
-    .ea-health-indicator { display: flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 12px;
-                           background: var(--sunk); border: 1px solid var(--line); font-size: 11px; font-weight: 550; color: var(--bark); }
-    .ea-health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; transition: all .3s ease; }
-    .ea-health-dot.connected { background: #4CD964; box-shadow: 0 0 6px rgba(76,217,100,.6); }
-    .ea-health-dot.busy { background: #E0A458; box-shadow: 0 0 6px rgba(224,164,88,.6); animation: eaPulse 1.2s infinite ease-in-out; }
-    .ea-health-dot.disconnected { background: #D9694F; box-shadow: 0 0 6px rgba(217,105,79,.6); }
-    .ea-health-text { font-family: var(--mono); font-size: 10px; }
-    @keyframes eaPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-
-    /* Disconnect Overlay */
-    .ea-disconnect-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(10,15,10,.78);
-                             backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; }
-    .ea-disconnect-overlay.show { display: flex; }
-    .ea-disconnect-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-                          padding: 26px; max-width: 380px; text-align: center; color: var(--ink); box-shadow: 0 24px 60px rgba(0,0,0,.65); }
-    .ea-disconnect-icon { font-size: 36px; margin-bottom: 10px; color: var(--warn); }
-    .ea-disconnect-title { font-weight: 700; font-size: 17px; margin-bottom: 8px; color: var(--ink); }
-    .ea-disconnect-msg { font-size: 12.5px; color: var(--bark); margin-bottom: 20px; line-height: 1.45; }
-
+    .ea-wsx-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .ea-wsx-qtool { font: 550 11px var(--ui); background: var(--panel); border: 1px solid var(--line);
                   border-radius: 999px; padding: 5px 11px; color: var(--ink); }
     /* Step 2: layers panel — visibility, active, expandable legend/style */
@@ -2111,37 +2092,6 @@ page_fillable(
         }, 60);
       });
 
-      /* Keep-Alive Heartbeat & Session Health Monitor */
-      (function(){
-        var hbTimer = null;
-        function sendPing(){
-          if (window.Shiny && Shiny.setInputValue) {
-            try { Shiny.setInputValue('ea_heartbeat', Date.now(), {priority: 'event'}); } catch(e){}
-          }
-        }
-        function setHealth(st){
-          var dot = document.getElementById('ea-health-dot');
-          var txt = document.getElementById('ea-health-text');
-          if (!dot) return;
-          dot.className = 'ea-health-dot ' + st;
-          if (txt) txt.textContent = st === 'connected' ? 'Connected' : (st === 'busy' ? 'Processing' : 'Disconnected');
-        }
-        if (window.jQuery) {
-          jQuery(document).on('shiny:connected', function(){
-            setHealth('connected');
-            if (!hbTimer) hbTimer = setInterval(sendPing, 25000);
-          });
-          jQuery(document).on('shiny:busy', function(){ setHealth('busy'); });
-          jQuery(document).on('shiny:idle', function(){ setHealth('connected'); });
-          jQuery(document).on('shiny:disconnected', function(){
-            setHealth('disconnected');
-            if (hbTimer) { clearInterval(hbTimer); hbTimer = null; }
-            var ov = document.getElementById('ea-disconnect-overlay');
-            if (ov) ov.classList.add('show');
-          });
-        }
-      })();
-
       /* Header drag: RESIZE when docked (drag up = taller), MOVE when floating. */
       document.addEventListener('mousedown', function(e){
         var h = e.target.closest ? e.target.closest('.ea-wsx-conh') : null;
@@ -2563,11 +2513,6 @@ page_fillable(
           icon("wand-magic-sparkles", style = "font-size:12px;"), "Co-Analyst"
         ),
         tags$div(class = "topbar-sep tb-coanalyst"),
-        # Session Health Indicator
-        tags$div(class = "ea-health-indicator", id = "ea-health-container",
-          tags$span(id = "ea-health-dot", class = "ea-health-dot connected", title = "Session connected & ready"),
-          tags$span(id = "ea-health-text", class = "ea-health-text", "Connected")
-        ),
         # Settings gear
         tags$button(
           class = "topbar-action-btn",
@@ -2713,27 +2658,6 @@ page_fillable(
         ),
         tags$p(class = "settings-hint",
           "Applies to the dataset currently active on the Data screen.")
-      ),
-
-      # --- Section: Session & Performance ---
-      tags$div(class = "settings-section",
-        tags$p(class = "settings-section-title", "Session & Performance"),
-        tags$div(class = "settings-action-row",
-          tags$button(
-            class   = "settings-action-btn",
-            title   = "Clear unused R memory and flush caches",
-            onclick = "Shiny.setInputValue('ws_clear_memory', Date.now(), {priority:'event'}); closeSettings();",
-            icon("broom"), " Clear Memory"
-          ),
-          tags$button(
-            class   = "settings-action-btn",
-            title   = "Reconnect Shiny session",
-            onclick = "if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.reconnect){try{Shiny.shinyapp.reconnect();}catch(e){}} location.reload();",
-            icon("arrows-rotate"), " Reconnect"
-          )
-        ),
-        tags$p(class = "settings-hint",
-          "Frees memory allocations (gc) and restores connection health.")
       ),
 
       # --- Section: Display ---
@@ -2936,18 +2860,6 @@ page_fillable(
   tags$div(class = "ea-hidden-file",
     downloadLink("ws_export", "Save as .eap", class = "ea-eap-save"),
     downloadLink("ws_report", "Export report")),
-
-  # Session Disconnect Overlay
-  tags$div(id = "ea-disconnect-overlay", class = "ea-disconnect-overlay",
-    tags$div(class = "ea-disconnect-card",
-      tags$div(class = "ea-disconnect-icon", icon("plug-circle-xmark")),
-      tags$div(class = "ea-disconnect-title", "Session Disconnected"),
-      tags$div(class = "ea-disconnect-msg", "The connection to EasyAnalysis was lost or timed out due to tab inactivity. Reconnect to resume without losing work."),
-      tags$button(class = "btn btn-success w-100",
-                  onclick = "if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.reconnect){try{Shiny.shinyapp.reconnect();}catch(e){}} location.reload();",
-                  icon("arrows-rotate"), " Reconnect Session")
-    )
-  ),
 
   # =================== AI CO-PILOT (floating) ===================
   chatUI("chat")

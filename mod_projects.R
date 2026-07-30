@@ -121,28 +121,9 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
     })
 
     # ---- select / open ----------------------------------------------------
-    observeEvent(input$pick, {
-      raw <- input$pick; req(isTruthy(raw))
-      pid <- if (is.list(raw)) raw$id %||% raw$val else as.character(raw)
-      if (isTruthy(pid)) sel(pid)
-    })
-    observeEvent(input$open, {
-      raw <- input$open; req(isTruthy(raw))
-      pid <- if (is.list(raw)) raw$id %||% raw$val else as.character(raw)
-      req(isTruthy(pid), nzchar(pid))
-      open_project(pid)
-    })
+    observeEvent(input$pick, { sel(input$pick) })
+    observeEvent(input$open, { open_project(input$open) })
     observeEvent(input$open_sel, { req(sel()); open_project(sel()) })
-    observeEvent(input$ask_rename, {
-      raw <- input$ask_rename; req(isTruthy(raw))
-      pid <- if (is.list(raw)) raw$id %||% raw$val else as.character(raw)
-      if (isTruthy(pid)) { sel(pid); .show_rename() }
-    })
-    observeEvent(input$ask_delete, {
-      raw <- input$ask_delete; req(isTruthy(raw))
-      pid <- if (is.list(raw)) raw$id %||% raw$val else as.character(raw)
-      if (isTruthy(pid)) { sel(pid); .show_delete() }
-    })
     observeEvent(input$dup_sel, {
       req(sel())
       nid <- tryCatch(ea_project_duplicate(sel()), error = function(e) NULL)
@@ -303,9 +284,8 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
 
 # onclick that sets a Shiny input without also triggering the card's own click.
 .set_in <- function(input_id, value) {
-  val_json <- jsonlite::toJSON(list(val = value, t = Sys.time()), auto_unbox = TRUE)
   sprintf("event.stopPropagation();event.preventDefault();eaSetInput('%s', %s);return false;",
-          input_id, val_json)
+          input_id, jsonlite::toJSON(value, auto_unbox = TRUE))
 }
 
 .ea_when <- function(ts) {
@@ -371,7 +351,7 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
     # eaSetInput() queues the click if the websocket is not up yet — this screen
     # is pre-rendered, so a plain setInputValue on the FIRST click was lost.
     div(class = paste("ea-proj", if (identical(pid, selected)) "sel" else ""),
-        onclick = sprintf("eaSetInput('%s', {val: %s, t: Date.now()});",
+        onclick = sprintf("eaSetInput('%s', %s);",
                           ns("open"), jsonlite::toJSON(pid, auto_unbox = TRUE)),
       div(class = "ea-proj-body",
         div(class = "nm", p$name %||% pid),

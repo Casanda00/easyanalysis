@@ -1158,17 +1158,11 @@ Reported by user for immediate implementation and testing ("we build one and I w
     1. "Reset Active Dataset" (and top-bar "Reset to upload") strictly resets **only** `active_dataset()` to its uploaded `raw_pool` state without modifying any other loaded dataset.
     2. Added an explicit **"Reset All Datasets..."** action button with a safety confirmation modal to reset all project datasets when explicitly requested.
 
-### 7. App Session Responsiveness & Long-Running Process Safeguards (Idle Timeout & App Freezing) (DONE)
+### 7. App Session Responsiveness & Long-Running Process Safeguards (Idle Timeout & App Freezing)
 > "sometimes, when I dont use the app for a while, it feels like it stops working and I have to kill it from the terminal.
 > sometimes, some processes are slow and freezes the app and i have to kill it from the terminal.
 > how can we solve these two issues and similar in the apps ui"
-- **Diagnosis & Architecture Plan:** [COMPLETED]
-  - Built & verified in `ui.R`, `server.R`, `mod_algo.R`, and `compute_worker.R`:
-    1. **25-Second Keep-Alive Heartbeat:** JS `setInterval` ping keeps WebSocket connection active during period of inactivity.
-    2. **Connection Health Dot:** Live status dot in top menubar (🟢 Connected | 🟡 Processing | 🔴 Disconnected).
-    3. **Auto-Reconnect Overlay:** `shiny:disconnected` overlay with a 1-click **"Reconnect Session"** button.
-    4. **Cancelable Background Worker Execution & Stop Button:** Heavy calculations run via `compute_worker.R` (`callr::r_bg`) with a red **"Stop / Cancel Process"** button that aborts stuck jobs instantly.
-    5. **Clear Memory:** Added **Session & Performance ▸ Clear Memory** in Settings drawer to run `gc(full = TRUE)` and refresh pools.
+- **Diagnosis & Architecture Plan:**
   - **Issue A — Idle Session Freeze / Silent Disconnect:**
     - *Root Cause:* Browsers throttle background tabs and close silent WebSockets when idle. Upon returning, the UI appears visible but Shiny events no longer communicate with R.
     - *UI Solution:*
