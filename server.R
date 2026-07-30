@@ -905,10 +905,21 @@ server <- function(input, output, session) {
     ))
   })
   output$global_data_table <- DT::renderDataTable({
-    req(active_dataset())
-    DT::datatable(dataset_pool[[active_dataset()]],
+    input$view_data            # re-read the dataset each time the viewer opens
+    ds <- active_dataset()
+    req(ds)
+    # isolate() the DATA on purpose. An edit writes back to dataset_pool, and if
+    # this render depended on the pool it would rebuild the whole table on every
+    # keystroke-commit -- throwing away the page you were on and the scroll
+    # position mid-edit. DT already updates the edited cell in the browser, so
+    # there is nothing to re-render. Switching dataset still rebuilds, because
+    # active_dataset() is a real dependency.
+    DT::datatable(isolate(dataset_pool[[ds]]),
                   editable = "cell",
-                  options  = list(pageLength = 15, scrollX = TRUE))
+                  class    = "compact stripe hover ea-dt",
+                  options  = list(pageLength = 15, scrollX = TRUE,
+                                  scrollY = "58vh", scrollCollapse = TRUE,
+                                  paging = TRUE, autoWidth = FALSE))
   })
 
   observeEvent(input$global_data_table_cell_edit, {
@@ -916,7 +927,20 @@ server <- function(input, output, session) {
     ds   <- active_dataset()
     req(ds)
     df <- dataset_pool[[ds]]
-    df[info$row, info$col] <- DT::coerceValue(info$value, df[info$row, info$col])
+    i <- as.integer(info$row); j <- as.integer(info$col)
+    # Guard the indices. `col` counts the ROWNAMES column, so column 0 is the row
+    # label, not data -- and `df[i, 0]` returns a 0-column data.frame, which makes
+    # coerceValue warn ("data type is not supported: data.frame") and the
+    # assignment fail with "attempt to select less than one element". Verified
+    # both behaviours directly. Out-of-range indices are ignored rather than
+    # allowed to error inside an observer, where the failure is silent.
+    if (is.na(i) || is.na(j) || j < 1L || j > ncol(df) || i < 1L || i > nrow(df)) return()
+    new <- tryCatch(DT::coerceValue(info$value, df[i, j]), error = function(e) NULL)
+    if (is.null(new)) {
+      showNotification("Could not use that value for this column.", type = "warning")
+      return()
+    }
+    df[i, j] <- new
     dataset_pool[[ds]] <- df
   })
 

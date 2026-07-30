@@ -574,11 +574,34 @@ something else?
 Apply an operation to several columns/datasets at once, with the control living on each
 tool rather than in one central place.
 
-### B8. Edit data table does not work
+### B8. Edit data table does not work — FIXED 2026-07-30
 > "edit data table does not work. no editing ability."
 
-The View Data modal is built with `editable = "cell"` and has a `cell_edit` handler, so
-this needs diagnosing rather than building.
+Diagnosed rather than rebuilt, and the table was never the problem: **there was no way to open
+it.** The menu entry named "Edit data table" called `.setTool("data")`, which just opens the Data
+screen. The only control wired to the editable viewer is a button in `.app-left`, and the
+workspace sets that rail to `display:none` — so on the app's main screen the editable table was
+unreachable. The entry now opens the viewer.
+
+Two further problems found while verifying:
+
+- **Editing rebuilt the whole table.** The render depended on `dataset_pool`, so committing a
+  cell re-rendered everything and threw away the page and scroll position mid-edit. The data is
+  read with `isolate()` now — DT already updates the edited cell in the browser.
+- **That made the viewer show stale data on reopen** — a regression I introduced with the
+  isolate: closing and reopening the modal did not invalidate the output, so Shiny re-sent the
+  cached render. Fixed by depending on `input$view_data`, so each open re-reads while an edit
+  still does not.
+
+Also guarded the handler's indices. `col` counts the rownames column, so column 0 is the row
+label rather than data: `df[i, 0]` returns a 0-column data.frame, which makes `coerceValue` warn
+("data type is not supported: data.frame") and the assignment fail with "attempt to select less
+than one element" — both reproduced directly. Out-of-range indices are now ignored instead of
+erroring inside an observer, where the failure is silent, and a value the column cannot take
+reports itself instead of vanishing.
+
+Verified end to end on a real project: editing `dbh_cm` row 1 from 44 to 99 persisted, a fresh
+open read back 99, and setting it to 44 restored it — so the project is unchanged.
 
 ---
 
@@ -859,12 +882,29 @@ The screen currently mixes plain `lm` with glmnet/poisson paths.
 
 ## F. Tables, reports, chrome
 
-### F23. Table view is unreadable
+### F23. Table view is unreadable — FIXED 2026-07-30
 > "the scroller for the table view is at the bottom and the header is not sticky. can put
 > the scroller up for left to right to see the other columns or make the header sticky?
 > also, reduce the size of the table, columns are too big and text size is big too."
 
-Sticky header, reachable horizontal scroll, smaller type and tighter columns.
+Sticky header, a scrollbar you can actually grab, and tighter type:
+
+| | before | after |
+|---|---|---|
+| scroll head position | `relative` | `sticky` |
+| header font | 14px | 11.5px |
+| cell font | — | 12px |
+| cell padding | — | 4px 8px |
+
+The viewer also gets `scrollY = "58vh"`, so the header stays put while the body scrolls rather
+than the whole page moving, and the horizontal scrollbar is 12px with a visible thumb instead of
+a hairline at the very bottom of a long table. A long text cell is clipped with an ellipsis at
+260px so one value cannot stretch a column across the screen.
+
+**`!important` was required, for the same reason as the date picker (A4):** DataTables ships its
+stylesheet as an htmlwidget *dependency*, injected when a table first renders — after the head
+styles — and it sets both the header font size and `position:relative` on the scroll head.
+Source order cannot win. Measured before and after to confirm each override actually landed.
 
 ### F24. Replace the placeholder text with the tour
 > "I dont understand this text: Pick a tool above. Its settings load here; spatial ops add

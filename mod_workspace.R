@@ -356,7 +356,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Undo",  "Shiny.setInputValue('data-undo_last', Date.now(), {priority:'event'})"),
           .mi("Reset to upload", "Shiny.setInputValue('data-reset_raw', Date.now(), {priority:'event'})"),
           .msep(),
-          .mi("Edit data table", .setTool("data"))
+          # Opens the EDITABLE dataset viewer (server.R's view_data modal). It used
+          # to call .setTool("data"), which just opens the Data screen -- so the
+          # menu entry named "Edit data table" never got you an editable table.
+          # The only control wired to that modal is a button in `.app-left`, and
+          # the workspace hides that rail (display:none), so in the workspace there
+          # was no way to reach it at all.
+          .mi("Edit data table",
+              "Shiny.setInputValue('view_data', Date.now(), {priority:'event'})")
         )),
         .menu("View", "eye", tagList(
           # colour sets — instant, client-side, remembered across sessions

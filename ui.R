@@ -226,6 +226,47 @@ page_fillable(
     .dataTables_paginate .paginate_button, .dt-paging .page-link {
       color: var(--ink) !important; background: transparent; border-color: var(--line);
     }
+    /* ---- Table readability (backlog F23) --------------------------------------
+       Reported: the horizontal scrollbar is only at the bottom, the header is not
+       sticky, the columns are too wide and the text too big. So: a STICKY header
+       inside the scroll body, tighter cells, smaller type, and a scrollbar that is
+       thick enough to grab without hunting for it.
+       These target DataTables' own scroll wrapper, which is what `scrollX`/`scrollY`
+       create -- styling `table.dataTable` alone cannot make a header stick,
+       because the header lives in a SEPARATE table element above the body. */
+    /* !important throughout: DataTables ships its own stylesheet as an htmlwidget
+       DEPENDENCY, injected when a table first renders -- i.e. AFTER these head
+       styles -- and it sets both the header font size and position:relative on the
+       scroll head. Source order cannot win, exactly as with the date picker.
+       Measured before/after: header font 14px -> 11.5px, scroll head
+       position relative -> sticky. */
+    table.dataTable th, table.dataTable td { padding: 4px 8px !important;
+                  font-size: 12px !important; line-height: 1.35 !important; }
+    table.dataTable thead th { font-weight: 600 !important; font-size: 11.5px !important;
+                  letter-spacing: .01em; white-space: nowrap; }
+    /* Sticky header: DataTables splits head and body into two tables when
+       scrollY is set, so pinning the head wrapper keeps it above the body. When
+       scrollY is NOT set (plain scrollX), the thead rule below pins the real one. */
+    .dataTables_scrollHead, .dt-scroll-head {
+                  position: sticky !important; top: 0; z-index: 3;
+                  background: var(--panel); }
+    .dataTables_wrapper table.dataTable:not(.no-sticky) thead th {
+                  position: sticky; top: 0; z-index: 2; background: var(--panel); }
+    /* Reachable horizontal scrollbar: make it chunky and always visible rather
+       than a hairline at the very bottom of a long table. */
+    .dataTables_scrollBody, .dt-scroll-body, .ea-dt-scroll {
+                  scrollbar-width: auto; }
+    .dataTables_scrollBody::-webkit-scrollbar,
+    .dt-scroll-body::-webkit-scrollbar { height: 12px; width: 12px; }
+    .dataTables_scrollBody::-webkit-scrollbar-thumb,
+    .dt-scroll-body::-webkit-scrollbar-thumb {
+                  background: var(--bark); border-radius: 6px; }
+    .dataTables_scrollBody::-webkit-scrollbar-track,
+    .dt-scroll-body::-webkit-scrollbar-track { background: var(--sunk); }
+    /* Stop a long text cell from stretching a column across the screen. */
+    table.dataTable td { max-width: 260px; overflow: hidden; text-overflow: ellipsis;
+                  white-space: nowrap; }
+    table.dataTable.ea-dt { width: 100% !important; }
     .accordion {
       --bs-accordion-bg: var(--panel);
       --bs-accordion-color: var(--ink);
