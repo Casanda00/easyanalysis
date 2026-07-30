@@ -302,6 +302,30 @@ page_fillable(
                   border-color: var(--line); }
     .btn-light:hover, .btn-light:active, .btn-outline-light:hover,
     .btn-outline-light:active { background-color: var(--tint); color: var(--ink); }
+    /* DATE PICKER (dateInput -- Download spatial data uses two). bslib compiled
+       bootstrap-datepicker.css from the DEFAULT (dark) palette too, so ALL 32 of
+       its state backgrounds are dark greens: on a light theme the hovered day,
+       the selected day and the range fill read as black blobs.
+       !important is needed here and not elsewhere: that stylesheet is injected as
+       a Shiny DEPENDENCY the first time a dateInput renders, which is AFTER these
+       head styles, so source order cannot win. */
+    .datepicker { background: var(--panel); color: var(--ink);
+                  border: 1px solid var(--line); }
+    .datepicker table tr td, .datepicker table tr th { color: var(--ink); }
+    .datepicker table tr td.old, .datepicker table tr td.new { color: var(--bark) !important; }
+    .datepicker table tr td.day:hover, .datepicker table tr td.focused,
+    .datepicker table tr td span:hover, .datepicker table tr td span.focused,
+    .datepicker .datepicker-switch:hover, .datepicker .prev:hover,
+    .datepicker .next:hover, .datepicker tfoot tr th:hover {
+                  background: var(--tint) !important; color: var(--ink) !important; }
+    .datepicker table tr td.highlighted, .datepicker table tr td.today,
+    .datepicker table tr td.range, .datepicker table tr td.range.highlighted,
+    .datepicker table tr td.range:hover {
+                  background: var(--sunk) !important; color: var(--ink) !important; }
+    .datepicker table tr td.selected, .datepicker table tr td.selected:hover,
+    .datepicker table tr td.active, .datepicker table tr td.active:hover,
+    .datepicker table tr td span.active, .datepicker table tr td span.active:hover {
+                  background: var(--forest) !important; color: var(--onbrand) !important; }
     /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
     .form-control, .form-select, textarea.form-control,
     .selectize-input, .selectize-dropdown {

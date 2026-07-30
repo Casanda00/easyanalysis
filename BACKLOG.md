@@ -362,12 +362,29 @@ the app (5 in the workspace, including Share this project and Collaborate) found
 hardcoded dark hex and no dark Bootstrap colour class anywhere, so the footer really was their
 only dark surface.
 
-### A4. Datepicker still carries dark literals (found while sweeping A1/A2)
-The compiled bootstrap has ~20 `.datepicker ...` rules with literal dark backgrounds
-(day hover, today, highlighted, range, and their focus/active variants). These are reachable:
-`mod_rs_search.R` ("Download spatial data") uses `dateInput`. Not yet confirmed visually
-against a light theme, and not yet fixed — the fix is a small block restating the visible
-states with tokens.
+### A4. Datepicker carried dark literals — FIXED 2026-07-30
+Found while sweeping A1/A2. **32** `.datepicker ...` rules have literal dark backgrounds — day
+hover, today, highlighted, range, selected, the header arrows, and every focus/active/disabled
+variant. bslib compiled `bootstrap-datepicker.css` from the default (dark) palette as well, so
+on a light theme the hovered day, the selected day and the range fill all read as dark blobs.
+Reachable: `mod_rs_search.R` ("Download spatial data") uses two `dateInput`s.
+
+**Why `!important` here and nowhere else in the sweep:** that stylesheet is injected as a Shiny
+*dependency* the first time a `dateInput` renders, which is AFTER the head styles — source order
+cannot win. Confirmed it is safe to rely on: none of the four datepicker CSS assets shipped with
+shiny contains `!important` at all, so an important declaration wins by spec rather than by
+luck with load order.
+
+Verified with the datepicker stylesheet actually loaded, light theme, by measuring a synthetic
+calendar (the cascade applies by selector, so this is the real answer):
+
+| state | before | after |
+|---|---|---|
+| container | — | `rgb(255,255,255)` |
+| today / highlighted | `rgb(37,58,39)` | `rgb(238,241,234)` |
+| range fill | `rgb(30,34,31)` | `rgb(238,241,234)` |
+| selected | dark green | `rgb(46,125,50)` + white text |
+| plain day | — | transparent, dark text |
 
 ### A3. Card and text colour in light mode
 > "dont like the card color and the color of the text in light mode."
