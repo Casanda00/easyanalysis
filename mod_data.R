@@ -13,110 +13,77 @@
 
 # Right-panel tools for the Data view (the processing toolbox accordion).
 # Uploading lives in the global left rail now, so there is no "Import Data" panel.
+# Every ETL command is its own pickable view (backlog B6: "each command should
+# now be separate but of course be synced"). They were nine accordion panels in a
+# narrow column, and several panels bundled more than one command -- Column
+# Management held keep/drop/rename/mutate, Level Management held rename/merge/
+# delete. Now one command per entry, in the same select-and-split idiom as the
+# model screens: pick one and it fills the canvas, pick several and they split.
+# Synced comes for free -- every branch writes the same rv$working_data.
+.DATA_VIEWS <- c(
+  overview      = "Dataset overview",
+  distributions = "Column distributions",
+  relationships = "Plot relationships",
+  keep_cols     = "Keep columns",
+  drop_cols     = "Drop columns",
+  rename_col    = "Rename column",
+  mutate        = "New column (mutate)",
+  filter        = "Filter rows",
+  convert       = "Convert types",
+  rename_lvl    = "Rename levels",
+  merge_lvl     = "Merge levels",
+  delete_lvl    = "Delete levels",
+  aggregate     = "Aggregate",
+  bin           = "Bin numeric",
+  impute        = "Impute missing",
+  join          = "Join datasets",
+  batch         = "Batch apply"
+)
+.DATA_VIEWS_PLOT <- c("distributions", "relationships")
+
 dataToolsUI <- function(id) {
   ns <- NS(id)
   tagList(
-  accordion(
-          id = ns("etl_accordion"),
-          open = FALSE,
-
-          accordion_panel("Column Management",
-            markdown("**Keep/Drop Columns**"),
-            pickerInput(ns("eng_subset_cols"), "Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-            actionButton(ns("apply_subset"), "Apply Subset", class = "btn-primary btn-sm", width = "100%"),
-            hr(),
-            pickerInput(ns("eng_drop_cols"), "Columns to Drop:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-            actionButton(ns("apply_drop"), "Drop Selected", class = "btn-danger btn-sm", width = "100%"),
-            hr(),
-            markdown("**Rename Column**"),
-            selectInput(ns("rename_col_target"), "Select Column:", choices = NULL),
-            textInput(ns("rename_col_new_name"), "New Name:", placeholder = "Enter new name"),
-            actionButton(ns("apply_col_rename"), "Rename Column", class = "btn-primary btn-sm", width = "100%"),
-            hr(),
-            markdown("**Mutate (Add Numeric Col)**"),
-            selectInput(ns("mutate_col1"), "Numeric Col 1:", choices = NULL),
-            selectInput(ns("mutate_op"), "Operation:", choices = c("+", "-", "*", "/")),
-            selectInput(ns("mutate_col2"), "Numeric Col 2:", choices = NULL),
-            textInput(ns("mutate_new_name"), "New Column Name:", placeholder = "e.g., area_calc"),
-            actionButton(ns("apply_mutate"), "Create Column", class = "btn-primary btn-sm", width = "100%"),
-            hr(),
-            actionButton(ns("reset_data"), "Reset to Raw Data", class = "btn-warning btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Row Filtering",
-            selectInput(ns("filter_col"), "Select Column to Filter:", choices = NULL),
-            uiOutput(ns("filter_condition_ui")),
-            actionButton(ns("apply_filter"), "Apply Filter", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Type Conversion",
-            pickerInput(ns("convert_to_num"), "Convert to Numeric:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-            pickerInput(ns("convert_to_cat"), "Convert to Categorical:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-            actionButton(ns("apply_conversion"), "Apply Conversions", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Level Management",
-            markdown("**Rename Levels**"),
-            selectInput(ns("rename_col"), "Categorical Column:", choices = NULL),
-            uiOutput(ns("dynamic_rename_ui")),
-            actionButton(ns("apply_rename"), "Apply Renames", class = "btn-primary btn-sm", width = "100%"),
-            hr(),
-            markdown("**Merge Levels**"),
-            selectInput(ns("agg_col"), "Categorical Column:", choices = NULL),
-            selectInput(ns("agg_levels"), "Levels to Merge:", choices = NULL, multiple = TRUE),
-            textInput(ns("agg_new_name"), "New Combined Name:", placeholder = "e.g., Wetland"),
-            actionButton(ns("apply_merge"), "Merge Levels", class = "btn-primary btn-sm", width = "100%"),
-            hr(),
-            markdown("**Delete Levels**"),
-            selectInput(ns("delete_lvl_col"), "Categorical Column:", choices = NULL),
-            selectInput(ns("delete_levels"), "Levels to Delete:", choices = NULL, multiple = TRUE),
-            actionButton(ns("apply_delete_lvl"), "Delete Levels", class = "btn-danger btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Aggregation",
-            selectInput(ns("group_id"), "Aggregate by:", choices = NULL),
-            selectInput(ns("agg_method"), "Aggregation Method:", choices = c("Average" = "mean", "Sum" = "sum", "Median" = "median", "Min" = "min", "Max" = "max")),
-            pickerInput(ns("group_nums"), "Numeric Columns to Aggregate:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-            pickerInput(ns("group_cats"), "Categorical Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE, `selected-text-format` = "count > 2", `count-selected-text` = "{0} columns selected")),
-            actionButton(ns("apply_group"), "Aggregate Data", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Bin/Cut Numeric",
-            selectInput(ns("bin_col"), "Numeric Column to Bin:", choices = NULL),
-            textInput(ns("bin_breaks"), "Breaks (e.g. -Inf,30,50,Inf):", placeholder = "-Inf, 30, 50, Inf"),
-            textInput(ns("bin_labels"), "Labels (comma-separated):", placeholder = "Winter, Dry Summer, Summer"),
-            textInput(ns("bin_new_name"), "New Column Name:", placeholder = "Trafficability_Class"),
-            actionButton(ns("apply_bin"), "Create Bins", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Conditional Imputation",
-            markdown("*Fill missing values (NA) in the Primary column using values from the Secondary column.*"),
-            selectInput(ns("coalesce_primary"), "Primary Column (Target):", choices = NULL),
-            selectInput(ns("coalesce_secondary"), "Secondary Column (Source):", choices = NULL),
-            actionButton(ns("apply_coalesce"), "Impute Missing Values", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Merge/Join Datasets",
-            selectInput(ns("join_target"), "Dataset to Join With:", choices = NULL),
-            selectInput(ns("join_type"), "Join Type:", choices = c("Left Join" = "left", "Inner Join" = "inner", "Full Join" = "full", "Right Join" = "right")),
-            selectInput(ns("join_by"), "Common ID Column:", choices = NULL),
-            actionButton(ns("apply_join"), "Merge Datasets", class = "btn-primary btn-sm", width = "100%")
-          ),
-
-          accordion_panel("Batch Apply Pipeline",
-            markdown("*Instantly apply active settings to other datasets.*"),
-            selectInput(ns("batch_targets"), "Select Datasets to Update:", choices = NULL, multiple = TRUE),
-            actionButton(ns("apply_batch"), "Batch Apply Settings", class = "btn-danger btn-sm", width = "100%")
-          )
-  )  # end accordion
-  )  # end tagList
+    div(class = "ea-hint",
+        "Every command lives in the ", tags$b("Show"), " picker above the canvas. ",
+        "Pick one to fill the area, or several to work side by side - they all act ",
+        "on the selected dataset."),
+    hr(class = "my-2"),
+    actionButton(ns("reset_data"), "Reset to Raw Data",
+                 class = "btn-warning btn-sm w-100")
+  )
 }
 
-# Center-canvas content for the Data view (Dataset Overview / Exploratory Plots).
 dataCanvasUI <- function(id) {
   ns <- NS(id)
-  navset_card_tab(
-        nav_panel("Dataset Overview",
+  card(
+    card_header(ea_view_header(ns, .DATA_VIEWS)),
+    div(class = "lm-viewport", uiOutput(ns("view_body")))
+  )
+}
+
+dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset) {
+  moduleServer(id, function(input, output, session) {
+
+    # ---- Select-and-split canvas (B6) --------------------------------------
+    # Input ids are UNCHANGED from the old accordion, so every observer further
+    # down still drives exactly the same controls.
+    output$view_tools <- renderUI({
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(.DATA_VIEWS)[1]
+      if (any(picked %in% .DATA_VIEWS_PLOT)) ea_plot_appearance()
+    })
+
+    .cmd <- function(title, ..., help = NULL) div(class = "p-3",
+      tags$h6(class = "text-uppercase text-muted small mb-2", title),
+      if (!is.null(help)) tags$p(class = "text-muted small", help),
+      ...)
+
+    output$view_body <- renderUI({
+      ns <- session$ns
+      ea_view_panes(input$view_pick, .DATA_VIEWS, function(k, solo) switch(k,
+
+        overview = tagList(
           uiOutput(ns("overview_stats")),
           card(
             card_header(class = "bg-light", "Dataset Structure"),
@@ -129,46 +96,110 @@ dataCanvasUI <- function(id) {
                   actionButton(ns("do_download"), "Download", icon = icon("download"),
                                class = "btn-sm btn-outline-success")))),
             div(style = "padding: 5px;", uiOutput(ns("eng_str")))
-          )
-        ),
-        nav_panel("Column Distributions",
-          card(
-            card_header(class = "d-flex justify-content-between align-items-center bg-light",
-              "Active Column Distributions",
-      ea_plot_appearance()),
-            div(style = "padding: 5px;",
-              selectInput(ns("eng_view_col"), "View Frequency/Summary of:", choices = NULL),
-              layout_columns(col_widths = c(6, 6),
-                plotOutput(ns("eng_plot"), height = "350px"),
-                div(style = "overflow-y: auto; height: 350px;", verbatimTextOutput(ns("eng_table")))
-              )
-            )
-          )
-        ),
-        nav_panel("Plot Relationships",
-          tags$p(class = "text-muted small mb-2",
+          )),
+
+        distributions = div(style = "padding: 5px;",
+          selectInput(ns("eng_view_col"), "View Frequency/Summary of:", choices = NULL),
+          layout_columns(col_widths = c(6, 6),
+            plotOutput(ns("eng_plot"), height = if (solo) "350px" else "100%"),
+            div(style = "overflow-y: auto; height: 350px;",
+                verbatimTextOutput(ns("eng_table"))))),
+
+        relationships = tagList(
+          tags$p(class = "text-muted small mb-2 px-2",
             "See how two variables relate: pick a ", tags$b("Y"), " and an ", tags$b("X"),
             " to plot them against each other, and optionally a ", tags$b("Group"),
             " to colour points by a category. Grid view shows every pairing at once."),
-          # Column pickers live WITH the plot so you can change variables right here.
-          div(class = "d-flex flex-wrap align-items-end gap-2 mb-2",
+          div(class = "d-flex flex-wrap align-items-end gap-2 mb-2 px-2",
             div(style = "min-width: 150px;", selectInput(ns("eda_num1"), "Y (numeric)", choices = NULL, width = "100%")),
             div(style = "min-width: 150px;", selectInput(ns("eda_num2"), "X (numeric)", choices = NULL, width = "100%")),
             div(style = "min-width: 150px;", selectInput(ns("eda_category"), "Group (colour)", choices = NULL, width = "100%")),
             div(class = "ms-auto d-flex align-items-end gap-2",
               radioGroupButtons(ns("eda_view_mode"), label = NULL, choices = c("Grid View", "Single Plot"), selected = "Grid View", size = "sm", status = "primary"),
-              uiOutput(ns("eda_single_selector"))
-            )
-          ),
-          div(class = "ea-eda-frame",
-              style = "overflow-x: hidden; overflow-y: auto; height: 600px;",
-              uiOutput(ns("dynamic_eda_plot_ui")))
-        )
-      )
-}
+              uiOutput(ns("eda_single_selector")))),
+          div(class = "ea-eda-frame", style = "overflow-x: hidden; overflow-y: auto;",
+              uiOutput(ns("dynamic_eda_plot_ui")))),
 
-dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset) {
-  moduleServer(id, function(input, output, session) {
+        keep_cols = .cmd("Keep columns",
+          pickerInput(ns("eng_subset_cols"), "Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+          actionButton(ns("apply_subset"), "Apply Subset", class = "btn-primary btn-sm")),
+
+        drop_cols = .cmd("Drop columns",
+          pickerInput(ns("eng_drop_cols"), "Columns to Drop:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+          actionButton(ns("apply_drop"), "Drop Selected", class = "btn-danger btn-sm")),
+
+        rename_col = .cmd("Rename column",
+          selectInput(ns("rename_col_target"), "Select Column:", choices = NULL),
+          textInput(ns("rename_col_new_name"), "New Name:", placeholder = "Enter new name"),
+          actionButton(ns("apply_col_rename"), "Rename Column", class = "btn-primary btn-sm")),
+
+        mutate = .cmd("New column from two numeric columns",
+          selectInput(ns("mutate_col1"), "Numeric Col 1:", choices = NULL),
+          selectInput(ns("mutate_op"), "Operation:", choices = c("+", "-", "*", "/")),
+          selectInput(ns("mutate_col2"), "Numeric Col 2:", choices = NULL),
+          textInput(ns("mutate_new_name"), "New Column Name:", placeholder = "e.g., area_calc"),
+          actionButton(ns("apply_mutate"), "Create Column", class = "btn-primary btn-sm")),
+
+        filter = .cmd("Filter rows",
+          selectInput(ns("filter_col"), "Select Column to Filter:", choices = NULL),
+          uiOutput(ns("filter_condition_ui")),
+          actionButton(ns("apply_filter"), "Apply Filter", class = "btn-primary btn-sm")),
+
+        convert = .cmd("Convert column types",
+          pickerInput(ns("convert_to_num"), "Convert to Numeric:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+          pickerInput(ns("convert_to_cat"), "Convert to Categorical:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+          actionButton(ns("apply_conversion"), "Apply Conversions", class = "btn-primary btn-sm")),
+
+        rename_lvl = .cmd("Rename levels",
+          selectInput(ns("rename_col"), "Categorical Column:", choices = NULL),
+          uiOutput(ns("dynamic_rename_ui")),
+          actionButton(ns("apply_rename"), "Apply Renames", class = "btn-primary btn-sm")),
+
+        merge_lvl = .cmd("Merge levels",
+          selectInput(ns("agg_col"), "Categorical Column:", choices = NULL),
+          selectInput(ns("agg_levels"), "Levels to Merge:", choices = NULL, multiple = TRUE),
+          textInput(ns("agg_new_name"), "New Combined Name:", placeholder = "e.g., Wetland"),
+          actionButton(ns("apply_merge"), "Merge Levels", class = "btn-primary btn-sm")),
+
+        delete_lvl = .cmd("Delete levels",
+          selectInput(ns("delete_lvl_col"), "Categorical Column:", choices = NULL),
+          selectInput(ns("delete_levels"), "Levels to Delete:", choices = NULL, multiple = TRUE),
+          actionButton(ns("apply_delete_lvl"), "Delete Levels", class = "btn-danger btn-sm")),
+
+        aggregate = .cmd("Aggregate",
+          selectInput(ns("group_id"), "Aggregate by:", choices = NULL),
+          selectInput(ns("agg_method"), "Aggregation Method:", choices = c("Average" = "mean", "Sum" = "sum", "Median" = "median", "Min" = "min", "Max" = "max")),
+          pickerInput(ns("group_nums"), "Numeric Columns to Aggregate:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+          pickerInput(ns("group_cats"), "Categorical Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE, `selected-text-format` = "count > 2", `count-selected-text` = "{0} columns selected")),
+          actionButton(ns("apply_group"), "Aggregate Data", class = "btn-primary btn-sm")),
+
+        bin = .cmd("Bin a numeric column",
+          selectInput(ns("bin_col"), "Numeric Column to Bin:", choices = NULL),
+          textInput(ns("bin_breaks"), "Breaks (e.g. -Inf,30,50,Inf):", placeholder = "-Inf, 30, 50, Inf"),
+          textInput(ns("bin_labels"), "Labels (comma-separated):", placeholder = "Winter, Dry Summer, Summer"),
+          textInput(ns("bin_new_name"), "New Column Name:", placeholder = "Trafficability_Class"),
+          actionButton(ns("apply_bin"), "Create Bins", class = "btn-primary btn-sm")),
+
+        impute = .cmd("Impute missing values",
+          help = "Fill missing values (NA) in the Primary column using values from the Secondary column.",
+          selectInput(ns("coalesce_primary"), "Primary Column (Target):", choices = NULL),
+          selectInput(ns("coalesce_secondary"), "Secondary Column (Source):", choices = NULL),
+          actionButton(ns("apply_coalesce"), "Impute Missing Values", class = "btn-primary btn-sm")),
+
+        join = .cmd("Join with another dataset",
+          selectInput(ns("join_target"), "Dataset to Join With:", choices = NULL),
+          selectInput(ns("join_type"), "Join Type:", choices = c("Left Join" = "left", "Inner Join" = "inner", "Full Join" = "full", "Right Join" = "right")),
+          selectInput(ns("join_by"), "Common ID Column:", choices = NULL),
+          actionButton(ns("apply_join"), "Merge Datasets", class = "btn-primary btn-sm")),
+
+        batch = .cmd("Batch apply",
+          help = "Instantly apply active settings to other datasets.",
+          selectInput(ns("batch_targets"), "Select Datasets to Update:", choices = NULL, multiple = TRUE),
+          actionButton(ns("apply_batch"), "Batch Apply Settings", class = "btn-danger btn-sm")),
+
+        NULL))
+    })
+
     ns <- session$ns
     rv <- reactiveValues(working_data = NULL, current_rename_levels = NULL)
     prev_state <- reactiveVal(NULL)  # one-step undo snapshot
@@ -231,7 +262,20 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
     # The screen therefore opened with every picker empty, which is also why the
     # Column Distributions and Plot Relationships tabs showed nothing: they have
     # no columns to plot until these run.
-    pop_arm <- reactive({ list(active_dataset(), rv$working_data) })
+    # Picking a view creates that command's controls for the FIRST time, so the
+    # population observers have to run again afterwards or the pickers arrive
+    # empty -- gotcha 18, now triggered by the view picker instead of the tool
+    # menu. Bumping on input$view_pick directly is too early: the update message
+    # would be sent in the same flush that inserts the UI, and Shiny drops an
+    # update aimed at an element that does not exist yet. onFlushed fires once
+    # that flush is out, so the update follows the insert.
+    view_rendered <- reactiveVal(0)
+    observeEvent(input$view_pick, {
+      session$onFlushed(function() view_rendered(isolate(view_rendered()) + 1),
+                        once = TRUE)
+    }, ignoreNULL = FALSE)
+
+    pop_arm <- reactive({ list(active_dataset(), rv$working_data, view_rendered()) })
 
     observeEvent(pop_arm(), {
       req(rv$working_data)

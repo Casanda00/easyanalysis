@@ -13,12 +13,30 @@
 
 files <- list.files(".", pattern = "^mod_")
 
-# does this expression contain a call to plotOutput()/rglwidgetOutput()?
+# Does this expression render a plot?
+#
+# Directly, via plotOutput()/rglwidgetOutput() -- or indirectly, via a uiOutput
+# whose id says it is a plot container. The indirect case is real, not a
+# loophole: Data & Exploration's "Plot relationships" and ANOVA's diagnostics
+# both build their plots server-side and hand back a uiOutput, so a rule that
+# only looked for plotOutput would call those views text and hide the appearance
+# control on a screen full of plots. The evidence is still in the code (the
+# output id), not guessed from the view's name -- which is the thing that made
+# the old ea_is_plot_view() wrong.
 has_plot <- function(e) {
   if (is.call(e)) {
     fn <- e[[1]]
-    if (is.name(fn) && as.character(fn) %in% c("plotOutput", "rglwidgetOutput"))
-      return(TRUE)
+    if (is.name(fn)) {
+      f <- as.character(fn)
+      if (f %in% c("plotOutput", "rglwidgetOutput")) return(TRUE)
+      if (identical(f, "uiOutput")) {
+        # The id is usually wrapped: uiOutput(ns("dynamic_eda_plot_ui")), so the
+        # string is inside a call and cannot be read by evaluating the argument.
+        # Deparse and look at the text.
+        txt <- paste(deparse(e), collapse = " ")
+        if (grepl("plot", txt, ignore.case = TRUE)) return(TRUE)
+      }
+    }
     return(any(vapply(as.list(e), has_plot, logical(1))))
   }
   FALSE

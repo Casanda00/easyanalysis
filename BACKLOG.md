@@ -456,7 +456,43 @@ summary, Plot Relationships renders the grid.
 page scrolls sideways (`.app-topbar` / `.topbar-right` extend to 1519px). Unrelated to
 the pane CSS.
 
-### B6. Separate the commands, but keep them synced
+### B6. Separate the commands, but keep them synced — DONE 2026-07-30
+**Decided: select-and-split, like the model screens.**
+
+The ETL toolbox was nine accordion panels crammed into the narrow tools column, and several
+panels bundled *more than one* command — Column Management held keep / drop / rename / mutate,
+Level Management held rename / merge / delete levels. So "each command separate" meant
+unbundling too: **14 commands**, plus the 3 exploration views, as **17 pickable entries**.
+
+Pick one and it fills the canvas; pick several and they split with draggable dividers. "Synced"
+needs no work — every branch reads and writes the same `rv$working_data`, so two commands open
+side by side act on the same dataset.
+
+**Input ids are unchanged**, so all ~15 existing observers drive exactly the same controls. The
+tools column now holds the hint and Reset to Raw Data.
+
+**The trap this created, and the fix.** Each command's controls are built the first time its
+view is picked, so the population observers had to run *again* afterwards or the pickers would
+arrive empty — gotcha 18, now fired by the view picker instead of the tool menu. Bumping on
+`input$view_pick` directly is too early: the update would be sent in the same flush that inserts
+the UI, and Shiny drops an update aimed at an element that does not exist yet. `session$onFlushed`
+fires once that flush is out, so the update follows the insert.
+
+That part is **not testable under `testServer`** (`onFlushed` behaves like `debounce`, gotcha 15),
+so it was verified in the browser instead.
+
+Verified: 17 entries in the picker; all 17 views render; a two-command split gives 2 panes and a
+divider; the appearance control appears on the 2 plot views and not on commands or Overview.
+Picking a command populates its controls — checked 9 of them, with the right types
+(`site` for the categorical commands, `dbh_cm` for the numeric ones). End to end, Drop columns
+on `age_yr` took the dataset from `180 x 4` to `180 x 3`, and Undo put it back.
+
+Also extended `check_plot_views.R`: a view whose plots come from a server-built
+`uiOutput(... "plot" ...)` now counts as plot-bearing. Without that it called
+"Plot relationships" a text view — the evidence is still read from the code, not guessed from
+the view's name.
+
+### B6-original. Separate the commands, but keep them synced
 > "separate the columns in data and exploration each command should now be separate but
 > for course be synced."
 
