@@ -20,34 +20,119 @@
 # delete. Now one command per entry, in the same select-and-split idiom as the
 # model screens: pick one and it fills the canvas, pick several and they split.
 # Synced comes for free -- every branch writes the same rv$working_data.
+# The CANVAS shows the dataset: overview and the two exploratory plot views,
+# picked with the select-and-split header (one fills, several split).
 .DATA_VIEWS <- c(
   overview      = "Dataset overview",
   distributions = "Column distributions",
-  relationships = "Plot relationships",
-  keep_cols     = "Keep columns",
-  drop_cols     = "Drop columns",
-  rename_col    = "Rename column",
-  mutate        = "New column (mutate)",
-  filter        = "Filter rows",
-  convert       = "Convert types",
-  rename_lvl    = "Rename levels",
-  merge_lvl     = "Merge levels",
-  delete_lvl    = "Delete levels",
-  aggregate     = "Aggregate",
-  bin           = "Bin numeric",
-  impute        = "Impute missing",
-  join          = "Join datasets",
-  batch         = "Batch apply"
+  relationships = "Plot relationships"
 )
 .DATA_VIEWS_PLOT <- c("distributions", "relationships")
+
+# The SIDEBAR shows ONE ETL command at a time -- the one you searched for or
+# picked from "Prepare data" in the menu. That is the flow the app is built
+# around: find the tool, click it, its controls appear in the tools sidebar.
+#
+# One command per entry (backlog B6). They used to be nine accordion panels and
+# several bundled more than one command: Column Management held keep / drop /
+# rename / mutate, Level Management held rename / merge / delete levels. Fourteen
+# now, each separately searchable. "Synced" is free -- every builder below makes
+# controls whose observers all read and write the same rv$working_data.
+#
+# Each entry is label + a builder taking ns. Keeping them as DATA means the
+# menubar, the search index and the sidebar all read one list and cannot drift.
+.cmd_box <- function(title, ..., help = NULL) tagList(
+  tags$h6(class = "text-uppercase text-muted small mb-2", title),
+  if (!is.null(help)) tags$p(class = "text-muted small", help),
+  ...
+)
+
+.DATA_CMDS <- list(
+  keep_cols = list(label = "Keep columns", ui = function(ns) .cmd_box("Keep columns",
+    pickerInput(ns("eng_subset_cols"), "Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    actionButton(ns("apply_subset"), "Apply Subset", class = "btn-primary btn-sm w-100"))),
+
+  drop_cols = list(label = "Drop columns", ui = function(ns) .cmd_box("Drop columns",
+    pickerInput(ns("eng_drop_cols"), "Columns to Drop:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    actionButton(ns("apply_drop"), "Drop Selected", class = "btn-danger btn-sm w-100"))),
+
+  rename_col = list(label = "Rename column", ui = function(ns) .cmd_box("Rename column",
+    selectInput(ns("rename_col_target"), "Select Column:", choices = NULL),
+    textInput(ns("rename_col_new_name"), "New Name:", placeholder = "Enter new name"),
+    actionButton(ns("apply_col_rename"), "Rename Column", class = "btn-primary btn-sm w-100"))),
+
+  mutate = list(label = "New column (mutate)", ui = function(ns) .cmd_box("New column from two numeric columns",
+    selectInput(ns("mutate_col1"), "Numeric Col 1:", choices = NULL),
+    selectInput(ns("mutate_op"), "Operation:", choices = c("+", "-", "*", "/")),
+    selectInput(ns("mutate_col2"), "Numeric Col 2:", choices = NULL),
+    textInput(ns("mutate_new_name"), "New Column Name:", placeholder = "e.g., area_calc"),
+    actionButton(ns("apply_mutate"), "Create Column", class = "btn-primary btn-sm w-100"))),
+
+  filter = list(label = "Filter rows", ui = function(ns) .cmd_box("Filter rows",
+    selectInput(ns("filter_col"), "Select Column to Filter:", choices = NULL),
+    uiOutput(ns("filter_condition_ui")),
+    actionButton(ns("apply_filter"), "Apply Filter", class = "btn-primary btn-sm w-100"))),
+
+  convert = list(label = "Convert types", ui = function(ns) .cmd_box("Convert column types",
+    pickerInput(ns("convert_to_num"), "Convert to Numeric:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    pickerInput(ns("convert_to_cat"), "Convert to Categorical:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    actionButton(ns("apply_conversion"), "Apply Conversions", class = "btn-primary btn-sm w-100"))),
+
+  rename_lvl = list(label = "Rename levels", ui = function(ns) .cmd_box("Rename levels",
+    selectInput(ns("rename_col"), "Categorical Column:", choices = NULL),
+    uiOutput(ns("dynamic_rename_ui")),
+    actionButton(ns("apply_rename"), "Apply Renames", class = "btn-primary btn-sm w-100"))),
+
+  merge_lvl = list(label = "Merge levels", ui = function(ns) .cmd_box("Merge levels",
+    selectInput(ns("agg_col"), "Categorical Column:", choices = NULL),
+    selectInput(ns("agg_levels"), "Levels to Merge:", choices = NULL, multiple = TRUE),
+    textInput(ns("agg_new_name"), "New Combined Name:", placeholder = "e.g., Wetland"),
+    actionButton(ns("apply_merge"), "Merge Levels", class = "btn-primary btn-sm w-100"))),
+
+  delete_lvl = list(label = "Delete levels", ui = function(ns) .cmd_box("Delete levels",
+    selectInput(ns("delete_lvl_col"), "Categorical Column:", choices = NULL),
+    selectInput(ns("delete_levels"), "Levels to Delete:", choices = NULL, multiple = TRUE),
+    actionButton(ns("apply_delete_lvl"), "Delete Levels", class = "btn-danger btn-sm w-100"))),
+
+  aggregate = list(label = "Aggregate", ui = function(ns) .cmd_box("Aggregate",
+    selectInput(ns("group_id"), "Aggregate by:", choices = NULL),
+    selectInput(ns("agg_method"), "Aggregation Method:", choices = c("Average" = "mean", "Sum" = "sum", "Median" = "median", "Min" = "min", "Max" = "max")),
+    pickerInput(ns("group_nums"), "Numeric Columns to Aggregate:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    pickerInput(ns("group_cats"), "Categorical Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE, `selected-text-format` = "count > 2", `count-selected-text` = "{0} columns selected")),
+    actionButton(ns("apply_group"), "Aggregate Data", class = "btn-primary btn-sm w-100"))),
+
+  bin = list(label = "Bin numeric", ui = function(ns) .cmd_box("Bin a numeric column",
+    selectInput(ns("bin_col"), "Numeric Column to Bin:", choices = NULL),
+    textInput(ns("bin_breaks"), "Breaks (e.g. -Inf,30,50,Inf):", placeholder = "-Inf, 30, 50, Inf"),
+    textInput(ns("bin_labels"), "Labels (comma-separated):", placeholder = "Winter, Dry Summer, Summer"),
+    textInput(ns("bin_new_name"), "New Column Name:", placeholder = "Trafficability_Class"),
+    actionButton(ns("apply_bin"), "Create Bins", class = "btn-primary btn-sm w-100"))),
+
+  impute = list(label = "Impute missing", ui = function(ns) .cmd_box("Impute missing values",
+    help = "Fill missing values (NA) in the Primary column using values from the Secondary column.",
+    selectInput(ns("coalesce_primary"), "Primary Column (Target):", choices = NULL),
+    selectInput(ns("coalesce_secondary"), "Secondary Column (Source):", choices = NULL),
+    actionButton(ns("apply_coalesce"), "Impute Missing Values", class = "btn-primary btn-sm w-100"))),
+
+  join = list(label = "Join datasets", ui = function(ns) .cmd_box("Join with another dataset",
+    selectInput(ns("join_target"), "Dataset to Join With:", choices = NULL),
+    selectInput(ns("join_type"), "Join Type:", choices = c("Left Join" = "left", "Inner Join" = "inner", "Full Join" = "full", "Right Join" = "right")),
+    selectInput(ns("join_by"), "Common ID Column:", choices = NULL),
+    actionButton(ns("apply_join"), "Merge Datasets", class = "btn-primary btn-sm w-100"))),
+
+  batch = list(label = "Batch apply", ui = function(ns) .cmd_box("Batch apply",
+    help = "Instantly apply active settings to other datasets.",
+    selectInput(ns("batch_targets"), "Select Datasets to Update:", choices = NULL, multiple = TRUE),
+    actionButton(ns("apply_batch"), "Batch Apply Settings", class = "btn-danger btn-sm w-100")))
+)
+
+# Label lookup for the menubar / search index, so it reads the same list.
+.DATA_CMD_LABELS <- vapply(.DATA_CMDS, function(x) x$label, character(1))
 
 dataToolsUI <- function(id) {
   ns <- NS(id)
   tagList(
-    div(class = "ea-hint",
-        "Every command lives in the ", tags$b("Show"), " picker above the canvas. ",
-        "Pick one to fill the area, or several to work side by side - they all act ",
-        "on the selected dataset."),
+    uiOutput(ns("cmd_panel")),
     hr(class = "my-2"),
     actionButton(ns("reset_data"), "Reset to Raw Data",
                  class = "btn-warning btn-sm w-100")
@@ -74,21 +159,6 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       if (!length(picked)) picked <- names(.DATA_VIEWS)[1]
       if (any(picked %in% .DATA_VIEWS_PLOT)) ea_plot_appearance()
     })
-
-    # A "Prepare data" entry in the menubar opens this screen and names the command
-    # it wants. The workspace cannot move this picker itself -- it would have to
-    # address another module's namespace -- so it sets a top-level input and
-    # server.R passes it in here.
-    observeEvent(view_request(), {
-      k <- view_request()
-      req(isTruthy(k), k %in% names(.DATA_VIEWS))
-      updateSelectizeInput(session, "view_pick", selected = k)
-    }, ignoreInit = TRUE)
-
-    .cmd <- function(title, ..., help = NULL) div(class = "p-3",
-      tags$h6(class = "text-uppercase text-muted small mb-2", title),
-      if (!is.null(help)) tags$p(class = "text-muted small", help),
-      ...)
 
     output$view_body <- renderUI({
       ns <- session$ns
@@ -131,84 +201,34 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
           div(class = "ea-eda-frame", style = "overflow-x: hidden; overflow-y: auto;",
               uiOutput(ns("dynamic_eda_plot_ui")))),
 
-        keep_cols = .cmd("Keep columns",
-          pickerInput(ns("eng_subset_cols"), "Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-          actionButton(ns("apply_subset"), "Apply Subset", class = "btn-primary btn-sm")),
-
-        drop_cols = .cmd("Drop columns",
-          pickerInput(ns("eng_drop_cols"), "Columns to Drop:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-          actionButton(ns("apply_drop"), "Drop Selected", class = "btn-danger btn-sm")),
-
-        rename_col = .cmd("Rename column",
-          selectInput(ns("rename_col_target"), "Select Column:", choices = NULL),
-          textInput(ns("rename_col_new_name"), "New Name:", placeholder = "Enter new name"),
-          actionButton(ns("apply_col_rename"), "Rename Column", class = "btn-primary btn-sm")),
-
-        mutate = .cmd("New column from two numeric columns",
-          selectInput(ns("mutate_col1"), "Numeric Col 1:", choices = NULL),
-          selectInput(ns("mutate_op"), "Operation:", choices = c("+", "-", "*", "/")),
-          selectInput(ns("mutate_col2"), "Numeric Col 2:", choices = NULL),
-          textInput(ns("mutate_new_name"), "New Column Name:", placeholder = "e.g., area_calc"),
-          actionButton(ns("apply_mutate"), "Create Column", class = "btn-primary btn-sm")),
-
-        filter = .cmd("Filter rows",
-          selectInput(ns("filter_col"), "Select Column to Filter:", choices = NULL),
-          uiOutput(ns("filter_condition_ui")),
-          actionButton(ns("apply_filter"), "Apply Filter", class = "btn-primary btn-sm")),
-
-        convert = .cmd("Convert column types",
-          pickerInput(ns("convert_to_num"), "Convert to Numeric:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-          pickerInput(ns("convert_to_cat"), "Convert to Categorical:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-          actionButton(ns("apply_conversion"), "Apply Conversions", class = "btn-primary btn-sm")),
-
-        rename_lvl = .cmd("Rename levels",
-          selectInput(ns("rename_col"), "Categorical Column:", choices = NULL),
-          uiOutput(ns("dynamic_rename_ui")),
-          actionButton(ns("apply_rename"), "Apply Renames", class = "btn-primary btn-sm")),
-
-        merge_lvl = .cmd("Merge levels",
-          selectInput(ns("agg_col"), "Categorical Column:", choices = NULL),
-          selectInput(ns("agg_levels"), "Levels to Merge:", choices = NULL, multiple = TRUE),
-          textInput(ns("agg_new_name"), "New Combined Name:", placeholder = "e.g., Wetland"),
-          actionButton(ns("apply_merge"), "Merge Levels", class = "btn-primary btn-sm")),
-
-        delete_lvl = .cmd("Delete levels",
-          selectInput(ns("delete_lvl_col"), "Categorical Column:", choices = NULL),
-          selectInput(ns("delete_levels"), "Levels to Delete:", choices = NULL, multiple = TRUE),
-          actionButton(ns("apply_delete_lvl"), "Delete Levels", class = "btn-danger btn-sm")),
-
-        aggregate = .cmd("Aggregate",
-          selectInput(ns("group_id"), "Aggregate by:", choices = NULL),
-          selectInput(ns("agg_method"), "Aggregation Method:", choices = c("Average" = "mean", "Sum" = "sum", "Median" = "median", "Min" = "min", "Max" = "max")),
-          pickerInput(ns("group_nums"), "Numeric Columns to Aggregate:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-          pickerInput(ns("group_cats"), "Categorical Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE, `selected-text-format` = "count > 2", `count-selected-text` = "{0} columns selected")),
-          actionButton(ns("apply_group"), "Aggregate Data", class = "btn-primary btn-sm")),
-
-        bin = .cmd("Bin a numeric column",
-          selectInput(ns("bin_col"), "Numeric Column to Bin:", choices = NULL),
-          textInput(ns("bin_breaks"), "Breaks (e.g. -Inf,30,50,Inf):", placeholder = "-Inf, 30, 50, Inf"),
-          textInput(ns("bin_labels"), "Labels (comma-separated):", placeholder = "Winter, Dry Summer, Summer"),
-          textInput(ns("bin_new_name"), "New Column Name:", placeholder = "Trafficability_Class"),
-          actionButton(ns("apply_bin"), "Create Bins", class = "btn-primary btn-sm")),
-
-        impute = .cmd("Impute missing values",
-          help = "Fill missing values (NA) in the Primary column using values from the Secondary column.",
-          selectInput(ns("coalesce_primary"), "Primary Column (Target):", choices = NULL),
-          selectInput(ns("coalesce_secondary"), "Secondary Column (Source):", choices = NULL),
-          actionButton(ns("apply_coalesce"), "Impute Missing Values", class = "btn-primary btn-sm")),
-
-        join = .cmd("Join with another dataset",
-          selectInput(ns("join_target"), "Dataset to Join With:", choices = NULL),
-          selectInput(ns("join_type"), "Join Type:", choices = c("Left Join" = "left", "Inner Join" = "inner", "Full Join" = "full", "Right Join" = "right")),
-          selectInput(ns("join_by"), "Common ID Column:", choices = NULL),
-          actionButton(ns("apply_join"), "Merge Datasets", class = "btn-primary btn-sm")),
-
-        batch = .cmd("Batch apply",
-          help = "Instantly apply active settings to other datasets.",
-          selectInput(ns("batch_targets"), "Select Datasets to Update:", choices = NULL, multiple = TRUE),
-          actionButton(ns("apply_batch"), "Batch Apply Settings", class = "btn-danger btn-sm")),
-
         NULL))
+    })
+
+    # ---- The ETL command, in the SIDEBAR ------------------------------------
+    # Search "rename", click the hit, and its controls appear here. One at a time:
+    # two commands sharing the sidebar would mean two copies of the same input ids.
+    cmd <- reactiveVal(NULL)
+    observeEvent(view_request(), {
+      k <- view_request()
+      req(isTruthy(k), k %in% names(.DATA_CMDS))
+      cmd(k)
+    }, ignoreInit = TRUE)
+
+    output$cmd_panel <- renderUI({
+      k <- cmd()
+      if (is.null(k)) return(div(class = "ea-hint",
+        "Pick a command from ", tags$b("Data \u2192 Prepare data"),
+        " in the menu bar, or search for it. Its controls open here and act on the ",
+        "selected dataset."))
+      # Arm the population AFTER this panel is out. Bumping only on view_request
+      # was not enough on the FIRST open of the screen: this is a uiOutput nested
+      # inside the sidebar the workspace had just rendered, so the controls
+      # appeared a flush later than the update aimed at them and arrived empty.
+      # Verified: searching a command and clicking it worked once the screen was
+      # already open, and left the picker blank when it was not.
+      # Safe from looping -- this output reads cmd(), never view_rendered().
+      .arm_after_flush()
+      .DATA_CMDS[[k]]$ui(session$ns)
     })
 
     ns <- session$ns
@@ -281,10 +301,13 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
     # update aimed at an element that does not exist yet. onFlushed fires once
     # that flush is out, so the update follows the insert.
     view_rendered <- reactiveVal(0)
-    observeEvent(input$view_pick, {
+    .arm_after_flush <- function()
       session$onFlushed(function() view_rendered(isolate(view_rendered()) + 1),
                         once = TRUE)
-    }, ignoreNULL = FALSE)
+    observeEvent(input$view_pick, .arm_after_flush(), ignoreNULL = FALSE)
+    # ...and when a COMMAND is opened in the sidebar, which is what creates its
+    # controls in the first place.
+    observeEvent(view_request(), .arm_after_flush(), ignoreNULL = FALSE)
 
     pop_arm <- reactive({ list(active_dataset(), rv$working_data, view_rendered()) })
 

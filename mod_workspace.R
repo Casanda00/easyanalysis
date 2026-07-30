@@ -1441,10 +1441,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
 
 
     # ---- Data & Exploration: each ETL command is its OWN menu entry ----------
-    # Derived from the module's own .DATA_VIEWS so the menu and the canvas picker
-    # cannot drift apart. Commands only -- the three exploration views (overview,
-    # distributions, relationships) are reached from the picker, not from
-    # "Prepare data".
+    # Derived from the module's own .DATA_CMDS, so the menu, the search index and
+    # the sidebar panel all read ONE list and cannot drift apart. Clicking an entry
+    # opens Data & Exploration and renders that command's controls in the tools
+    # sidebar -- the app's normal flow: find the tool, click it, settings appear in
+    # the sidebar. The three exploration views live in the canvas picker instead.
     #
     # This used to be nine hardcoded titles matching the module's accordion
     # panels, and .data_op_ui() pulled the matching .accordion-item out of
@@ -1452,8 +1453,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # per-command canvas views there was no accordion left to find, so every entry
     # reported "Could not load '<name>'". Deriving the list removes that whole
     # class of breakage.
-    DATA_OPS <- .DATA_VIEWS[!names(.DATA_VIEWS) %in%
-                            c("overview", "distributions", "relationships")]
+    DATA_OPS <- .DATA_CMD_LABELS
 
     # ---- Step 3: tool-panel host — pick a tool -> its settings load here ----
     current_tool <- reactiveVal(NULL)

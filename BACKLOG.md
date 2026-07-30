@@ -457,7 +457,18 @@ page scrolls sideways (`.app-topbar` / `.topbar-right` extend to 1519px). Unrela
 the pane CSS.
 
 ### B6. Separate the commands, but keep them synced — DONE 2026-07-30
-**Decided: select-and-split, like the model screens.**
+**CORRECTED after testing.** I first moved the commands into the canvas as select-and-split
+views. That was wrong, and the reporter said so plainly:
+
+> "that is how the entire app has always been. we select the tool from the analysis tab and the
+> settings under that tool goes into the sidebar. the only change was that we had many tools
+> under one umbrella which hid other tools. so, the goal was to separate them but the logic
+> remained"
+
+So the app's logic is unchanged: **pick a tool, its settings appear in the tools sidebar.** The
+only thing B6 changes is *unbundling* — commands that were hidden under an umbrella panel are
+now separate, findable tools. The canvas keeps the three dataset views (overview + the two
+exploratory plots) with the select-and-split header.
 
 The ETL toolbox was nine accordion panels crammed into the narrow tools column, and several
 panels bundled *more than one* command — Column Management held keep / drop / rename / mutate,
