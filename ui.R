@@ -302,6 +302,28 @@ page_fillable(
                   border-color: var(--line); }
     .btn-light:hover, .btn-light:active, .btn-outline-light:hover,
     .btn-outline-light:active { background-color: var(--tint); color: var(--ink); }
+    /* DATASET SUMMARY TILES (the six value_box()es on Dataset Overview).
+       Two things were wrong, both measured in light mode. value_box(theme=) goes
+       through Bootstrap's .bg-* utilities, which bslib compiled ONCE from the
+       dark palette -- and theme.R maps secondary, success AND info all to
+       `canopy`. So every tile came out the same loud mint rgb(126,212,129)
+       regardless of its theme, in every app theme: six identical blocks, and the
+       distinction between a plain count and a warning was lost entirely -- a
+       non-zero NA count looked exactly like the row count.
+       Neutral surface now, with colour kept for the tile that is actually saying
+       something: an amber edge when there are NAs. An inset box-shadow rather
+       than a tinted background, so it needs no color-mix() and cannot fall back
+       to Bootstrap's green if that is unsupported.
+       .bg-* are !important in Bootstrap, so these have to be too; scoped to
+       .bslib-value-box so buttons and badges elsewhere keep their colours. */
+    .bslib-value-box.bg-secondary, .bslib-value-box.bg-success,
+    .bslib-value-box.bg-info, .bslib-value-box.bg-warning {
+                  background-color: var(--sunk) !important;
+                  color: var(--ink) !important;
+                  border: 1px solid var(--line); }
+    .bslib-value-box.bg-warning { box-shadow: inset 3px 0 0 var(--warn); }
+    .bslib-value-box .value-box-title { color: var(--bark) !important; }
+    .bslib-value-box .value-box-showcase { color: var(--forest); }
     /* DATE PICKER (dateInput -- Download spatial data uses two). bslib compiled
        bootstrap-datepicker.css from the DEFAULT (dark) palette too, so ALL 32 of
        its state backgrounds are dark greens: on a light theme the hovered day,

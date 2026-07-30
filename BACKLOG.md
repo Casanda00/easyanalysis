@@ -386,11 +386,36 @@ calendar (the cascade applies by selector, so this is the real answer):
 | selected | dark green | `rgb(46,125,50)` + white text |
 | plain day | — | transparent, dark text |
 
-### A3. Card and text colour in light mode
+### A3. Card and text colour in light mode — DEFECT PART FIXED 2026-07-30
 > "dont like the card color and the color of the text in light mode."
+>
+> clarified: "i meant the cards that show the data summary. not sure if we are talking abou
+> the same card here"
 
-A judgement call rather than a defect. **Decide:** what should change — card background,
-body text, or both? Worth a side-by-side before changing tokens that affect every screen.
+**Identified:** the six `value_box()` tiles across the top of Dataset Overview — Rows,
+Columns, Numeric, Categorical, Total NA, Complete rows (`output$overview_stats`, mod_data.R).
+
+**It was not a taste call, it was a defect.** Measured in light mode, all six tiles came out
+`rgb(126,212,129)` — one loud mint — because `value_box(theme=)` goes through Bootstrap's
+`.bg-*` utilities, which bslib compiled once from the dark palette, and `theme.R:49-51` maps
+`secondary`, `success` **and** `info` all to `canopy`. Two consequences: the tiles never
+followed the theme, and the semantic distinction was gone — a non-zero NA count looked
+identical to the row count.
+
+**Fixed:** neutral raised surface in both themes, with colour kept for the tile that is
+actually signalling something (an amber inset edge when NAs are present). Used an inset
+box-shadow rather than a tinted background so it needs no `color-mix()` and cannot fall back to
+Bootstrap's green. Scoped to `.bslib-value-box` so buttons and badges keep their colours.
+
+Verified: light `rgb(238,241,234)` tiles with `rgb(16,21,15)` text; forest `rgb(19,24,19)`
+tiles on a `rgb(15,19,16)` page with `rgb(232,237,228)` text, so they read as raised panels
+either way.
+
+**Not verified:** the amber NA edge — the test dataset has 0 NAs, so no `bg-warning` tile was
+rendered to measure.
+
+**Still open if wanted:** body text colour app-wide, and card surfaces outside these tiles.
+Those are genuine taste calls and were not touched.
 
 ---
 
