@@ -240,7 +240,16 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
         }
         if (!consumed) keep <- c(keep, nm)
       }
-      if (length(keep)) keep else NULL
+      if (!length(keep)) return(NULL)
+      # Which of the kept outputs were DERIVED from `df`? Needed for the C9 rule
+      # in .commit: a transform of the selected dataset updates that dataset
+      # rather than adding a layer under whatever name it was assigned to.
+      derived <- vapply(keep, function(nm) {
+        i <- assigns[[nm]]
+        v <- rhs[[as.character(i)]] %||% character(0)
+        "df" %in% v
+      }, logical(1))
+      structure(keep, derived = derived)
     }
 
     .classify <- function(x) {
@@ -278,20 +287,45 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
         # `df` is an ALIAS for the active dataset; write it back under the real
         # name rather than creating a stray layer called "df".
         target <- if (identical(nm, "df") && !is.null(ad)) ad else nm
-        out[[target]] <- list(kind = kind, value = x)
+        out[[target]] <- list(kind = kind, value = x,
+                              # did this come out of `df`? (C9, applied in .commit)
+                              from_df = identical(nm, "df") ||
+                                isTRUE((attr(outs, "derived") %||% logical(0))[[nm]] %||% FALSE))
       }
       out
     }
 
+    # C9: "creating a new dataset all the time if there is a change is not the
+    # best or smartest move. we need it working on the dataset selected."
+    #
+    # So a TRANSFORM of the selected dataset updates that dataset, even when the
+    # script assigned it a new name -- `vmi9_transformed <- df %>% mutate(...)`
+    # edits the selected dataset instead of adding a layer called
+    # vmi9_transformed. `df <- ...` already did this; the new part is honouring it
+    # for a renamed result too.
+    #
+    # Guarded to ONE such output. With several tables derived from df
+    # (`a <- df[1:10,]; b <- df[11:20,]`) there is no single answer to which one
+    # "is" the dataset, and silently letting the last one win would destroy the
+    # other. In that case each keeps its own name, as before.
     .commit <- function(items) {
       done <- character(0)
+      ad <- tryCatch(active_dataset(), error = function(err) NULL)
+      derived_tbl <- names(items)[vapply(items, function(it)
+        isTRUE(it$from_df) && identical(it$kind, "table"), logical(1))]
+      in_place <- if (!is.null(ad) && length(derived_tbl) == 1L) derived_tbl else character(0)
       for (nm in names(items)) {
         it <- items[[nm]]; pool <- .pool_for(it$kind)
         if (is.null(pool)) next
-        try({ pool[[nm]] <- it$value; done <- c(done, paste0(nm, " (", it$kind, ")")) },
-            silent = TRUE)
+        tgt <- if (nm %in% in_place) ad else nm
+        try({
+          pool[[tgt]] <- it$value
+          done <- c(done, if (!identical(tgt, nm))
+                            paste0(tgt, " (", it$kind, ", updated in place)")
+                          else paste0(tgt, " (", it$kind, ")"))
+        }, silent = TRUE)
       }
-      done
+      unique(done)
     }
 
     output$objects <- renderUI({

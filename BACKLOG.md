@@ -481,7 +481,35 @@ this needs diagnosing rather than building.
 
 ## C. R Console / scripting
 
-### C9. Working on a NEW dataset every time is wrong
+### C9. Working on a NEW dataset every time is wrong — FIXED 2026-07-30
+**Decided: update the existing layer in place.**
+
+`df <- ...` already wrote back to the selected dataset. The new part is honouring that for a
+**renamed** result: `vmi9_transformed <- df %>% mutate(...)` now edits the selected dataset
+instead of adding a layer called `vmi9_transformed`, which is the case that was reported.
+
+**Guarded to one such output.** With several tables derived from `df`
+(`a <- df[1:10,]; b <- df[11:20,]`) there is no single answer to which one *is* the dataset, and
+letting the last one win would silently destroy the other — so in that case each keeps its own
+name, as before. Derivation is read off the parse tree (does `df` appear in the right-hand
+side?), not guessed from the name.
+
+Verified with `testServer` on all four cases:
+
+| script | result |
+|---|---|
+| `df$logdbh <- log(df$dbh_cm)` | `trees` updated in place, 3 -> 4 cols |
+| `vmi9_transformed <- df; ...$logdbh <- ...` | `trees` updated, **no stray layer** |
+| `a <- df[1:2,]; b <- df[3,]` | both keep their own names, `trees` untouched |
+| `fresh <- data.frame(z = 1:3)` | new layer `fresh`, `trees` untouched |
+
+The console line reports which happened — "(table, updated in place)" versus "(table)".
+
+**Note the trade-off you accepted:** an in-place update replaces the dataset, so the pre-edit
+version is gone unless it was saved. Undo in the Data screen still covers edits made there, not
+console edits.
+
+### C9-original. Working on a NEW dataset every time is wrong
 > "it created a new dataset. creating a new dataset all the time if there is a change is
 > not the best or smartest move. we need it working on the dataset selected."
 
