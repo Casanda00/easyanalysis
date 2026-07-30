@@ -487,6 +487,32 @@ Picking a command populates its controls — checked 9 of them, with the right t
 (`site` for the categorical commands, `dbh_cm` for the numeric ones). End to end, Drop columns
 on `age_yr` took the dataset from `180 x 4` to `180 x 3`, and Undo put it back.
 
+**REGRESSION I INTRODUCED, then fixed (same day).** Reported as
+*"Could not load 'Column Management'"*, *"Could not load 'Row Filtering'"*, and the tools panel
+showing only the hint — "all of the commands are not loading".
+
+Cause: the workspace **already** listed each ETL operation as its own menu entry (`DATA_OPS`,
+nine hardcoded titles) and `.data_op_ui()` rendered one by pulling the matching
+`.accordion-item` out of `dataToolsUI("data")`. I replaced that accordion with canvas views, so
+there was no accordion left to find and every entry failed. B6 was half-built already and I
+broke that half instead of extending it.
+
+Reconciled onto one source of truth:
+
+- `DATA_OPS` is now **derived from `.DATA_VIEWS`** (commands only), so the menu and the canvas
+  picker cannot drift apart again. It lists 14 commands, not the old 9 bundles.
+- A "Prepare data" entry opens the Data screen and selects that command in its picker. The
+  workspace cannot move another module's picker across namespaces, so it sets a top-level
+  `data_op_request` input which `server.R` passes to `dataServer`. Going through the server
+  avoids poking the selectize from JS after a guessed delay for the panel to exist.
+- `.data_op_ui()` and the four dead `dataop:` guards are gone.
+
+Verified in the browser: all 14 commands appear under Prepare data; clicking "Filter rows"
+opens the screen with the picker on `filter`, `filter_col` populated and its condition UI
+rendered (1413 chars); clicking "Merge levels" gives `agg_col` = `site` (categorical only) and
+its real levels `Peat, Dry, Mesic` — the deepest dependency chain in the module. No
+"Could not load" anywhere.
+
 Also extended `check_plot_views.R`: a view whose plots come from a server-built
 `uiOutput(... "plot" ...)` now counts as plot-bearing. Without that it called
 "Plot relationships" a text view — the evidence is still read from the code, not guessed from

@@ -62,7 +62,8 @@ dataCanvasUI <- function(id) {
   )
 }
 
-dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset) {
+dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset,
+                       view_request = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
     # ---- Select-and-split canvas (B6) --------------------------------------
@@ -73,6 +74,16 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       if (!length(picked)) picked <- names(.DATA_VIEWS)[1]
       if (any(picked %in% .DATA_VIEWS_PLOT)) ea_plot_appearance()
     })
+
+    # A "Prepare data" entry in the menubar opens this screen and names the command
+    # it wants. The workspace cannot move this picker itself -- it would have to
+    # address another module's namespace -- so it sets a top-level input and
+    # server.R passes it in here.
+    observeEvent(view_request(), {
+      k <- view_request()
+      req(isTruthy(k), k %in% names(.DATA_VIEWS))
+      updateSelectizeInput(session, "view_pick", selected = k)
+    }, ignoreInit = TRUE)
 
     .cmd <- function(title, ..., help = NULL) div(class = "p-3",
       tags$h6(class = "text-uppercase text-muted small mb-2", title),

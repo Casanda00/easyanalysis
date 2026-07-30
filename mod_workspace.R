@@ -289,6 +289,15 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(class = "gm-menu", items))
     }
     .setTool <- function(k) sprintf("Shiny.setInputValue('%s', '%s', {priority:'event'})", ns("tool_pick"), k)
+    # A "Prepare data" entry opens Data & Exploration and selects that command in
+    # its view picker. Two inputs, not one: the tool_pick opens the screen, and
+    # `data_op_request` is a TOP-LEVEL input (deliberately un-namespaced) that
+    # server.R hands to dataServer, which moves its own picker. Going through the
+    # server avoids the alternative -- poking the selectize from JS after a guessed
+    # delay for the panel to exist.
+    .setDataOp <- function(k) paste0(
+      .setTool("data"), ";",
+      sprintf("Shiny.setInputValue('data_op_request', '%s', {priority:'event'})", k))
 
     output$menubar <- renderUI({
       # Analysis = OUR tools, grouped exactly like GeoLibre's submenu list.
@@ -300,11 +309,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         tags$div(class = "gm-item has-sub", g,
           tags$div(class = "gm-sub",
             lapply(ks, function(k) .mi(MODUI[[k]]$nm, .setTool(k))),
-            # every Data & Exploration operation, listed individually
+            # every Data & Exploration command, listed individually
             if (identical(g, "Data")) tagList(
               .msep(),
               tags$div(class = "gm-grp", "Prepare data"),
-              lapply(DATA_OPS, function(op) .mi(op, .setTool(paste0("dataop:", op)))))))
+              lapply(names(DATA_OPS), function(k)
+                .mi(unname(DATA_OPS[[k]]), .setDataOp(k))))))
       })
       has_recent <- length(tryCatch(ea_project_list(), error = function(e) list())) > 0
 
@@ -803,7 +813,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # in either view — the sidebar holds its controls. Map tools never do:
       # they draw on the map, which keeps the centre.
       t <- current_tool()
-      mi <- if (!is.null(t) && !startsWith(t, "dataop:")) MODUI[[t]] else NULL
+      mi <- if (!is.null(t)) MODUI[[t]] else NULL
       if (!is.null(mi) && !isTRUE(mi$map_based) && identical(tool_mode(), "dock"))
         return(tagList(
           div(class = "ea-wsx-resulthead",
@@ -1430,33 +1440,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     output$chart <- renderPlot({ .gg() }, bg = "white")
 
 
-    # ---- Data & Exploration: each ETL operation is its OWN menu entry --------
-    # The Data module's tools panel is a 9-panel accordion. Instead of dumping
-    # all of it into the sidebar, every operation is listed individually in the
-    # menu and only the chosen one's controls render in the panel.
-    DATA_OPS <- c("Column Management", "Row Filtering", "Type Conversion",
-                  "Level Management", "Aggregation", "Bin/Cut Numeric",
-                  "Conditional Imputation", "Merge/Join Datasets", "Batch Apply Pipeline")
-    # Pull ONE accordion panel out of the built UI and render it already open.
-    .data_op_ui <- function(title) {
-      ui <- tryCatch(dataToolsUI("data"), error = function(e) NULL)
-      if (is.null(ui)) return(NULL)
-      items <- tryCatch(htmltools::tagQuery(ui)$find(".accordion-item")$selectedTags(),
-                        error = function(e) NULL)
-      if (!length(items)) return(NULL)
-      for (it in items) {
-        hdr <- tryCatch(paste(as.character(
-                 htmltools::tagQuery(it)$find(".accordion-header")$selectedTags()), collapse = ""),
-                 error = function(e) "")
-        if (grepl(title, hdr, fixed = TRUE)) {
-          opened <- tryCatch(
-            htmltools::tagQuery(it)$find(".accordion-collapse")$addClass("show")$allTags(),
-            error = function(e) it)
-          return(div(class = "accordion", opened))
-        }
-      }
-      NULL
-    }
+    # ---- Data & Exploration: each ETL command is its OWN menu entry ----------
+    # Derived from the module's own .DATA_VIEWS so the menu and the canvas picker
+    # cannot drift apart. Commands only -- the three exploration views (overview,
+    # distributions, relationships) are reached from the picker, not from
+    # "Prepare data".
+    #
+    # This used to be nine hardcoded titles matching the module's accordion
+    # panels, and .data_op_ui() pulled the matching .accordion-item out of
+    # dataToolsUI() to render in the sidebar. When B6 replaced that accordion with
+    # per-command canvas views there was no accordion left to find, so every entry
+    # reported "Could not load '<name>'". Deriving the list removes that whole
+    # class of breakage.
+    DATA_OPS <- .DATA_VIEWS[!names(.DATA_VIEWS) %in%
+                            c("overview", "distributions", "relationships")]
 
     # ---- Step 3: tool-panel host — pick a tool -> its settings load here ----
     current_tool <- reactiveVal(NULL)
@@ -1571,7 +1568,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
 
     .tool_title <- function() {
       t <- current_tool(); if (is.null(t)) return(NULL)
-      if (startsWith(t, "dataop:")) return(sub("^dataop:", "", t))
       (MODUI[[t]] %||% TOOLS[[t]])$nm %||% t
     }
     # header buttons shared by the sidebar and the floating panel
@@ -1609,7 +1605,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       t <- current_tool()
       if (is.null(t)) return(span(class = "ea-wsx-atl-none", "No tool open — use ",
                                   tags$b("Analysis"), " in the menu bar"))
-      nm <- .tool_title() %||% t     # strips the internal "dataop:" prefix
+      nm <- .tool_title() %||% t
       tagList(
         span(class = "ea-wsx-atl", icon("gears"), nm),
         tags$button(class = "ea-wsx-atl-x", type = "button", title = "Close tool",
@@ -1619,13 +1615,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       t <- current_tool()
       if (is.null(t)) return(div(class = "ea-hint",
         "Pick a tool above. Its settings load here; spatial ops add a layer, models drop a result (Step 4)."))
-      # a single Data & Exploration operation, opened from the menu
-      if (startsWith(t, "dataop:")) {
-        op <- sub("^dataop:", "", t)
-        body <- .data_op_ui(op)
-        return(if (is.null(body))
-                 div(class = "ea-hint", paste0("Could not load '", op, "'.")) else body)
-      }
       mi <- MODUI[[t]]
       if (!is.null(mi)) {
         # Signal AFTER this panel has been sent to the browser. Bumping on
@@ -1761,7 +1750,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # The ACTIVE TOOL's own output renders as a pop-out panel over the canvas —
       # the canvas itself stays the map / chart (new design).
       t0 <- current_tool()
-      if (!is.null(t0) && startsWith(t0, "dataop:")) t0 <- NULL   # ETL ops have no own canvas
       mi0 <- if (!is.null(t0)) MODUI[[t0]] else NULL
       # DEFAULT = sidebar controls + results in the CENTRE. A tool only becomes a
       # floating pop-out when the user asks for it (the float button), or when a

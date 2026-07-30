@@ -858,7 +858,12 @@ server <- function(input, output, session) {
 
   # --- Components (canvas + tools wired by the shell; servers bound once) ---
   # Each model server returns a reactive of its live "context" text for the Co-Analyst.
-  data_ctx  <- dataServer("data", raw_pool, dataset_pool, dataset_names, active_dataset)
+  # `data_op_request` is set by the menubar's "Prepare data" entries. It is a
+  # TOP-LEVEL input on purpose: the workspace module cannot update another
+  # module's picker across namespaces, so it names the command here and the Data
+  # module selects it.
+  data_ctx  <- dataServer("data", raw_pool, dataset_pool, dataset_names, active_dataset,
+                          view_request = reactive(input$data_op_request))
   lm_ctx    <- lmServer("lm", dataset_pool, active_dataset)
   lme_ctx   <- lmeServer("lme", dataset_pool, active_dataset)
   anova_ctx <- anovaServer("anova", dataset_pool, active_dataset)
