@@ -493,11 +493,31 @@ data view moved the lit tab with it.
 **Still open:** the map view must exist regardless of what the project holds, with the
 default choice following the data.
 
-### D17. Opening a tool must not change the view  **LIKELY REGRESSION**
+### D17. Opening a tool must not change the view — FIXED 2026-07-30
 > "download spatial data switches the tab if we are in map view we click it. should not be
 > like that. the map view should remain since only the tool box gets displayed."
 
-Picking a tool should load its settings panel and leave the current view alone.
+**Reproduced first**, in a tables-only project: sitting on Map view, clicking "Download spatial
+data" flipped to Data view.
+
+**Cause: two of my own mechanisms fighting.** The "canvas follows the data" rule picks the view
+from what layers exist, but only while `user_picked_view()` is FALSE. That flag was re-armed by
+`observeEvent(active_dataset(), ...)` — and `active_dataset()` deliberately depends on
+`ds_refresh`, which server.R bumps on **every tool open** to re-arm selector population
+(gotcha 18). So opening any tool threw away the user's view choice and re-derived the view from
+the data. In a tables-only project that means Data view, which overrode even that tool's own
+`wsview("map")` request, since it is `map_based`.
+
+**Fix:** compare the value before re-arming — a `ds_refresh` bump leaves the dataset name
+unchanged, so it is now a no-op. A genuine dataset change (opening a project) still re-arms.
+
+Verified in the browser: project opens on Data view (correct for tables-only), clicking Map
+view sticks, and opening "Download spatial data" leaves Map view active.
+
+**Deliberately kept:** a `map_based` tool opened from Data view still switches to the map. Its
+results are drawn on the map and its canvas *is* the map, so opening one with the map off screen
+would hide the thing it produces. If that turns out to be unwanted too, it is one line
+(mod_workspace.R, the `tool_pick` observer).
 
 ### D18. Spatial & LiDAR screens still carry their own views — PART 1 DONE 2026-07-29
 > "the point cloud or 3d view opens two views. i thought we dixed that. everything if not

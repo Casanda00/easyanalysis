@@ -113,7 +113,21 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       wsview(if (spatial) "map" else "data")
     })
     # Reopening a different project re-arms the automatic choice.
-    observeEvent(active_dataset(), { user_picked_view(FALSE) }, ignoreInit = TRUE)
+    #
+    # Only when the dataset REALLY changes. `active_dataset()` deliberately
+    # depends on `ds_refresh` (server.R), which is bumped every time a tool is
+    # opened to re-arm selector population — so this observer fired on every tool
+    # open, threw away the user's view choice, and let the rule above re-derive
+    # the view from the data. Symptom: sitting in Map view, clicking "Download
+    # spatial data" dropped you into Data view, overriding even that tool's own
+    # request for the map. Comparing the value makes a bump a no-op.
+    last_ds <- reactiveVal(NULL)
+    observeEvent(active_dataset(), {
+      nm <- active_dataset()
+      if (identical(nm, isolate(last_ds()))) return()
+      last_ds(nm)
+      user_picked_view(FALSE)
+    }, ignoreInit = TRUE)
 
     observeEvent(input$ws_vis,    { nm <- input$ws_vis; lvis[[nm]] <- !.vis(nm) })
     observeEvent(input$ws_active, { activeLayer(input$ws_active) })
