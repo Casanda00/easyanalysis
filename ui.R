@@ -284,6 +284,24 @@ page_fillable(
     .bg-dark  { background-color: var(--sunk)  !important; color: var(--ink) !important; }
     .bg-body, .bg-body-tertiary, .bg-body-secondary {
                   background-color: var(--panel) !important; color: var(--ink) !important; }
+    /* The SAME trap as .bg-light, in the other places bslib compiled a literal
+       dark hex instead of a variable. Found by scanning the compiled
+       bootstrap.min.css for rules whose background-color is a literal rgb() dark
+       enough to read as black: 30 of them. These are the ones on surfaces this app
+       actually renders.
+         .modal-footer      rgb(37,41,37) -- the black strip under every dialog,
+                            which is the 'black on the packages page' and the same
+                            bar in Share project. Transparent, so the frosted
+                            .modal-content shows through.
+         .input-group-text  rgb(37,41,37)
+         .btn-light hover   rgb(33,37,33)
+       (The rest were .carousel-indicators and .progress-bar-light, which this app
+       never renders, plus the .datepicker family handled further down.) */
+    .modal-footer { background-color: transparent; }
+    .input-group-text { background-color: var(--sunk); color: var(--ink);
+                  border-color: var(--line); }
+    .btn-light:hover, .btn-light:active, .btn-outline-light:hover,
+    .btn-outline-light:active { background-color: var(--tint); color: var(--ink); }
     /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
     .form-control, .form-select, textarea.form-control,
     .selectize-input, .selectize-dropdown {

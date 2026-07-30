@@ -333,17 +333,41 @@ Four of these look like they come from my own recent changes; they are marked
 
 ## A. Theme / colour (same family as round-1 items 3, 8, 10)
 
-### A1. Black on the packages page
+### A1 + A2. Black on the packages page, and in the Project dropdown — FIXED 2026-07-30
 > "black color on the packages page"
-
-The package install/list modal. Round 1 fixed `.bg-light` and the Bootstrap surface
-variables; this is somewhere those did not reach.
-
-### A2. Black in the Project dropdown, including Share project
+>
 > "the share project has the black color thing. check everything in the dropdown under
 > project for that black hardcoded color."
 
-**Explicitly a sweep, not one fix** — check every entry under the Project menu.
+**One cause, both reports: `.modal-footer`.** Measured in light mode, the footer strip under
+every dialog computed to `rgb(37,41,37)` while `.modal-content` was correctly white. It is
+gotcha 22 again — bslib's compiled `bootstrap.min.css` contains a **literal**
+`.modal-footer { background-color: rgb(37,41,37) }` from the default (dark) palette, so
+`html[data-ea-theme]` can never reach it. Every dialog in the app shares it, which is why the
+same bar appeared on the packages page and in Share project.
+
+Set to `transparent`, so the frosted `.modal-content` shows through in either theme.
+
+**Swept rather than spot-fixed.** Scanning the compiled bootstrap for *every* rule whose
+background is a literal rgb() dark enough to read as black found **30**. Of those, the ones on
+surfaces this app renders were `.modal-footer`, `.input-group-text` (rgb(37,41,37)) and
+`.btn-light`/`.btn-outline-light` hover (rgb(33,37,33)) — all three now take tokens. The rest
+were `.carousel-indicators` and `.progress-bar-light`, which the app never renders, plus the
+`.datepicker` family (~20 rules), which IS reachable via the date inputs in
+`mod_rs_search.R` and is **still open** — see A4.
+
+Verified: in light mode the packages dialog now reports `.modal-footer` as `rgba(0,0,0,0)` and
+**no** element inside it with a dark opaque background. And an audit of every `showModal()` in
+the app (5 in the workspace, including Share this project and Collaborate) found **no**
+hardcoded dark hex and no dark Bootstrap colour class anywhere, so the footer really was their
+only dark surface.
+
+### A4. Datepicker still carries dark literals (found while sweeping A1/A2)
+The compiled bootstrap has ~20 `.datepicker ...` rules with literal dark backgrounds
+(day hover, today, highlighted, range, and their focus/active variants). These are reachable:
+`mod_rs_search.R` ("Download spatial data") uses `dateInput`. Not yet confirmed visually
+against a light theme, and not yet fixed — the fix is a small block restating the visible
+states with tokens.
 
 ### A3. Card and text colour in light mode
 > "dont like the card color and the color of the text in light mode."
