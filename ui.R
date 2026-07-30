@@ -659,6 +659,24 @@ page_fillable(
          div.ea-pop > button.ea-pop-btn[onclick=eaPop(this)] + div.ea-pop-body  */
     .ea-pop { position: relative; display: inline-flex; margin-left: auto; }
     .ea-pop.block { display: block; margin-left: 0; margin-top: 10px; }
+    /* The map's own controls button sits at the right of the map strip, before the
+       3D toggle, and its panel must clear the leaflet canvas. */
+    .ea-pop.ea-pop-map { margin-left: auto; }
+    .ea-pop.ea-pop-map .ea-pop-body { z-index: 1200; min-width: 190px; }
+    .ea-pop.ea-pop-map .ea-ctx-item { font: 400 12.5px var(--ui); }
+    /* Right-click menu on a layer row (built by eaLayerMenu). Fixed position at
+       the cursor, so it must sit above the panels and the leaflet map. */
+    .ea-ctxmenu { position: fixed; z-index: 4000; min-width: 186px; padding: 5px;
+                  background: var(--panel); color: var(--ink);
+                  border: 1px solid var(--line); border-radius: 9px;
+                  box-shadow: 0 14px 38px rgba(0,0,0,.34); font: 400 12.5px var(--ui); }
+    .ea-ctx-item { display: block; padding: 7px 10px; border-radius: 6px;
+                   color: var(--ink); text-decoration: none; cursor: pointer;
+                   white-space: nowrap; }
+    .ea-ctx-item:hover { background: var(--tint); color: var(--ink); text-decoration: none; }
+    .ea-ctx-item.danger { color: var(--danger); }
+    .ea-ctx-item.danger:hover { background: var(--danger); color: #fff; }
+    .ea-ctx-sep { height: 1px; margin: 4px 6px; background: var(--line); }
     .ea-pop-btn { font: 500 11px var(--ui); border: 1px solid var(--line);
                   background: var(--panel); color: var(--bark); border-radius: 6px;
                   padding: 4px 9px; cursor: pointer; white-space: nowrap;
@@ -1853,13 +1871,52 @@ page_fillable(
           if (first) setTimeout(function(){ first.focus(); }, 30);
         }
       };
+      /* Right-click menu for a layer row. One menu element reused for every
+         layer, built at the cursor. The actions are the ones that only make
+         sense per-layer: zoom to it, rename it, hide it, remove it. */
+      window.eaLayerMenu = function(ev, name, kind, visible){
+        ev.preventDefault(); ev.stopPropagation();
+        var old = document.getElementById('ea-ctxmenu');
+        if (old) old.remove();
+        var m = document.createElement('div');
+        m.id = 'ea-ctxmenu'; m.className = 'ea-ctxmenu';
+        var add = function(label, fn, danger){
+          var a = document.createElement('a');
+          a.className = 'ea-ctx-item' + (danger ? ' danger' : '');
+          a.textContent = label;
+          a.onclick = function(e){ e.preventDefault(); m.remove(); fn(); };
+          m.appendChild(a);
+        };
+        var sep = function(){ var d=document.createElement('div'); d.className='ea-ctx-sep'; m.appendChild(d); };
+        add('Zoom to layer', function(){
+          Shiny.setInputValue('workspace-ws_zoom_layer', name, {priority:'event'}); });
+        add('Rename…', function(){
+          Shiny.setInputValue('layer_rename_request', name, {priority:'event'}); });
+        add(visible ? 'Hide layer' : 'Show layer', function(){
+          Shiny.setInputValue('workspace-ws_vis', name, {priority:'event'}); });
+        sep();
+        add('Remove from project', function(){
+          if (confirm('Remove \\'' + name + '\\' from this project?\\n\\nYour original file on disk is not deleted.'))
+            eaSetInput('delete_dataset', name); }, true);
+        document.body.appendChild(m);
+        /* keep it on screen */
+        var w = m.offsetWidth, h = m.offsetHeight;
+        var x = Math.min(ev.clientX, window.innerWidth  - w - 8);
+        var y = Math.min(ev.clientY, window.innerHeight - h - 8);
+        m.style.left = Math.max(4, x) + 'px';
+        m.style.top  = Math.max(4, y) + 'px';
+      };
       document.addEventListener('click', function(e){
+        var m = document.getElementById('ea-ctxmenu');
+        if (m && !e.target.closest('#ea-ctxmenu')) m.remove();
         if (e.target.closest && e.target.closest('.ea-pop')) return;
         document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
       });
       document.addEventListener('keydown', function(e){
-        if (e.key === 'Escape')
+        if (e.key === 'Escape') {
+          var m = document.getElementById('ea-ctxmenu'); if (m) m.remove();
           document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
+        }
       });
       /* Mark the icon when the panel holds a value, so a closed panel still
          shows that something was overridden. Done here rather than server-side

@@ -547,6 +547,70 @@ server <- function(input, output, session) {
     showNotification(paste0("'", val, "' removed."), type = "message", duration = 2)
   })
 
+  # ---- Rename a layer (right-click a layer -> Rename…) --------------------
+  # Handled HERE, not in the workspace module, because a rename has to move every
+  # trace of the name at once and some of those live only at this level:
+  # raw_pool (what "Reset to upload" restores), src_paths (the project's copy of
+  # the file) and active_ds. A rename done inside the workspace would leave
+  # raw_pool keyed by the old name and quietly break Reset to upload.
+  .pool_of <- function(nm) {
+    if (nm %in% .pool_names(dataset_pool)) "table"
+    else if (nm %in% .pool_names(raster_pool)) "raster"
+    else if (nm %in% .pool_names(las_pool)) "las"
+    else if (nm %in% .pool_names(vector_pool)) "vector"
+    else NA_character_
+  }
+  observeEvent(input$layer_rename_request, {
+    nm <- input$layer_rename_request
+    req(isTruthy(nm))
+    kind <- .pool_of(nm)
+    if (is.na(kind)) { showNotification("That layer is no longer here.", type = "warning"); return() }
+    showModal(modalDialog(
+      title = paste0("Rename '", nm, "'"), easyClose = TRUE, size = "s",
+      textInput("layer_rename_new", "New name", value = nm, width = "100%"),
+      div(class = "ea-hint",
+          "Only the name in this project changes. Your file on disk keeps its own name."),
+      footer = tagList(modalButton("Cancel"),
+        actionButton("layer_rename_ok", "Rename", class = "btn-success"))))
+  })
+  observeEvent(input$layer_rename_ok, {
+    old <- input$layer_rename_request
+    new <- trimws(input$layer_rename_new %||% "")
+    req(isTruthy(old))
+    kind <- .pool_of(old)
+    taken <- c(.pool_names(dataset_pool), .pool_names(raster_pool),
+               .pool_names(las_pool), .pool_names(vector_pool))
+    if (!nzchar(new)) { showNotification("Give it a name.", type = "warning"); return() }
+    if (identical(new, old)) { removeModal(); return() }
+    if (new %in% taken) {
+      showNotification(paste0("'", new, "' is already used in this project."), type = "error")
+      return()
+    }
+    if (is.na(kind)) { removeModal(); return() }
+    pool <- switch(kind, table = dataset_pool, raster = raster_pool,
+                   las = las_pool, vector = vector_pool)
+    pool[[new]] <- pool[[old]]; pool[[old]] <- NULL
+    if (identical(kind, "table")) {
+      if (!is.null(raw_pool[[old]])) { raw_pool[[new]] <- raw_pool[[old]]; raw_pool[[old]] <- NULL }
+      if (isTruthy(active_ds()) && identical(active_ds(), old)) active_ds(new)
+    }
+    if (!is.null(src_paths[[old]])) { src_paths[[new]] <- src_paths[[old]]; src_paths[[old]] <- NULL }
+    # layer_style is a reactiveVal holding a LIST, not reactiveValues -- so it is
+    # read, edited and written back. Indexing it with [[ ]] silently aborted this
+    # whole observer, which is why the first version of this renamed nothing and
+    # left the dialog open.
+    local({
+      ls <- layer_style()
+      if (is.list(ls) && !is.null(ls[[old]])) {
+        ls[[new]] <- ls[[old]]; ls[[old]] <- NULL
+        layer_style(ls)
+      }
+    })
+    ds_refresh(ds_refresh() + 1)
+    removeModal()
+    showNotification(paste0("Renamed to '", new, "'."), type = "message", duration = 3)
+  })
+
   # ---- Menubar -> switch canvas + tools in lockstep ----
   observeEvent(input$current_view, .switch_view(input$current_view))
 

@@ -110,23 +110,53 @@ Verified both ways: entering 3D removes the map pane (`lidar-location_map` absen
 keeps the viewer; the button flips to "Back to map" with active styling; clicking it
 returns to Map view with the map present and the label back to "3D view".
 
-## 5. One button on the map housing its controls
+## 5. One button on the map housing its controls — DONE 2026-07-30
 
 > "on the map, I think we can have that button that houses many controls like the zoom
 > controls, clip function"
+>
+> scoped later: "plus other basic map functions"
 
-Apply the **`.ea-pop`** pattern (already built, documented in `UNIFIED_WORKSPACE.md`) to
-the map: one icon opening a panel with zoom controls, clip, and the other map actions.
-**Decide:** exactly which controls belong in it, and whether it replaces the existing
-scattered controls or supplements them.
+A `.ea-pop` button at the right of the map strip, before the 3D toggle: **Zoom to all layers**,
+**Zoom to active layer**, then **Attribute table**, **Layers panel**, **Tool panel**. It
+supplements the Controls menu rather than replacing it — the same actions are still up there,
+but they no longer require leaving the map to reach them.
 
-## 6. Right-click functionality
+Per-layer actions deliberately are NOT in it: those belong to a layer, so they live on the
+layer's right-click menu (item 6). Clip is not in it either — the two draw-based clips need a
+polygon drawn on the map, and the pool-driven equivalents are searchable algorithms
+("Clip raster to vector layer", "Buffer").
+
+Verified: the button opens with all five entries; "Layers panel" toggles `no-left` on the grid
+and toggles it back.
+
+## 6. Right-click functionality — DONE 2026-07-30
 
 > "we can add some right click functionalities."
+>
+> scoped later: "zoom to layer, right clicking on the layer to rename it. plus other basic map
+> functions."
 
-Context menus. **Needs scoping before building** — on what, and offering what? Likely
-candidates: a layer in the Layers panel (zoom to, rename, remove, export), the map canvas
-(clip here, add marker), a results card. Ask before implementing.
+Right-clicking a layer row opens a menu at the cursor with **Zoom to layer**, **Rename…**,
+**Show/Hide layer** and **Remove from project**. Left-click still selects the layer, so nothing
+existing changed. One menu element is reused for every row and closes on outside click or Escape.
+
+**Zoom to layer** also selects the layer, so the legend and attribute dock follow what you just
+zoomed to.
+
+**Rename is handled in `server.R`, not in the workspace module**, and that placement matters: a
+rename has to move every trace of the name at once, and some of those exist only at app level —
+`raw_pool` (what "Reset to upload" restores), `src_paths` (the project's copy of the file) and
+`active_ds`. Renaming inside the workspace would leave `raw_pool` keyed by the old name and
+quietly break Reset to upload. It refuses an empty name and a name already used in the project.
+
+**Bug found while verifying:** the first version renamed nothing and left the dialog open.
+`layer_style` is a `reactiveVal` holding a *list*, not `reactiveValues`, so `layer_style[[old]]`
+aborted the whole observer before `removeModal()`. It is read, edited and written back now.
+
+Verified end to end on a real project: right-click gives the four actions; Rename moves the
+layer name and the status bar's Active follows it; renaming back restores the project exactly
+(`trees`, 180 x 4).
 
 ## 7. Vector attribute table not working — FIXED 2026-07-29
 

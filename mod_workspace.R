@@ -222,6 +222,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         vis <- .vis(l$nm); ex <- isTRUE(lexp[[l$nm]])
         div(class = paste("ea-wsx-lyr2", if (identical(l$nm, act)) "active" else "",
                           if (vis) "" else "off", if (ex) "exp" else ""),
+          # Right-click the row for the per-layer actions: zoom to it, rename it,
+          # hide it, remove it. The row keeps its left-click behaviour (select).
+          oncontextmenu = sprintf("eaLayerMenu(event, %s, %s, %s)",
+            jsonlite::toJSON(l$nm, auto_unbox = TRUE),
+            jsonlite::toJSON(l$kind, auto_unbox = TRUE),
+            if (vis) "true" else "false"),
           div(class = "ea-wsx-lyrtop",
             # visibility = a real toggle switch (was a ◉/○ glyph)
             tags$span(class = paste("ea-wsx-sw-toggle", if (vis) "on" else ""),
@@ -446,6 +452,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     }
     observeEvent(input$ws_zoom,        { .zoom_to(NULL) })
     observeEvent(input$ws_zoom_active, { .zoom_to(activeLayer()) })
+    # Zoom to ONE named layer, from its right-click menu. Also selects it, so the
+    # legend and attribute dock follow what you just zoomed to.
+    observeEvent(input$ws_zoom_layer, {
+      nm <- input$ws_zoom_layer
+      req(isTruthy(nm))
+      activeLayer(nm)
+      .zoom_to(nm)
+    })
     observeEvent(input$ws_tour, { session$sendCustomMessage("ea-tour", "start") })
 
     observeEvent(input$ws_share, {
@@ -773,6 +787,31 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(class = "ea-wsx-maptop", tags$span("Map view"),
           tags$span(class = "ea-wsx-mapsub", "Visible: ",
             if (length(vis)) paste(vapply(vis, function(l) l$nm, character(1)), collapse = ", ") else "none"),
+          # The basic map functions, behind ONE icon on the map itself, rather than
+          # only in the Controls menu at the top of the window (round-1 item 5).
+          # Per-layer actions are not here -- those belong to the layer, and live
+          # on its right-click menu.
+          div(class = "ea-pop ea-pop-map",
+            tags$button(type = "button", class = "ea-pop-btn",
+              title = "Map controls", onclick = "eaPop(this)", icon("sliders")),
+            div(class = "ea-pop-body",
+              div(class = "ea-pop-h", icon("sliders"), tags$span("Map")),
+              tags$a(class = "ea-ctx-item", href = "#",
+                onclick = paste0(.fire("ws_zoom", "x"), "return false;"),
+                "Zoom to all layers"),
+              tags$a(class = "ea-ctx-item", href = "#",
+                onclick = paste0(.fire("ws_zoom_active", "x"), "return false;"),
+                "Zoom to active layer"),
+              div(class = "ea-ctx-sep"),
+              tags$a(class = "ea-ctx-item", href = "#",
+                onclick = "var d=document.querySelector('.ea-wsx-attrdock'); if(d)d.classList.toggle('collapsed'); return false;",
+                "Attribute table"),
+              tags$a(class = "ea-ctx-item", href = "#",
+                onclick = "document.querySelector('.ea-wsx-grid').classList.toggle('no-left'); return false;",
+                "Layers panel"),
+              tags$a(class = "ea-ctx-item", href = "#",
+                onclick = "document.querySelector('.ea-wsx-grid').classList.toggle('no-right'); return false;",
+                "Tool panel"))),
           # 3D viewer: sits at the right-hand end of this strip, and only while
           # a point cloud is the selected layer.
           uiOutput(ns("tab_three_ui"), inline = TRUE)),
