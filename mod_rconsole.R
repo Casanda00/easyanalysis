@@ -168,7 +168,8 @@ rconsoleCanvasUI <- function(id) {
 
 rconsoleServer <- function(id, dataset_pool, active_dataset,
                            raster_pool = NULL, las_pool = NULL, vector_pool = NULL,
-                           sync_mode = getOption("ea.console_sync", "auto")) {
+                           sync_mode = getOption("ea.console_sync", "auto"),
+                           on_data_change = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     log_r     <- reactiveVal(list())
@@ -325,6 +326,7 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
                           else paste0(tgt, " (", it$kind, ")"))
         }, silent = TRUE)
       }
+      if (length(done) && is.function(on_data_change)) try(on_data_change(), silent = TRUE)
       unique(done)
     }
 

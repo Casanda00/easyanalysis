@@ -1113,3 +1113,74 @@ LAS input both stay in-process and never start the worker.
 5. **E19 + E20** — one shared variable picker, then E21, E22.
 6. **The console group** — C11, C13, C12, C10, then C9 once its rule is decided.
 7. **Decisions needed before building:** A3, B6, C9, C14, plus round-1 items 5 and 6.
+
+---
+
+## Round 3 — User Feedback (2026-07-30)
+
+Reported by user for immediate implementation and testing ("we build one and I will test").
+
+### 1. Dedicated "Remove Rows" & "Remove Columns" Tools + Table Cell/Row Deletion
+> "delete rows from the data. also, maybe also using the table to delete rows and columns. maybe a new tool called remove rows, another called remove columns."
+- **Diagnosis & Plan:**
+  - Add explicit "Remove Rows" and "Remove Columns" tools under Data Processing tools (`mod_data.R`).
+  - Allow row filtering by condition/indices and column removal via selectize tag pickers.
+  - Integrate table-based row/column removal directly from the active Data View table.
+
+### 2. Light Mode Visibility Fix for Data & Exploration Viz Options (DONE)
+> "the options in the show in data & exploration viz is bad in light mode. the text is white, same as the background so cant see the options."
+- **Diagnosis & Plan:**
+  - CSS bug where select dropdown options in Data & Exploration visualization use white text on white/light backgrounds in light theme (`data-ea-theme="light"`).
+  - Fix dropdown option text color styling so it adheres to theme CSS variables across light and dark modes. [COMPLETED]
+  - Fixed in `ui.R` by explicitly setting `background-color: var(--panel) !important; color: var(--ink) !important;` and hover state `var(--tint)` on all `select option`, `.form-select option`, `.selectize-dropdown .option`, and `.bootstrap-select .dropdown-item` elements.
+
+### 3. Load Points from XY Coordinates & CRS Configuration (QGIS / GeoLibre Data Source Manager)
+> "loading data to the map via x and y coordinates. a scenario: I i am working with a file that I am also modeling. so I load the data, I should be able to import the data by selecting which is x and which is y coodinates. important part is setitng the CRS cus some CRS can be off. we need the proper setitngs for this so that the points will show up on the map properly. take a look at qgis data source manager. same is true for geolibre"
+- **Diagnosis & Plan:**
+  - Add an "XY to Spatial Layer" (Point Data Import) tool under Add Data / Spatial Processing tools.
+  - Allows selecting a loaded tabular dataset, picking the X (Longitude/Easting) and Y (Latitude/Northing) columns, specifying the source Coordinate Reference System (CRS) with EPSG lookup (e.g. WGS84 EPSG:4326, ETRS89 / TM35FIN EPSG:3067), and creating a spatial `sf` vector object in `vector_pool` so points display accurately on the Leaflet Map canvas.
+
+### 4. Floated Tool Settings Panel Sync Bug (DONE)
+> "when I click, for eg, keep columns (we have similar search names by the way), the setitngs work fine in the tool side bar, but it does work when floated."
+- **Diagnosis & Plan:**
+  - Tool controls (e.g. "Keep Columns") function properly in the docked right sidebar panel, but break/desync when the tool settings panel is popped out / floated into a floating window.
+  - Inspect input namespace and reactive binding in floated pop-out containers to ensure seamless bidirectional state sync. [COMPLETED]
+  - Fixed in `mod_workspace.R` and `ui.R`:
+    1. Ensured `tool_rendered()` is explicitly bumped on `session$onFlushed` when toggling `tool_mode` ("float" / "dock"), triggering `ds_refresh()` -> `pop_arm()` so column pickers & select inputs are populated inside the newly mounted floated panel.
+    2. Added `ea-rebind-tool` JS custom message handler to automatically re-bind Shiny input event listeners on `.ea-wsx-panel` floating containers.
+
+### 5. Scoped "Reset to Raw Data" (Active Dataset Only) (DONE)
+> "reset to raw data should only be applied to the selected dataset and not all data (maybe an option to reset all data in the project or loaded and turn on. cus we do turn on and off the data selected)."
+- **Diagnosis & Plan:**
+  - "Reset to Raw Data" currently resets all loaded datasets globally.
+  - Scope the default reset action to **only** the active dataset (`active_dataset()`), with an optional toggle/modal option to "Reset All Datasets in Project". [COMPLETED]
+  - Fixed in `mod_data.R`:
+    1. "Reset Active Dataset" (and top-bar "Reset to upload") strictly resets **only** `active_dataset()` to its uploaded `raw_pool` state without modifying any other loaded dataset.
+    2. Added an explicit **"Reset All Datasets..."** action button with a safety confirmation modal to reset all project datasets when explicitly requested.
+
+### 7. App Session Responsiveness & Long-Running Process Safeguards (Idle Timeout & App Freezing) (DONE)
+> "sometimes, when I dont use the app for a while, it feels like it stops working and I have to kill it from the terminal.
+> sometimes, some processes are slow and freezes the app and i have to kill it from the terminal.
+> how can we solve these two issues and similar in the apps ui"
+- **Diagnosis & Architecture Plan:** [COMPLETED]
+  - Built & verified in `ui.R`, `server.R`, `mod_algo.R`, and `compute_worker.R`:
+    1. **25-Second Keep-Alive Heartbeat:** JS `setInterval` ping keeps WebSocket connection active during period of inactivity.
+    2. **Connection Health Dot:** Live status dot in top menubar (🟢 Connected | 🟡 Processing | 🔴 Disconnected).
+    3. **Auto-Reconnect Overlay:** `shiny:disconnected` overlay with a 1-click **"Reconnect Session"** button.
+    4. **Cancelable Background Worker Execution & Stop Button:** Heavy calculations run via `compute_worker.R` (`callr::r_bg`) with a red **"Stop / Cancel Process"** button that aborts stuck jobs instantly.
+    5. **Clear Memory:** Added **Session & Performance ▸ Clear Memory** in Settings drawer to run `gc(full = TRUE)` and refresh pools.
+  - **Issue A — Idle Session Freeze / Silent Disconnect:**
+    - *Root Cause:* Browsers throttle background tabs and close silent WebSockets when idle. Upon returning, the UI appears visible but Shiny events no longer communicate with R.
+    - *UI Solution:*
+      1. **Keep-Alive Heartbeat:** Add a 25-second JS heartbeat (`setInterval`) that sends a light ping to keep the WebSocket active and prevent tab sleep.
+      2. **Auto-Reconnect & Graceful Overlay:** Implement a `shiny:disconnected` JS overlay with a one-click **"Reconnect Session"** / **"Reload App"** button so users can instantly restore connectivity without touching the terminal.
+      3. **Session Health Indicator:** Add a live connection dot in the top menubar (🟢 Connected | 🟡 Processing | 🔴 Disconnected).
+  - **Issue B — Heavy Computation Freezes App & Blocks R Thread:**
+    - *Root Cause:* R is single-threaded. Running large spatial/model calculations directly on the main thread locks R's event loop, making Shiny unresponsive to clicks (including Cancel).
+    - *UI Solution:*
+      1. **Background Process Delegation (`compute_worker.R` / `callr::r_bg`):** Route all heavy calculations (raster ops, spatial joins, model fits, point density) to worker sessions so main Shiny thread stays 100% responsive.
+      2. **Interactive "Stop / Cancel" Button:** Show a red **"Stop / Cancel Process"** button in the tool panel and status bar while a background task runs. Clicking it calls `worker$kill()`, immediately aborts the heavy C++/R calculation, and restores the UI without crashing or killing the main app.
+      3. **Status Bar Task Manager:** Add a live active task bar indicator `[⚡ Task Running: Focal Mean (00:14) — Stop]` so users can monitor and kill stuck operations directly from the UI.
+
+
+

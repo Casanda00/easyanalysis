@@ -516,33 +516,47 @@ server <- function(input, output, session) {
 
   # ---- Delete dataset from appropriate pool ----
   observeEvent(input$delete_dataset, {
-    val <- input$delete_dataset
-    req(isTruthy(val))
+    raw_val <- input$delete_dataset
+    req(isTruthy(raw_val))
+    val <- if (is.list(raw_val)) raw_val$val else as.character(raw_val)
+    req(isTruthy(val), nzchar(val))
+
     if (val %in% names(reactiveValuesToList(dataset_pool))) {
       dataset_pool[[val]] <- NULL
       raw_pool[[val]]     <- NULL
       if (isTruthy(active_ds()) && active_ds() == val) active_ds(NULL)
-    } else if (val %in% names(reactiveValuesToList(raster_pool))) {
+    }
+    if (val %in% names(reactiveValuesToList(raster_pool))) {
       raster_pool[[val]] <- NULL
-    } else if (val %in% names(reactiveValuesToList(las_pool))) {
+    }
+    if (val %in% names(reactiveValuesToList(las_pool))) {
       las_pool[[val]] <- NULL
-    } else if (val %in% names(reactiveValuesToList(vector_pool))) {
+    }
+    if (val %in% names(reactiveValuesToList(vector_pool))) {
       vector_pool[[val]] <- NULL
     }
+
+    # Also check base name (without extension) if passed with extension
+    base_nm <- tools::file_path_sans_ext(val)
+    if (base_nm %in% names(reactiveValuesToList(raster_pool))) {
+      raster_pool[[base_nm]] <- NULL
+    }
+    if (base_nm %in% names(reactiveValuesToList(vector_pool))) {
+      vector_pool[[base_nm]] <- NULL
+    }
+
     # Delete the copy this project made of a spatial layer, so removing a layer
-    # does not leave an orphaned file behind. ea_project_remove_file() only ever
-    # deletes inside the project's own files/ folder — the user's original file
-    # is never touched.
-    local({
+    # does not leave an orphaned file behind.
+    tryCatch({
       pid <- current_project(); src <- .src_path(val)
       if (!is.null(pid) && nzchar(src))
         try(ea_project_remove_file(pid, src), silent = TRUE)
-      src_paths[[val]] <- NULL
-    })
+      if (exists("src_paths") && !is.null(src_paths[[val]])) src_paths[[val]] <- NULL
+    }, error = function(e) NULL)
+
     gc(FALSE)                     # reclaim the removed object's memory
     ds_refresh(ds_refresh() + 1)  # force datasets_list to drop the removed name
-    # Clear the file-upload widget's leftover filename text (it keeps showing the
-    # last uploaded name even after the dataset is removed).
+    # Clear the file-upload widget's leftover filename text
     session$sendCustomMessage("ea-reset-upload", list())
     showNotification(paste0("'", val, "' removed."), type = "message", duration = 2)
   })
@@ -996,7 +1010,22 @@ server <- function(input, output, session) {
   wind_ctx       <- windServer("wind", dataset_pool, active_dataset)
   gam_ctx        <- gamServer("gam", dataset_pool, active_dataset)
   rconsole_ctx   <- rconsoleServer("rconsole", dataset_pool, active_dataset,
-                                   raster_pool, las_pool, vector_pool)
+                                   raster_pool, las_pool, vector_pool,
+                                   on_data_change = function() ds_refresh(ds_refresh() + 1))
+  .flush_current_project <- function() {
+    pid <- current_project()
+    if (is.null(pid)) return()
+    st <- isolate(project_state())
+    spatial <- c(
+      lapply(st$rasters, function(n) list(name = n, kind = "raster", path = .src_path(n))),
+      lapply(st$las,     function(n) list(name = n, kind = "las",    path = .src_path(n))),
+      lapply(st$vectors, function(n) list(name = n, kind = "vector", path = .src_path(n)))
+    )
+    try(ea_project_save_data(pid, tables = st$tables, spatial = spatial,
+                             last_view = st$view, active_dataset = st$active,
+                             layer_style = st$style), silent = TRUE)
+  }
+
   # ---- Workspace File menu (ids are app-level, not module-namespaced) ----
   # "Save project as .eap": the .ea-eap-save JS turns this into a native
   # save-location dialog; otherwise it is a normal browser download.
@@ -1007,11 +1036,24 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       pid <- current_project(); req(pid)
-      zip::zipr(zipfile = file, files = ea_project_path(pid), recurse = TRUE)
+      .flush_current_project()
+      ea_project_export(pid, file)
     }
   )
   # Project ▸ Open Recent ▸ <project>
   observeEvent(input$ws_open_recent, { open_project(input$ws_open_recent) })
+
+  # Keep-alive session heartbeat ping observer
+  observeEvent(input$ea_heartbeat, {
+    # Lightweight ping receiver: keeps WebSocket active and resets idle timers
+  }, ignoreInit = TRUE)
+
+  # Clear R memory and refresh reactive session pools
+  observeEvent(input$ws_clear_memory, {
+    gc(full = TRUE)
+    ds_refresh(ds_refresh() + 1)
+    showNotification("R memory cleared and session pools refreshed successfully.", type = "message")
+  })
 
   # Project ▸ Export report (HTML) — a self-contained snapshot of the project.
   output$ws_report <- downloadHandler(

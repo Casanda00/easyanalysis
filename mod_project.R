@@ -71,9 +71,16 @@ projectServer <- function(id, meta, counts, on_files, on_sample, on_rename, on_d
     # Left rail: the CATEGORISED data — each type as a section with its items.
     output$data_list <- renderUI({
       cn <- counts(); if (is.null(cn)) return(NULL)
-      row <- function(nm, colour) div(class = "ea-pd-item",
-        span(class = "ea-pd-dot", style = paste0("background:", colour, ";")),
-        span(class = "ea-pd-nm", title = nm, nm))
+      row <- function(nm, colour) div(class = "ea-pd-item", style = "display:flex; align-items:center; justify-content:space-between;",
+        div(style = "display:flex; align-items:center; gap:6px; overflow:hidden;",
+          span(class = "ea-pd-dot", style = paste0("background:", colour, ";")),
+          span(class = "ea-pd-nm", title = nm, nm)),
+        tags$span("×",
+          title = paste0("Remove '", nm, "' from this project"),
+          style = "cursor:pointer; color:#dc3545; font-weight:bold; padding:0 4px; flex-shrink:0;",
+          onclick = sprintf(
+            "event.stopPropagation(); if(confirm('Remove \\'%s\\' from this project?\\n\\nYour original file on disk is not deleted.')) eaSetInput('delete_dataset', {val:%s, t:Date.now()});",
+            gsub("'", "", nm), jsonlite::toJSON(nm, auto_unbox = TRUE))))
       sec <- function(label, names, colour) {
         if (!length(names)) return(NULL)
         div(class = "ea-pd-cat",
@@ -175,7 +182,7 @@ projectServer <- function(id, meta, counts, on_files, on_sample, on_rename, on_d
       },
       content = function(file) {
         m <- meta(); req(m)
-        zip::zipr(zipfile = file, files = ea_project_path(m$id), recurse = TRUE)
+        ea_project_export(m$id, file)
       }
     )
 
@@ -285,7 +292,7 @@ projectServer <- function(id, meta, counts, on_files, on_sample, on_rename, on_d
     tags$button(class = "ea-fcard-x", type = "button",
       title = paste0("Remove '", nm, "' from this project"),
       onclick = sprintf(
-        "event.stopPropagation(); if(confirm('Remove \\'%s\\' from this project?\\n\\nYour original file on disk is not deleted.')) eaSetInput('delete_dataset', %s);",
+        "event.stopPropagation(); if(confirm('Remove \\'%s\\' from this project?\\n\\nYour original file on disk is not deleted.')) eaSetInput('delete_dataset', {val:%s, t:Date.now()});",
         gsub("'", "", nm), jsonlite::toJSON(nm, auto_unbox = TRUE)),
       HTML("&times;")))
   cards <- c(

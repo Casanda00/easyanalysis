@@ -52,26 +52,56 @@
     pickerInput(ns("eng_subset_cols"), "Columns to Keep:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
     actionButton(ns("apply_subset"), "Apply Subset", class = "btn-primary btn-sm w-100"))),
 
-  drop_cols = list(label = "Drop columns", ui = function(ns) .cmd_box("Drop columns",
-    pickerInput(ns("eng_drop_cols"), "Columns to Drop:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
-    actionButton(ns("apply_drop"), "Drop Selected", class = "btn-danger btn-sm w-100"))),
+  drop_cols = list(label = "Remove columns", ui = function(ns) .cmd_box("Remove columns",
+    selectInput(ns("rem_cols_target_ds"), "Target Dataset:", choices = NULL),
+    pickerInput(ns("eng_drop_cols"), "Columns to Remove:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
+    actionButton(ns("apply_drop"), "Remove Selected Columns", class = "btn-danger btn-sm w-100"))),
 
   rename_col = list(label = "Rename column", ui = function(ns) .cmd_box("Rename column",
     selectInput(ns("rename_col_target"), "Select Column:", choices = NULL),
     textInput(ns("rename_col_new_name"), "New Name:", placeholder = "Enter new name"),
     actionButton(ns("apply_col_rename"), "Rename Column", class = "btn-primary btn-sm w-100"))),
 
-  mutate = list(label = "New column (mutate)", ui = function(ns) .cmd_box("New column from two numeric columns",
-    selectInput(ns("mutate_col1"), "Numeric Col 1:", choices = NULL),
-    selectInput(ns("mutate_op"), "Operation:", choices = c("+", "-", "*", "/")),
-    selectInput(ns("mutate_col2"), "Numeric Col 2:", choices = NULL),
-    textInput(ns("mutate_new_name"), "New Column Name:", placeholder = "e.g., area_calc"),
-    actionButton(ns("apply_mutate"), "Create Column", class = "btn-primary btn-sm w-100"))),
+  add_col = list(label = "Add column", ui = function(ns) .cmd_box("Add column",
+    selectInput(ns("add_col_target_ds"), "Target Dataset:", choices = NULL),
+    textInput(ns("add_col_name"), "New Column Name:", placeholder = "e.g., total_val"),
+    selectInput(ns("add_col_type"), "Column Source / Type:", choices = c(
+      "Formula (Col1 [op] Col2)" = "formula",
+      "Constant Value" = "constant",
+      "Sequential Row Index (1..N)" = "index",
+      "Log Transform log(x+1)" = "log",
+      "Z-Score Standardize scale(x)" = "scale"
+    )),
+    uiOutput(ns("add_col_params_ui")),
+    actionButton(ns("apply_add_col"), "Create Column", class = "btn-primary btn-sm w-100"))),
 
   filter = list(label = "Filter rows", ui = function(ns) .cmd_box("Filter rows",
     selectInput(ns("filter_col"), "Select Column to Filter:", choices = NULL),
     uiOutput(ns("filter_condition_ui")),
     actionButton(ns("apply_filter"), "Apply Filter", class = "btn-primary btn-sm w-100"))),
+
+  remove_rows = list(label = "Remove rows", ui = function(ns) .cmd_box("Remove rows",
+    selectInput(ns("rem_rows_target_ds"), "Target Dataset:", choices = NULL),
+    selectInput(ns("rem_rows_mode"), "Remove Method:", choices = c(
+      "Rows with Missing Values (NA)" = "na",
+      "Condition (Column [op] Value)" = "condition",
+      "Specific Row Index / Range" = "indices"
+    )),
+    uiOutput(ns("rem_rows_params_ui")),
+    actionButton(ns("apply_remove_rows"), "Remove Rows", class = "btn-danger btn-sm w-100"))),
+
+  transform_col = list(label = "Transform column", ui = function(ns) .cmd_box("Transform column",
+    selectInput(ns("tf_col_target_ds"), "Target Dataset:", choices = NULL),
+    selectInput(ns("tf_col_src"), "Select Column:", choices = NULL),
+    selectInput(ns("tf_col_func"), "Transformation:", choices = c(
+      "Logarithm: log(x + 1)" = "log",
+      "Z-Score Standardize: (x - mean)/sd" = "zscore",
+      "Min-Max Normalize (0 to 1)" = "minmax",
+      "Square Root: sqrt(x)" = "sqrt",
+      "Absolute Value: abs(x)" = "abs"
+    )),
+    textInput(ns("tf_col_new_name"), "New Column Name (leave blank to overwrite):", placeholder = "e.g., col_log"),
+    actionButton(ns("apply_transform_col"), "Transform Column", class = "btn-primary btn-sm w-100"))),
 
   convert = list(label = "Convert types", ui = function(ns) .cmd_box("Convert column types",
     pickerInput(ns("convert_to_num"), "Convert to Numeric:", choices = NULL, multiple = TRUE, options = list(`actions-box` = TRUE, `live-search` = TRUE)),
@@ -134,8 +164,12 @@ dataToolsUI <- function(id) {
   tagList(
     uiOutput(ns("cmd_panel")),
     hr(class = "my-2"),
-    actionButton(ns("reset_data"), "Reset to Raw Data",
-                 class = "btn-warning btn-sm w-100")
+    div(class = "d-flex flex-column gap-2",
+      actionButton(ns("reset_data"), "Reset Active Dataset",
+                   class = "btn-warning btn-sm w-100", icon = icon("rotate-left")),
+      actionButton(ns("reset_all_data"), "Reset All Datasets...",
+                   class = "btn-outline-danger btn-sm w-100", icon = icon("trash-arrow-up"))
+    )
   )
 }
 
@@ -247,35 +281,70 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       rv$working_data <- dataset_pool[[active_dataset()]]
     }, ignoreNULL = TRUE)
 
+    # ---- Reset Active Dataset ----
     observeEvent(input$reset_data, {
-      req(active_dataset())
+      act <- active_dataset()
+      req(act)
+      raw <- raw_pool[[act]]
+      if (is.null(raw)) { showNotification("No raw data found for active dataset.", type = "warning"); return() }
       snap()
-      raw <- raw_pool[[active_dataset()]]
       rv$working_data <- raw
-      dataset_pool[[active_dataset()]] <- raw
-      showNotification("Dataset reset to original raw data across all tabs.", type = "message")
+      dataset_pool[[act]] <- raw
+      showNotification(sprintf("Active dataset '%s' reset to raw uploaded data.", act), type = "message")
+    })
+
+    # ---- Reset All Datasets in Project (Modal + Action) ----
+    observeEvent(input$reset_all_data, {
+      showModal(modalDialog(
+        title = "Reset All Datasets in Project?",
+        p("Are you sure you want to reset ALL datasets in this project back to their original raw uploaded states? All column transformations and edits across all tables will be reverted."),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("confirm_reset_all"), "Reset All Datasets", class = "btn-danger")
+        ),
+        easyClose = TRUE
+      ))
+    })
+
+    observeEvent(input$confirm_reset_all, {
+      removeModal()
+      dn <- dataset_names()
+      if (!length(dn)) return()
+      for (nm in dn) {
+        raw <- raw_pool[[nm]]
+        if (!is.null(raw)) {
+          dataset_pool[[nm]] <- raw
+        }
+      }
+      act <- active_dataset()
+      if (!is.null(act) && !is.null(raw_pool[[act]])) {
+        rv$working_data <- raw_pool[[act]]
+      }
+      showNotification("All datasets in the project have been reset to original raw data.", type = "message")
     })
 
     # ---- Undo last operation ----
     observeEvent(input$undo_last, {
-      req(active_dataset())
+      act <- active_dataset()
+      req(act)
       prev <- prev_state()
       if (is.null(prev)) { showNotification("Nothing to undo.", type = "warning"); return() }
       rv$working_data <- prev
-      dataset_pool[[active_dataset()]] <- prev
+      dataset_pool[[act]] <- prev
       prev_state(NULL)
       showNotification("Last change undone.", type = "message")
     })
 
-    # ---- Reset to original upload (top-bar button) ----
+    # ---- Reset active dataset to original upload (top-bar button / shortcut) ----
     observeEvent(input$reset_raw, {
-      req(active_dataset())
-      orig <- raw_pool[[active_dataset()]]
-      if (is.null(orig)) { showNotification("No original data found.", type = "warning"); return() }
+      act <- active_dataset()
+      req(act)
+      orig <- raw_pool[[act]]
+      if (is.null(orig)) { showNotification("No original data found for active dataset.", type = "warning"); return() }
       snap()
       rv$working_data <- orig
-      dataset_pool[[active_dataset()]] <- orig
-      showNotification("Dataset restored to original upload.", type = "message")
+      dataset_pool[[act]] <- orig
+      showNotification(sprintf("Active dataset '%s' restored to original upload.", act), type = "message")
     })
 
     # ---- Toolbox picker population ----
@@ -313,12 +382,17 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     observeEvent(pop_arm(), {
       req(rv$working_data)
+      act <- active_dataset()
+      if (is.null(act) || !is.character(act) || length(act) != 1 || !nzchar(act)) return()
       df <- rv$working_data
       cols <- names(df)
       num_cols <- names(df)[sapply(df, is.numeric)]
       cat_cols <- names(df)[!sapply(df, is.numeric)]
 
-      updatePickerInput(session, "eng_subset_cols", choices = names(raw_pool[[active_dataset()]]), selected = cols)
+      raw_df <- tryCatch(raw_pool[[act]], error = function(e) NULL)
+      raw_cols <- if (!is.null(raw_df)) names(raw_df) else cols
+
+      updatePickerInput(session, "eng_subset_cols", choices = raw_cols, selected = cols)
       updatePickerInput(session, "eng_drop_cols", choices = cols, selected = NULL)
       updateSelectInput(session, "rename_col_target", choices = cols)
       updateSelectInput(session, "mutate_col1", choices = num_cols)
@@ -340,12 +414,22 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       updateSelectInput(session, "agg_col", choices = cat_cols, selected = curr_agg)
       curr_del <- if (isTruthy(isolate(input$delete_lvl_col)) && isolate(input$delete_lvl_col) %in% cat_cols) isolate(input$delete_lvl_col) else cat_cols[1]
       updateSelectInput(session, "delete_lvl_col", choices = cat_cols, selected = curr_del)
+
+      updatePickerInput(session, "rem_cols_list", choices = cols, selected = NULL)
+      updateSelectInput(session, "tf_col_src", choices = cols)
     })
 
-    # Datasets available to join / batch against.
+    # Datasets available to join / batch / target against.
     observeEvent(list(pop_arm(), dataset_names()), {
-      updateSelectInput(session, "batch_targets", choices = dataset_names())
-      updateSelectInput(session, "join_target", choices = dataset_names())
+      dn <- dataset_names()
+      act <- active_dataset()
+      act_str <- if (is.character(act) && length(act) == 1 && nzchar(act)) act else NULL
+      updateSelectInput(session, "batch_targets", choices = dn)
+      updateSelectInput(session, "join_target", choices = dn)
+      updateSelectInput(session, "add_col_target_ds", choices = dn, selected = act_str)
+      updateSelectInput(session, "rem_rows_target_ds", choices = dn, selected = act_str)
+      updateSelectInput(session, "rem_cols_target_ds", choices = dn, selected = act_str)
+      updateSelectInput(session, "tf_col_target_ds", choices = dn, selected = act_str)
     })
 
     # Download via a custom message (R builds the text, JS saves a Blob) — the
@@ -527,6 +611,165 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       }, error = function(e) {
         showNotification(paste("Error joining datasets:", e$message), type = "error")
       })
+    })
+
+    # ---- Add Column dynamic UI & observer ----
+    output$add_col_params_ui <- renderUI({
+      req(input$add_col_type)
+      df <- rv$working_data
+      if (is.null(df)) return(NULL)
+      cols <- names(df)
+      num_cols <- names(df)[vapply(df, is.numeric, logical(1))]
+      switch(input$add_col_type,
+        "constant" = textInput(ns("add_col_const_val"), "Constant Value:", value = "0"),
+        "index"    = tags$p(class = "text-muted small my-2", "Adds a 1..N row index column."),
+        "log"      = selectInput(ns("add_col_log_src"), "Source Numeric Column:", choices = num_cols),
+        "scale"    = selectInput(ns("add_col_scale_src"), "Source Numeric Column:", choices = num_cols),
+        "formula"  = tagList(
+          selectInput(ns("add_col_f_c1"), "Column 1:", choices = num_cols),
+          selectInput(ns("add_col_f_op"), "Operation:", choices = c("+", "-", "*", "/")),
+          selectInput(ns("add_col_f_c2"), "Column 2:", choices = num_cols)
+        )
+      )
+    })
+
+    observeEvent(input$apply_add_col, {
+      req(input$add_col_name, input$add_col_type)
+      target_ds <- input$add_col_target_ds %||% active_dataset()
+      req(target_ds, target_ds %in% names(dataset_pool))
+      snap()
+      df <- dataset_pool[[target_ds]]
+      col_name <- trimws(input$add_col_name)
+      if (!nzchar(col_name)) { showNotification("Please enter a column name.", type = "warning"); return() }
+
+      new_vals <- tryCatch({
+        switch(input$add_col_type,
+          "constant" = rep(input$add_col_const_val %||% "0", nrow(df)),
+          "index"    = seq_len(nrow(df)),
+          "log"      = { c <- df[[req(input$add_col_log_src)]]; log(as.numeric(c) + 1) },
+          "scale"    = { c <- df[[req(input$add_col_scale_src)]]; as.numeric(scale(as.numeric(c))) },
+          "formula"  = {
+            c1 <- as.numeric(df[[req(input$add_col_f_c1)]])
+            c2 <- as.numeric(df[[req(input$add_col_f_c2)]])
+            switch(input$add_col_f_op, "+" = c1 + c2, "-" = c1 - c2, "*" = c1 * c2, "/" = c1 / c2)
+          }
+        )
+      }, error = function(e) NULL)
+
+      if (is.null(new_vals) || length(new_vals) != nrow(df)) {
+        showNotification("Error computing new column values.", type = "error")
+        return()
+      }
+
+      df[[col_name]] <- new_vals
+      dataset_pool[[target_ds]] <- df
+      if (identical(target_ds, active_dataset())) rv$working_data <- df
+      showNotification(paste("Added column", col_name, "to", target_ds), type = "message")
+    })
+
+    # ---- Remove Rows dynamic UI & observer ----
+    output$rem_rows_params_ui <- renderUI({
+      req(input$rem_rows_mode)
+      df <- rv$working_data
+      if (is.null(df)) return(NULL)
+      cols <- names(df)
+      switch(input$rem_rows_mode,
+        "na" = selectInput(ns("rem_rows_na_col"), "Check NAs in Column:", choices = c("All Columns" = "_all_", cols)),
+        "condition" = tagList(
+          selectInput(ns("rem_rows_cond_col"), "Column:", choices = cols),
+          selectInput(ns("rem_rows_cond_op"), "Operator:", choices = c(">", "<", "==", "!=", ">=", "<=")),
+          textInput(ns("rem_rows_cond_val"), "Value:", value = "0")
+        ),
+        "indices" = textInput(ns("rem_rows_idx_text"), "Row Indices (e.g., 1, 5, 10:20):", placeholder = "1:5, 10")
+      )
+    })
+
+    observeEvent(input$apply_remove_rows, {
+      req(input$rem_rows_mode)
+      target_ds <- input$rem_rows_target_ds %||% active_dataset()
+      req(target_ds, target_ds %in% names(dataset_pool))
+      snap()
+      df <- dataset_pool[[target_ds]]
+      n_start <- nrow(df)
+
+      remove_idx <- tryCatch({
+        switch(input$rem_rows_mode,
+          "na" = {
+            col <- input$rem_rows_na_col %||% "_all_"
+            if (identical(col, "_all_")) !complete.cases(df) else is.na(df[[col]])
+          },
+          "condition" = {
+            col_data <- df[[req(input$rem_rows_cond_col)]]
+            op <- req(input$rem_rows_cond_op)
+            val <- input$rem_rows_cond_val %||% "0"
+            if (is.numeric(col_data)) {
+              num_val <- as.numeric(val)
+              switch(op, ">" = col_data > num_val, "<" = col_data < num_val, "==" = col_data == num_val, "!=" = col_data != num_val, ">=" = col_data >= num_val, "<=" = col_data <= num_val)
+            } else {
+              switch(op, "==" = col_data == val, "!=" = col_data != val, rep(FALSE, nrow(df)))
+            }
+          },
+          "indices" = {
+            txt <- trimws(input$rem_rows_idx_text %||% "")
+            if (!nzchar(txt)) logical(nrow(df)) else {
+              idxs <- suppressWarnings(as.integer(eval(parse(text = paste0("c(", txt, ")")))))
+              seq_len(nrow(df)) %in% idxs[!is.na(idxs)]
+            }
+          }
+        )
+      }, error = function(e) logical(nrow(df)))
+
+      remove_idx[is.na(remove_idx)] <- FALSE
+      df <- df[!remove_idx, , drop = FALSE]
+      df <- droplevels(df)
+      dataset_pool[[target_ds]] <- df
+      if (identical(target_ds, active_dataset())) rv$working_data <- df
+      showNotification(paste("Removed", n_start - nrow(df), "rows from", target_ds), type = "message")
+    })
+
+    # ---- Remove Columns observer ----
+    observeEvent(input$apply_remove_cols, {
+      target_ds <- input$rem_cols_target_ds %||% active_dataset()
+      cols_to_rem <- input$rem_cols_list
+      req(target_ds, target_ds %in% names(dataset_pool), length(cols_to_rem) > 0)
+      snap()
+      df <- dataset_pool[[target_ds]]
+      df <- df[, !(names(df) %in% cols_to_rem), drop = FALSE]
+      dataset_pool[[target_ds]] <- df
+      if (identical(target_ds, active_dataset())) rv$working_data <- df
+      showNotification(paste("Removed", length(cols_to_rem), "columns from", target_ds), type = "message")
+    })
+
+    # ---- Transform Column observer ----
+    observeEvent(input$apply_transform_col, {
+      req(input$tf_col_src, input$tf_col_func)
+      target_ds <- input$tf_col_target_ds %||% active_dataset()
+      req(target_ds, target_ds %in% names(dataset_pool))
+      snap()
+      df <- dataset_pool[[target_ds]]
+      src_col <- input$tf_col_src
+      c_vals <- as.numeric(df[[src_col]])
+
+      new_vals <- tryCatch({
+        switch(input$tf_col_func,
+          "log"    = log(c_vals + 1),
+          "zscore" = as.numeric(scale(c_vals)),
+          "minmax" = { rng <- range(c_vals, na.rm = TRUE); (c_vals - rng[1]) / (rng[2] - rng[1]) },
+          "sqrt"   = sqrt(pmax(0, c_vals, na.rm = TRUE)),
+          "abs"    = abs(c_vals)
+        )
+      }, error = function(e) NULL)
+
+      if (is.null(new_vals)) {
+        showNotification("Transformation failed.", type = "error")
+        return()
+      }
+
+      dest_name <- if (nzchar(trimws(input$tf_col_new_name %||% ""))) trimws(input$tf_col_new_name) else src_col
+      df[[dest_name]] <- new_vals
+      dataset_pool[[target_ds]] <- df
+      if (identical(target_ds, active_dataset())) rv$working_data <- df
+      showNotification(paste("Transformed", src_col, "->", dest_name), type = "message")
     })
 
     # ---- Type conversion ----

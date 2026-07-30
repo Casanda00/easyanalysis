@@ -389,13 +389,26 @@ page_fillable(
     .datepicker table tr td.active, .datepicker table tr td.active:hover,
     .datepicker table tr td span.active, .datepicker table tr td span.active:hover {
                   background: var(--forest) !important; color: var(--onbrand) !important; }
-    /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
-    .form-control, .form-select, textarea.form-control,
-    .selectize-input, .selectize-dropdown {
-      background-color: var(--panel); color: var(--ink); border-color: var(--line);
+    /* Form controls & select dropdown options styling across themes */
+    .form-control, .form-select, select, textarea.form-control,
+    .selectize-input, .selectize-dropdown,
+    .selectize-control .selectize-input,
+    .bootstrap-select .dropdown-toggle,
+    .bootstrap-select .dropdown-menu {
+      background-color: var(--sunk) !important; color: var(--ink) !important; border-color: var(--line) !important;
     }
-    .selectize-dropdown .active { background: var(--sunk); color: var(--ink); }
-    .form-control::placeholder { color: var(--bark); }
+    option, select option, .form-select option, optgroup, optgroup option,
+    .selectize-dropdown .option, .selectize-dropdown-content .option,
+    .bootstrap-select .dropdown-item {
+      background-color: var(--panel) !important; color: var(--ink) !important;
+    }
+    .selectize-dropdown .active, .selectize-dropdown .option:hover, .selectize-dropdown .option.selected,
+    .bootstrap-select .dropdown-item:hover, .bootstrap-select .dropdown-item.active,
+    select option:hover, select option:focus, select option:checked {
+      background-color: var(--tint) !important; color: var(--ink) !important;
+    }
+    .selectize-input .item { color: var(--ink) !important; }
+    .form-control::placeholder { color: var(--bark) !important; }
 
     /* Boot overlay — one calm screen instead of a dimming, half-drawn app. */
     #ea-boot { position: fixed; inset: 0; z-index: 4000; background: var(--paper);
@@ -957,7 +970,26 @@ page_fillable(
     .ea-wsx-ty { margin-left: auto; font: 400 9px var(--mono); text-transform: uppercase; color: var(--bark); }
     .ea-wsx-mapnote, .ea-wsx-chartnote { border: 1px dashed var(--line); border-radius: 10px; padding: 16px;
                   color: var(--bark); font-size: 13px; line-height: 1.6; background: var(--panel); margin-bottom: 12px; }
-    .ea-wsx-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    /* Session Health & Connection Indicator */
+    .ea-health-indicator { display: flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 12px;
+                           background: var(--sunk); border: 1px solid var(--line); font-size: 11px; font-weight: 550; color: var(--bark); }
+    .ea-health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; transition: all .3s ease; }
+    .ea-health-dot.connected { background: #4CD964; box-shadow: 0 0 6px rgba(76,217,100,.6); }
+    .ea-health-dot.busy { background: #E0A458; box-shadow: 0 0 6px rgba(224,164,88,.6); animation: eaPulse 1.2s infinite ease-in-out; }
+    .ea-health-dot.disconnected { background: #D9694F; box-shadow: 0 0 6px rgba(217,105,79,.6); }
+    .ea-health-text { font-family: var(--mono); font-size: 10px; }
+    @keyframes eaPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Disconnect Overlay */
+    .ea-disconnect-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(10,15,10,.78);
+                             backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; }
+    .ea-disconnect-overlay.show { display: flex; }
+    .ea-disconnect-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+                          padding: 26px; max-width: 380px; text-align: center; color: var(--ink); box-shadow: 0 24px 60px rgba(0,0,0,.65); }
+    .ea-disconnect-icon { font-size: 36px; margin-bottom: 10px; color: var(--warn); }
+    .ea-disconnect-title { font-weight: 700; font-size: 17px; margin-bottom: 8px; color: var(--ink); }
+    .ea-disconnect-msg { font-size: 12.5px; color: var(--bark); margin-bottom: 20px; line-height: 1.45; }
+
     .ea-wsx-qtool { font: 550 11px var(--ui); background: var(--panel); border: 1px solid var(--line);
                   border-radius: 999px; padding: 5px 11px; color: var(--ink); }
     /* Step 2: layers panel — visibility, active, expandable legend/style */
@@ -1422,12 +1454,21 @@ page_fillable(
                                  color: var(--ink); }
 
     /* form controls */
-    .form-control, .form-select, .selectize-input, textarea {
+    .form-control, .form-select, select, textarea,
+    .selectize-input, .selectize-dropdown,
+    .bootstrap-select .dropdown-menu {
       background: var(--sunk) !important; color: var(--ink) !important;
       border-color: var(--line) !important; }
-    .selectize-dropdown { background: var(--panel); color: var(--ink);
-                          border-color: var(--line); }
-    .form-control::placeholder { color: var(--bark); }
+    option, select option, .form-select option, optgroup, optgroup option,
+    .selectize-dropdown .option, .selectize-dropdown-content .option,
+    .bootstrap-select .dropdown-item {
+      background-color: var(--panel) !important; color: var(--ink) !important;
+    }
+    .selectize-dropdown .active, .selectize-dropdown .option:hover,
+    .bootstrap-select .dropdown-item:hover, .bootstrap-select .dropdown-item.active {
+      background: var(--tint) !important; color: var(--ink) !important;
+    }
+    .form-control::placeholder { color: var(--bark) !important; }
     /* ===== Glassy popups — a frosted translucent panel over a blurred, dark
        backdrop. Never the white-ish default. ===== */
     .modal-content {
@@ -2058,7 +2099,49 @@ page_fillable(
             document.querySelectorAll('.rc-plotwin').forEach(function(w){ pwObs.observe(w); });
           }, 1500);
         });
-      }
+      /* Re-bind Shiny inputs when a tool panel is floated or docked. */
+      Shiny.addCustomMessageHandler('ea-rebind-tool', function(msg){
+        setTimeout(function(){
+          if (!window.Shiny) return;
+          var targets = document.querySelectorAll('.ea-wsx-panel, .app-right, .app-tools');
+          targets.forEach(function(el){
+            try { Shiny.unbindInputs(el); } catch(e){}
+            try { Shiny.bindInputs(el); } catch(e){}
+          });
+        }, 60);
+      });
+
+      /* Keep-Alive Heartbeat & Session Health Monitor */
+      (function(){
+        var hbTimer = null;
+        function sendPing(){
+          if (window.Shiny && Shiny.setInputValue) {
+            try { Shiny.setInputValue('ea_heartbeat', Date.now(), {priority: 'event'}); } catch(e){}
+          }
+        }
+        function setHealth(st){
+          var dot = document.getElementById('ea-health-dot');
+          var txt = document.getElementById('ea-health-text');
+          if (!dot) return;
+          dot.className = 'ea-health-dot ' + st;
+          if (txt) txt.textContent = st === 'connected' ? 'Connected' : (st === 'busy' ? 'Processing' : 'Disconnected');
+        }
+        if (window.jQuery) {
+          jQuery(document).on('shiny:connected', function(){
+            setHealth('connected');
+            if (!hbTimer) hbTimer = setInterval(sendPing, 25000);
+          });
+          jQuery(document).on('shiny:busy', function(){ setHealth('busy'); });
+          jQuery(document).on('shiny:idle', function(){ setHealth('connected'); });
+          jQuery(document).on('shiny:disconnected', function(){
+            setHealth('disconnected');
+            if (hbTimer) { clearInterval(hbTimer); hbTimer = null; }
+            var ov = document.getElementById('ea-disconnect-overlay');
+            if (ov) ov.classList.add('show');
+          });
+        }
+      })();
+
       /* Header drag: RESIZE when docked (drag up = taller), MOVE when floating. */
       document.addEventListener('mousedown', function(e){
         var h = e.target.closest ? e.target.closest('.ea-wsx-conh') : null;
@@ -2100,32 +2183,6 @@ page_fillable(
         var m = document.querySelector('.app-main');
         if (m) m.classList.toggle('projects-empty', !!isEmpty);
       });
-
-      /* 'Save as .eap' -> a real location picker via the File System Access API
-         (works on localhost/https in Chrome/Edge): fetch the project zip from
-         the download handler, then let the user choose exactly where to write
-         it. If the API is unavailable (e.g. Firefox), do nothing here and let
-         the normal browser download proceed. */
-      document.addEventListener('click', function(e){
-        var a = e.target.closest('.ea-eap-save'); if(!a) return;
-        if(!window.showSaveFilePicker) return;          // fall back to download
-        e.preventDefault(); e.stopPropagation();
-        (async function(){
-          try{
-            var resp = await fetch(a.href);
-            var blob = await resp.blob();
-            var name = 'project.eap';
-            var cd = resp.headers.get('Content-Disposition');
-            if(cd){ var mm = /filename\\*?=\"?([^\";]+)\"?/i.exec(cd); if(mm) name = decodeURIComponent(mm[1]); }
-            var handle = await window.showSaveFilePicker({
-              suggestedName: name,
-              types: [{ description: 'EasyAnalysis project', accept: { 'application/octet-stream': ['.eap'] } }]
-            });
-            var w = await handle.createWritable();
-            await w.write(blob); await w.close();
-          }catch(err){ if(err && err.name !== 'AbortError') console.error('save .eap failed', err); }
-        })();
-      }, true);
 
       /* ---- Panel resize drag ---- */
       (function(){
@@ -2506,6 +2563,11 @@ page_fillable(
           icon("wand-magic-sparkles", style = "font-size:12px;"), "Co-Analyst"
         ),
         tags$div(class = "topbar-sep tb-coanalyst"),
+        # Session Health Indicator
+        tags$div(class = "ea-health-indicator", id = "ea-health-container",
+          tags$span(id = "ea-health-dot", class = "ea-health-dot connected", title = "Session connected & ready"),
+          tags$span(id = "ea-health-text", class = "ea-health-text", "Connected")
+        ),
         # Settings gear
         tags$button(
           class = "topbar-action-btn",
@@ -2651,6 +2713,27 @@ page_fillable(
         ),
         tags$p(class = "settings-hint",
           "Applies to the dataset currently active on the Data screen.")
+      ),
+
+      # --- Section: Session & Performance ---
+      tags$div(class = "settings-section",
+        tags$p(class = "settings-section-title", "Session & Performance"),
+        tags$div(class = "settings-action-row",
+          tags$button(
+            class   = "settings-action-btn",
+            title   = "Clear unused R memory and flush caches",
+            onclick = "Shiny.setInputValue('ws_clear_memory', Date.now(), {priority:'event'}); closeSettings();",
+            icon("broom"), " Clear Memory"
+          ),
+          tags$button(
+            class   = "settings-action-btn",
+            title   = "Reconnect Shiny session",
+            onclick = "if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.reconnect){try{Shiny.shinyapp.reconnect();}catch(e){}} location.reload();",
+            icon("arrows-rotate"), " Reconnect"
+          )
+        ),
+        tags$p(class = "settings-hint",
+          "Frees memory allocations (gc) and restores connection health.")
       ),
 
       # --- Section: Display ---
@@ -2853,6 +2936,18 @@ page_fillable(
   tags$div(class = "ea-hidden-file",
     downloadLink("ws_export", "Save as .eap", class = "ea-eap-save"),
     downloadLink("ws_report", "Export report")),
+
+  # Session Disconnect Overlay
+  tags$div(id = "ea-disconnect-overlay", class = "ea-disconnect-overlay",
+    tags$div(class = "ea-disconnect-card",
+      tags$div(class = "ea-disconnect-icon", icon("plug-circle-xmark")),
+      tags$div(class = "ea-disconnect-title", "Session Disconnected"),
+      tags$div(class = "ea-disconnect-msg", "The connection to EasyAnalysis was lost or timed out due to tab inactivity. Reconnect to resume without losing work."),
+      tags$button(class = "btn btn-success w-100",
+                  onclick = "if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.reconnect){try{Shiny.shinyapp.reconnect();}catch(e){}} location.reload();",
+                  icon("arrows-rotate"), " Reconnect Session")
+    )
+  ),
 
   # =================== AI CO-PILOT (floating) ===================
   chatUI("chat")

@@ -212,12 +212,17 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
     # ---- Toolbox picker population ----
     observeEvent(rv$working_data, {
       req(rv$working_data)
+      act <- active_dataset()
+      if (is.null(act) || !is.character(act) || length(act) != 1 || !nzchar(act)) return()
       df <- rv$working_data
       cols <- names(df)
       num_cols <- names(df)[sapply(df, is.numeric)]
       cat_cols <- names(df)[!sapply(df, is.numeric)]
 
-      updatePickerInput(session, "eng_subset_cols", choices = names(raw_pool[[active_dataset()]]), selected = cols)
+      raw_df <- tryCatch(raw_pool[[act]], error = function(e) NULL)
+      raw_cols <- if (!is.null(raw_df)) names(raw_df) else cols
+
+      updatePickerInput(session, "eng_subset_cols", choices = raw_cols, selected = cols)
       updatePickerInput(session, "eng_drop_cols", choices = cols, selected = NULL)
       updateSelectInput(session, "rename_col_target", choices = cols)
       updateSelectInput(session, "mutate_col1", choices = num_cols)

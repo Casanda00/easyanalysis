@@ -42,6 +42,50 @@ ea_sel <- function(key, label, choices, value = NULL, hint = NULL)
   list(kind = "sel", key = key, label = label, choices = choices,
        value = value %||% unname(choices)[1], hint = hint)
 
+# A searchable CRS selector with typeahead matching for global, regional, and UTM EPSGs.
+# Supports custom entry (create = TRUE) for any EPSG code, PROJ string, or WKT.
+ea_crs <- function(key, label = "Target CRS (EPSG / PROJ / WKT)", value = "EPSG:4326", hint = NULL)
+  list(kind = "crs", key = key, label = label, value = value, hint = hint)
+
+.ea_crs_choices <- function() {
+  c(
+    "Global & Standard" = c(
+      "EPSG:4326 - WGS 84 (Geographic Lat/Lon)" = "EPSG:4326",
+      "EPSG:3857 - WGS 84 / Pseudo-Mercator (Web Mercator)" = "EPSG:3857",
+      "EPSG:4269 - NAD83 (North America)" = "EPSG:4269",
+      "EPSG:4258 - ETRS89 (Europe)" = "EPSG:4258"
+    ),
+    "Finland & Nordic" = c(
+      "EPSG:3067 - ETRS89 / TM35FIN (Finland Transverse Mercator)" = "EPSG:3067",
+      "EPSG:3879 - ETRS89 / GK25FIN (Helsinki)" = "EPSG:3879",
+      "EPSG:25832 - ETRS89 / UTM zone 32N" = "EPSG:25832",
+      "EPSG:25833 - ETRS89 / UTM zone 33N" = "EPSG:25833"
+    ),
+    "UTM Northern Hemisphere (WGS 84)" = c(
+      "EPSG:32630 - WGS 84 / UTM zone 30N" = "EPSG:32630",
+      "EPSG:32631 - WGS 84 / UTM zone 31N" = "EPSG:32631",
+      "EPSG:32632 - WGS 84 / UTM zone 32N" = "EPSG:32632",
+      "EPSG:32633 - WGS 84 / UTM zone 33N" = "EPSG:32633",
+      "EPSG:32634 - WGS 84 / UTM zone 34N" = "EPSG:32634",
+      "EPSG:32635 - WGS 84 / UTM zone 35N" = "EPSG:32635",
+      "EPSG:32610 - WGS 84 / UTM zone 10N (US West)" = "EPSG:32610",
+      "EPSG:32618 - WGS 84 / UTM zone 18N (US East)" = "EPSG:32618"
+    ),
+    "UTM Southern Hemisphere (WGS 84)" = c(
+      "EPSG:32733 - WGS 84 / UTM zone 33S" = "EPSG:32733",
+      "EPSG:32735 - WGS 84 / UTM zone 35S" = "EPSG:32735",
+      "EPSG:32756 - WGS 84 / UTM zone 56S (Australia East)" = "EPSG:32756"
+    ),
+    "North America & UK (NAD83 / OSGB)" = c(
+      "EPSG:26910 - NAD83 / UTM zone 10N" = "EPSG:26910",
+      "EPSG:26912 - NAD83 / UTM zone 12N" = "EPSG:26912",
+      "EPSG:26918 - NAD83 / UTM zone 18N" = "EPSG:26918",
+      "EPSG:2263 - NAD83 / New York Long Island" = "EPSG:2263",
+      "EPSG:27700 - OSGB36 / UK National Grid" = "EPSG:27700"
+    )
+  )
+}
+
 # A BAND picker: its choices are the band names of whichever raster is chosen for
 # input `from`, so a Sentinel-2 stack shows its real band names rather than
 # asking the user to remember that NIR is number 4. `value` is the band index to
@@ -379,13 +423,14 @@ ea_algorithms <- function() {
        }),
 
     mk("reproject", "Reproject raster", "Warps the raster to another CRS.",
-       params = list(ea_txt("crs", "Target CRS", "EPSG:3067",
-                            hint = "An EPSG code, PROJ string or WKT.")),
+       params = list(ea_crs("crs", "Target CRS", "EPSG:3067",
+                            hint = "Search CRS name or EPSG code (e.g. EPSG:3067, EPSG:4326, EPSG:3857, EPSG:32635). Custom entries supported.")),
        default = "Reprojected",
        run = function(inp, p) {
-         crs_str <- trimws(p$crs %||% "")
-         if (!nzchar(crs_str)) stop("Enter a target CRS (e.g. EPSG:3067).")
-         terra::project(inp$r, crs_str)
+         crs_raw <- trimws(p$crs %||% "")
+         if (!nzchar(crs_raw)) stop("Enter or select a target CRS (e.g. EPSG:3067).")
+         crs_val <- if (grepl("^[0-9]+$", crs_raw)) paste0("EPSG:", crs_raw) else crs_raw
+         terra::project(inp$r, crs_val)
        }),
 
     mk("resample", "Resample resolution", "Resamples to a new cell size.",
@@ -427,46 +472,85 @@ ea_algorithms <- function() {
     idx("ndre", "NDRE (red-edge index)", "(RedEdge - Red) / (RedEdge + Red)",
         "RedEdge band", "Red band", 5L, 3L),
 
-    # The one algorithm here whose output is a TABLE, not a layer: it lands in
-    # the data view rather than on the map.
-    mk("zonal", "Zonal statistics",
-       "Summarises raster values inside each polygon. Result is a table.",
-       inputs = c(rin(), list(ea_in("v", "Zone polygons (vector layer)", "vector"))),
-       params = list(
-         ea_sel("stat", "Summary statistic",
-                c("mean", "sum", "min", "max", "sd", "count", "median")),
-         ea_field("id_col", "Zone ID column", "v", blank = "(use row number)")),
-       pool = "table", default = "zonal_stats",
+    mk("focal_mean", "Focal Mean Filter", "Smooths raster cell values using a moving window mean.",
+       params = list(ea_num("size", "Window size (cells)", 3, 3, 21, 2)),
+       default = "Focal_Mean",
        run = function(inp, p) {
-         if (!requireNamespace("exactextractr", quietly = TRUE))
-           stop("Install 'exactextractr' for zonal statistics.")
-         zones <- sf::st_transform(inp$v, terra::crs(inp$r))
-         stat <- exactextractr::exact_extract(inp$r[[1]], zones,
-                                              fun = p$stat, progress = FALSE)
-         id <- trimws(p$id_col %||% "")
-         df <- if (nzchar(id) && id %in% names(sf::st_drop_geometry(zones)))
-                 data.frame(zone = sf::st_drop_geometry(zones)[[id]], value = stat)
-               else data.frame(zone_id = seq_along(stat), value = stat)
-         colnames(df)[2] <- paste0(p$stat, "_value")
-         df
+         sz <- as.integer(p$size); if (sz %% 2 == 0) sz <- sz + 1L
+         w <- matrix(1, sz, sz)
+         terra::focal(inp$r, w = w, fun = "mean", na.policy = "omit")
+       }),
+
+    mk("focal_sd", "Focal Standard Deviation Filter", "Computes local variance/SD using a moving window.",
+       params = list(ea_num("size", "Window size (cells)", 3, 3, 21, 2)),
+       default = "Focal_SD",
+       run = function(inp, p) {
+         sz <- as.integer(p$size); if (sz %% 2 == 0) sz <- sz + 1L
+         w <- matrix(1, sz, sz)
+         terra::focal(inp$r, w = w, fun = "sd", na.policy = "omit")
+       }),
+
+    mk("rast_mask_range", "Mask Value Range", "Masks out raster cells outside a specified min and max range.",
+       params = list(ea_num("min_val", "Min Value", 0, NA, NA, 1),
+                     ea_num("max_val", "Max Value", 100, NA, NA, 1)),
+       default = "Masked_Raster",
+       run = function(inp, p) {
+         r <- inp$r
+         min_v <- as.numeric(p$min_val); max_v <- as.numeric(p$max_val)
+         terra::clamp(r, lower = min_v, upper = max_v, values = FALSE)
+       }),
+
+    mk("rast_reclass", "Reclassify Raster", "Reclassifies raster values into discrete numeric classes.",
+       params = list(ea_txt("rcl", "Reclass matrix (from, to, new_val; comma-separated)", "0,10,1, 10,50,2, 50,100,3")),
+       default = "Reclassified_Raster",
+       run = function(inp, p) {
+         txt <- trimws(p$rcl %||% "")
+         vals <- suppressWarnings(as.numeric(trimws(unlist(strsplit(txt, ",")))))
+         vals <- vals[!is.na(vals)]
+         if (length(vals) %% 3 != 0) stop("Reclass matrix values must be multiples of 3 (from, to, new_val).")
+         rcl_mat <- matrix(vals, ncol = 3, byrow = TRUE)
+         terra::classify(inp$r, rcl_mat)
+       }),
+
+    mk("las_metrics_grid_algo", "LiDAR Structural Metrics Grid", "Computes canopy metrics (mean Z, P95, density) across cells.",
+       inputs = list(ea_in("las", "Point cloud", "las")),
+       params = list(ea_num("res", "Grid Resolution (m)", 10, 1, 50, 1)),
+       default = "LiDAR_Metrics",
+       run = function(inp, p) {
+         res_val <- as.numeric(p$res)
+         lidR::pixel_metrics(inp$las, ~list(mean_z = mean(Z), p95 = quantile(Z, 0.95), count = length(Z)), res = res_val)
        })
   )
 }
 
 # ==========================================================================
 # Vector operations -- ported from mod_raster.R's run_vec_op switch().
-#
-# NOT ported, deliberately: "Clip to drawn shape", for the same reason as the
-# raster crop above -- it needs a polygon drawn on the map, not a pool layer.
 # ==========================================================================
 .ea_vector_algs <- function() {
   vin <- function() list(ea_in("v", "Input vector layer", "vector"))
-  mk <- function(id, label, summary, run, params = list(), default)
+  mk <- function(id, label, summary, run, params = list(), default, inputs = vin(), pool = "vector")
     list(id = id, label = label, group = "Vector", summary = summary,
-         inputs = vin(), params = params,
-         output = ea_out("vector", default), run = run)
+         inputs = inputs, params = params,
+         output = ea_out(pool, default), run = run)
 
   list(
+    mk("xy_to_sf", "XY Coordinates to Vector", "Converts tabular X and Y coordinate columns to a spatial point layer.",
+       inputs = list(ea_in("tbl", "Tabular dataset", "table")),
+       params = list(
+         ea_field("x_col", "X Coordinate Column (Easting/Lon)", "tbl"),
+         ea_field("y_col", "Y Coordinate Column (Northing/Lat)", "tbl"),
+         ea_crs("crs", "Target CRS", "EPSG:4326",
+                hint = "Search CRS name or EPSG code (e.g. EPSG:4326 WGS84, EPSG:3067 TM35FIN, EPSG:3857 Web Mercator).")
+       ),
+       default = "Points_Layer",
+       run = function(inp, p) {
+         df <- inp$tbl; x <- p$x_col %||% ""; y <- p$y_col %||% ""
+         if (!nzchar(x) || !nzchar(y)) stop("Select valid X and Y coordinate columns.")
+         crs_raw <- trimws(p$crs %||% "EPSG:4326")
+         crs_val <- if (grepl("^[0-9]+$", crs_raw)) paste0("EPSG:", crs_raw) else crs_raw
+         sf::st_as_sf(df, coords = c(x, y), crs = crs_val, remove = FALSE)
+       }),
+
     mk("buffer", "Buffer", "Grows each feature by a fixed distance.",
        params = list(ea_num("dist", "Distance (map units)", 100, 0, NA, 10,
                             hint = "Units follow the layer CRS - metres for EPSG:3067.")),
@@ -490,6 +574,115 @@ ea_algorithms <- function() {
 
     mk("centroid", "Centroids", "One point per feature, at its centre.",
        default = "Centroids",
-       run = function(inp, p) sf::st_centroid(inp$v))
+       run = function(inp, p) sf::st_centroid(inp$v)),
+
+    mk("vec_reproject", "Reproject Vector", "Reprojects a vector layer into a target CRS.",
+       params = list(ea_crs("crs", "Target CRS", "EPSG:3067",
+                            hint = "Search CRS name or EPSG code (e.g. EPSG:3067, EPSG:4326, EPSG:3857, EPSG:32635). Custom entries supported.")),
+       default = "Reprojected_Vector",
+       run = function(inp, p) {
+         crs_raw <- trimws(p$crs %||% "")
+         if (!nzchar(crs_raw)) stop("Enter a target CRS.")
+         crs_val <- if (grepl("^[0-9]+$", crs_raw)) paste0("EPSG:", crs_raw) else crs_raw
+         sf::st_transform(inp$v, crs_val)
+       }),
+
+    mk("vec_clip", "Clip Vector by Polygon", "Intersects vector features with a polygon boundary.",
+       inputs = list(ea_in("v", "Vector layer to clip", "vector"),
+                     ea_in("mask", "Clipping polygon", "vector")),
+       default = "Clipped_Vector",
+       run = function(inp, p) {
+         m <- sf::st_transform(inp$mask, sf::st_crs(inp$v))
+         sf::st_intersection(inp$v, m)
+       }),
+
+    mk("vec_bbox", "Bounding Box Polygon", "Computes the minimum bounding box polygon around a vector layer.",
+       default = "Bounding_Box",
+       run = function(inp, p) {
+         bb <- sf::st_bbox(inp$v)
+         sf::st_as_sfc(bb)
+       }),
+
+    mk("vec_convex_hull", "Convex Hull", "Computes the minimum convex polygon enclosing geometries.",
+       default = "Convex_Hull",
+       run = function(inp, p) {
+         sf::st_sf(geometry = sf::st_convex_hull(sf::st_union(inp$v)))
+       }),
+
+    mk("vec_simplify", "Simplify Geometries", "Reduces vertex density while preserving general shapes.",
+       params = list(ea_num("tol", "Tolerance distance (map units)", 5, 0.1, 1000, 1)),
+       default = "Simplified_Vector",
+       run = function(inp, p) {
+         sf::st_simplify(inp$v, dTolerance = as.numeric(p$tol))
+       }),
+
+    mk("vec_spatial_join", "Spatial Join", "Joins attributes from a second vector layer based on spatial overlap.",
+       inputs = list(ea_in("v", "Target vector layer", "vector"),
+                     ea_in("join_layer", "Source vector layer", "vector")),
+       default = "Spatially_Joined",
+       run = function(inp, p) {
+         j <- sf::st_transform(inp$join_layer, sf::st_crs(inp$v))
+         sf::st_join(inp$v, j)
+       }),
+
+    mk("point_density", "Point Density Heatmap", "Computes a continuous point density raster grid from points.",
+       params = list(ea_num("res", "Grid Resolution (m)", 10, 1, 500, 5)),
+       default = "Point_Density",
+       run = function(inp, p) {
+         v <- inp$v; res_val <- as.numeric(p$res)
+         v_terra <- terra::vect(v)
+         r_tmpl <- terra::rast(terra::ext(v_terra), res = res_val, crs = terra::crs(v_terra))
+         terra::rasterize(v_terra, r_tmpl, fun = "length", background = 0)
+       }),
+
+    mk("rast_dist_vector", "Distance to Vector Features", "Computes raster grid of distance to nearest vector geometry.",
+       inputs = list(ea_in("v", "Input vector layer", "vector"), ea_in("r_ref", "Reference raster extent", "raster")),
+       params = list(),
+       default = "Distance_To_Vector",
+       run = function(inp, p) {
+         v_terra <- terra::vect(sf::st_transform(inp$v, terra::crs(inp$r_ref)))
+         terra::distance(inp$r_ref, v_terra)
+       }),
+
+    mk("multidir_hillshade", "Multidirectional Hillshade", "Computes multidirectional hillshade composite.",
+       inputs = list(ea_in("dem", "DEM (input raster)", "raster")),
+       params = list(ea_num("alt", "Sun altitude", 45, 0, 90, 5)),
+       default = "Multidir_Hillshade",
+       run = function(inp, p) {
+         sl <- terra::terrain(inp$dem, "slope", unit = "radians")
+         as <- terra::terrain(inp$dem, "aspect", unit = "radians")
+         h1 <- terra::shade(sl, as, angle = as.numeric(p$alt), direction = 225)
+         h2 <- terra::shade(sl, as, angle = as.numeric(p$alt), direction = 315)
+         (h1 + h2) / 2
+       }),
+
+    mk("las_normalize_algo", "Normalize Point Cloud Heights", "Subtracts ground elevation from point cloud Z coordinates.",
+       inputs = list(ea_in("las", "Point cloud", "las"), ea_in("dtm", "Bare-earth DTM", "raster")),
+       default = "Normalized_Cloud",
+       pool = "las",
+       run = function(inp, p) {
+         lidR::normalize_height(inp$las, inp$dtm)
+       }),
+
+    mk("vec_area_length", "Geometry Area and Length", "Calculates polygon area (m2/ha) or line length.",
+       inputs = list(ea_in("v", "Input vector layer", "vector")),
+       default = "Geom_Metrics",
+       pool = "table",
+       run = function(inp, p) {
+         v <- inp$v
+         df <- sf::st_drop_geometry(v)
+         df$geom_area_m2 <- as.numeric(sf::st_area(v))
+         df$geom_area_ha <- df$geom_area_m2 / 10000
+         df$geom_length_m <- as.numeric(sf::st_length(v))
+         df
+       }),
+
+    mk("vec_points_along_line", "Generate Points Along Line", "Places equidistant sample points along line geometries.",
+       inputs = list(ea_in("v", "Line vector layer", "vector")),
+       params = list(ea_num("dist", "Spacing distance (map units)", 50, 1, 5000, 10)),
+       default = "Sample_Points",
+       run = function(inp, p) {
+         sf::st_line_sample(inp$v, density = 1 / as.numeric(p$dist))
+       })
   )
 }

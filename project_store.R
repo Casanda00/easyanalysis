@@ -348,11 +348,15 @@ ea_project_export <- function(id, dest) {
   if (!dir.exists(src)) return("")
   if (!grepl("\\.eap$", dest, ignore.case = TRUE)) dest <- paste0(dest, ".eap")
   ok <- tryCatch({
-    # zip the folder CONTENTS with the id as the top-level dir, so import can
-    # recover the project cleanly. `zip::zipr` is cross-platform (no system zip).
+    # Zip relative project folder so import can recover the project cleanly
+    # without machine-specific absolute path prefixes.
     if (file.exists(dest)) unlink(dest)
-    zip::zipr(zipfile = dest, files = src, recurse = TRUE)
-    file.exists(dest)
+    dest_abs <- suppressWarnings(normalizePath(dest, winslash = "/", mustWork = FALSE))
+    old_wd <- getwd()
+    on.exit(setwd(old_wd), add = TRUE)
+    setwd(dirname(src))
+    zip::zipr(zipfile = dest_abs, files = basename(src), recurse = TRUE)
+    file.exists(dest_abs)
   }, error = function(e) FALSE)
   if (isTRUE(ok)) dest else ""
 }
@@ -365,13 +369,59 @@ ea_project_import <- function(eap_path, parent = NULL) {
   tmp <- file.path(tempdir(), paste0("ea-imp-", as.integer(runif(1, 1e5, 9e5))))
   dir.create(tmp, recursive = TRUE, showWarnings = FALSE)
   on.exit(unlink(tmp, recursive = TRUE, force = TRUE), add = TRUE)
-  ok <- tryCatch({ zip::unzip(eap_path, exdir = tmp); TRUE },
-                 error = function(e)
-                   tryCatch({ utils::unzip(eap_path, exdir = tmp); TRUE },
-                            error = function(e2) FALSE))
+
+  # Copy uploaded file to a temporary file with an explicit .zip extension
+  # (Shiny datapath files like '0.tmp' cause utils::unzip error 1 on Windows)
+  tmp_zip <- file.path(tmp, "archive.zip")
+  file.copy(eap_path, tmp_zip, overwrite = TRUE)
+
+  extracted <- file.path(tmp, "extracted")
+  dir.create(extracted, recursive = TRUE, showWarnings = FALSE)
+
+  ok <- FALSE
+
+  # Method 1: zip::unzip
+  ok <- tryCatch({ zip::unzip(tmp_zip, exdir = extracted); TRUE },
+                 error = function(e) FALSE)
+
+  # Method 2: utils::unzip on explicit .zip path
+  if (!isTRUE(ok)) {
+    ok <- tryCatch({ utils::unzip(tmp_zip, exdir = extracted); TRUE },
+                   error = function(e) FALSE)
+  }
+
+  # Method 3: PowerShell Expand-Archive (Windows fallback)
+  if (!isTRUE(ok) && .Platform$OS.type == "windows") {
+    ok <- tryCatch({
+      cmd <- sprintf('powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath \'%s\' -DestinationPath \'%s\' -Force"',
+                     gsub("'", "''", tmp_zip), gsub("'", "''", extracted))
+      res <- system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+      res == 0
+    }, error = function(e) FALSE)
+  }
+
+  # Method 4: tar -xf fallback (works for zip/tar Archives on macOS/Linux/Win10+)
+  if (!isTRUE(ok)) {
+    ok <- tryCatch({
+      res <- system2("tar", c("-xf", shQuote(tmp_zip), "-C", shQuote(extracted)), stdout = FALSE, stderr = FALSE)
+      res == 0
+    }, error = function(e) FALSE)
+  }
+
+  # Method 5: Direct single project.json file upload fallback
+  if (!isTRUE(ok)) {
+    meta_direct <- tryCatch(jsonlite::read_json(eap_path, simplifyVector = TRUE), error = function(e) NULL)
+    if (!is.null(meta_direct) && !is.null(meta_direct$name)) {
+      direct_json_path <- file.path(extracted, "project.json")
+      jsonlite::write_json(meta_direct, direct_json_path, auto_unbox = TRUE, pretty = TRUE)
+      ok <- TRUE
+    }
+  }
+
   if (!isTRUE(ok)) return(NULL)
+
   # find the folder that actually holds project.json
-  hit <- list.files(tmp, pattern = "^project\\.json$", recursive = TRUE,
+  hit <- list.files(extracted, pattern = "^project\\.json$", recursive = TRUE,
                     full.names = TRUE)
   if (!length(hit)) return(NULL)
   src <- dirname(hit[[1]])

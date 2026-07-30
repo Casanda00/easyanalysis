@@ -143,8 +143,7 @@ projectsServer <- function(id, current_project, open_project, refresh_token,
       },
       content = function(file) {
         req(sel())
-        src <- ea_project_path(sel())
-        zip::zipr(zipfile = file, files = src, recurse = TRUE)
+        ea_project_export(sel(), file)
       }
     )
 

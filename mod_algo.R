@@ -23,7 +23,13 @@ algoToolsUI <- function(id, spec) {
               textAreaInput(ns(paste0("p_", p$key)), p$label, value = p$value, rows = p$rows)
             else textInput(ns(paste0("p_", p$key)), p$label, value = p$value),
       sel = selectInput(ns(paste0("p_", p$key)), p$label, choices = p$choices,
-                        selected = p$value))
+                        selected = p$value),
+      crs = selectizeInput(ns(paste0("p_", p$key)), p$label,
+                           choices = .ea_crs_choices(),
+                           selected = p$value,
+                           options = list(create = TRUE,
+                                          createOnBlur = TRUE,
+                                          placeholder = "Search EPSG code or CRS name...")))
     if (is.null(p$hint)) inp
     else tagList(inp, tags$p(class = "text-muted small mt-n1 mb-2", p$hint))
   }

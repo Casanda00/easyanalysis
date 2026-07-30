@@ -1604,8 +1604,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       mi <- MODUI[[input$tool_pick]]
       if (!is.null(mi) && isTRUE(mi$map_based) && !identical(wsview(), "split")) wsview("map")
     })
-    observeEvent(input$tool_float, { tool_mode("float") })
-    observeEvent(input$tool_dock,  { tool_mode("dock") })
+    observeEvent(input$tool_float, {
+      tool_mode("float")
+      session$onFlushed(function() {
+        tool_rendered(isolate(tool_rendered()) + 1)
+        session$sendCustomMessage("ea-rebind-tool", list())
+      }, once = TRUE)
+    })
+    observeEvent(input$tool_dock, {
+      tool_mode("dock")
+      session$onFlushed(function() {
+        tool_rendered(isolate(tool_rendered()) + 1)
+        session$sendCustomMessage("ea-rebind-tool", list())
+      }, once = TRUE)
+    })
     observeEvent(input$tool_min,   { tool_mode("min") })
     out_min <- reactiveVal(FALSE)                       # tool OUTPUT panel minimized?
     observeEvent(input$ws_out_min,     { out_min(TRUE) })
@@ -1661,17 +1673,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       t <- current_tool()
       if (is.null(t)) return(div(class = "ea-hint",
         "Pick a tool above. Its settings load here; spatial ops add a layer, models drop a result (Step 4)."))
+      # Signal AFTER this panel has been sent to the browser.
+      session$onFlushed(function() {
+        tool_rendered(isolate(tool_rendered()) + 1)
+        session$sendCustomMessage("ea-rebind-tool", list())
+      }, once = TRUE)
       mi <- MODUI[[t]]
-      if (!is.null(mi)) {
-        # Signal AFTER this panel has been sent to the browser. Bumping on
-        # tool_pick alone was timing-fragile: the module's repopulate ran while
-        # the panel still did not exist, the update was dropped, and nothing
-        # bumped again. onFlushed fires once the flush carrying this UI is out,
-        # so the update message that follows is processed AFTER the insert —
-        # message order is what guarantees the element is there.
-        session$onFlushed(function() tool_rendered(isolate(tool_rendered()) + 1),
-                          once = TRUE)
-      }
       if (!is.null(mi)) return(tagList(
         if (isTRUE(mi$map_based))
           div(class = "ea-wsx-mapnote2", icon("map-location-dot"),
