@@ -389,26 +389,13 @@ page_fillable(
     .datepicker table tr td.active, .datepicker table tr td.active:hover,
     .datepicker table tr td span.active, .datepicker table tr td span.active:hover {
                   background: var(--forest) !important; color: var(--onbrand) !important; }
-    /* Form controls & select dropdown options styling across themes */
-    .form-control, .form-select, select, textarea.form-control,
-    .selectize-input, .selectize-dropdown,
-    .selectize-control .selectize-input,
-    .bootstrap-select .dropdown-toggle,
-    .bootstrap-select .dropdown-menu {
-      background-color: var(--sunk) !important; color: var(--ink) !important; border-color: var(--line) !important;
+    /* Inputs: Bootstrap compiles these to literal hex, not vars -- state them. */
+    .form-control, .form-select, textarea.form-control,
+    .selectize-input, .selectize-dropdown {
+      background-color: var(--panel); color: var(--ink); border-color: var(--line);
     }
-    option, select option, .form-select option, optgroup, optgroup option,
-    .selectize-dropdown .option, .selectize-dropdown-content .option,
-    .bootstrap-select .dropdown-item {
-      background-color: var(--panel) !important; color: var(--ink) !important;
-    }
-    .selectize-dropdown .active, .selectize-dropdown .option:hover, .selectize-dropdown .option.selected,
-    .bootstrap-select .dropdown-item:hover, .bootstrap-select .dropdown-item.active,
-    select option:hover, select option:focus, select option:checked {
-      background-color: var(--tint) !important; color: var(--ink) !important;
-    }
-    .selectize-input .item { color: var(--ink) !important; }
-    .form-control::placeholder { color: var(--bark) !important; }
+    .selectize-dropdown .active { background: var(--sunk); color: var(--ink); }
+    .form-control::placeholder { color: var(--bark); }
 
     /* Boot overlay — one calm screen instead of a dimming, half-drawn app. */
     #ea-boot { position: fixed; inset: 0; z-index: 4000; background: var(--paper);
@@ -1435,21 +1422,12 @@ page_fillable(
                                  color: var(--ink); }
 
     /* form controls */
-    .form-control, .form-select, select, textarea,
-    .selectize-input, .selectize-dropdown,
-    .bootstrap-select .dropdown-menu {
+    .form-control, .form-select, .selectize-input, textarea {
       background: var(--sunk) !important; color: var(--ink) !important;
       border-color: var(--line) !important; }
-    option, select option, .form-select option, optgroup, optgroup option,
-    .selectize-dropdown .option, .selectize-dropdown-content .option,
-    .bootstrap-select .dropdown-item {
-      background-color: var(--panel) !important; color: var(--ink) !important;
-    }
-    .selectize-dropdown .active, .selectize-dropdown .option:hover,
-    .bootstrap-select .dropdown-item:hover, .bootstrap-select .dropdown-item.active {
-      background: var(--tint) !important; color: var(--ink) !important;
-    }
-    .form-control::placeholder { color: var(--bark) !important; }
+    .selectize-dropdown { background: var(--panel); color: var(--ink);
+                          border-color: var(--line); }
+    .form-control::placeholder { color: var(--bark); }
     /* ===== Glassy popups — a frosted translucent panel over a blurred, dark
        backdrop. Never the white-ish default. ===== */
     .modal-content {
@@ -2080,18 +2058,7 @@ page_fillable(
             document.querySelectorAll('.rc-plotwin').forEach(function(w){ pwObs.observe(w); });
           }, 1500);
         });
-      /* Re-bind Shiny inputs when a tool panel is floated or docked. */
-      Shiny.addCustomMessageHandler('ea-rebind-tool', function(msg){
-        setTimeout(function(){
-          if (!window.Shiny) return;
-          var targets = document.querySelectorAll('.ea-wsx-panel, .app-right, .app-tools');
-          targets.forEach(function(el){
-            try { Shiny.unbindInputs(el); } catch(e){}
-            try { Shiny.bindInputs(el); } catch(e){}
-          });
-        }, 60);
-      });
-
+      }
       /* Header drag: RESIZE when docked (drag up = taller), MOVE when floating. */
       document.addEventListener('mousedown', function(e){
         var h = e.target.closest ? e.target.closest('.ea-wsx-conh') : null;

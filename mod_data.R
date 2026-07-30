@@ -164,12 +164,8 @@ dataToolsUI <- function(id) {
   tagList(
     uiOutput(ns("cmd_panel")),
     hr(class = "my-2"),
-    div(class = "d-flex flex-column gap-2",
-      actionButton(ns("reset_data"), "Reset Active Dataset",
-                   class = "btn-warning btn-sm w-100", icon = icon("rotate-left")),
-      actionButton(ns("reset_all_data"), "Reset All Datasets...",
-                   class = "btn-outline-danger btn-sm w-100", icon = icon("trash-arrow-up"))
-    )
+    actionButton(ns("reset_data"), "Reset to Raw Data",
+                 class = "btn-warning btn-sm w-100")
   )
 }
 
@@ -281,70 +277,35 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       rv$working_data <- dataset_pool[[active_dataset()]]
     }, ignoreNULL = TRUE)
 
-    # ---- Reset Active Dataset ----
     observeEvent(input$reset_data, {
-      act <- active_dataset()
-      req(act)
-      raw <- raw_pool[[act]]
-      if (is.null(raw)) { showNotification("No raw data found for active dataset.", type = "warning"); return() }
+      req(active_dataset())
       snap()
+      raw <- raw_pool[[active_dataset()]]
       rv$working_data <- raw
-      dataset_pool[[act]] <- raw
-      showNotification(sprintf("Active dataset '%s' reset to raw uploaded data.", act), type = "message")
-    })
-
-    # ---- Reset All Datasets in Project (Modal + Action) ----
-    observeEvent(input$reset_all_data, {
-      showModal(modalDialog(
-        title = "Reset All Datasets in Project?",
-        p("Are you sure you want to reset ALL datasets in this project back to their original raw uploaded states? All column transformations and edits across all tables will be reverted."),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("confirm_reset_all"), "Reset All Datasets", class = "btn-danger")
-        ),
-        easyClose = TRUE
-      ))
-    })
-
-    observeEvent(input$confirm_reset_all, {
-      removeModal()
-      dn <- dataset_names()
-      if (!length(dn)) return()
-      for (nm in dn) {
-        raw <- raw_pool[[nm]]
-        if (!is.null(raw)) {
-          dataset_pool[[nm]] <- raw
-        }
-      }
-      act <- active_dataset()
-      if (!is.null(act) && !is.null(raw_pool[[act]])) {
-        rv$working_data <- raw_pool[[act]]
-      }
-      showNotification("All datasets in the project have been reset to original raw data.", type = "message")
+      dataset_pool[[active_dataset()]] <- raw
+      showNotification("Dataset reset to original raw data across all tabs.", type = "message")
     })
 
     # ---- Undo last operation ----
     observeEvent(input$undo_last, {
-      act <- active_dataset()
-      req(act)
+      req(active_dataset())
       prev <- prev_state()
       if (is.null(prev)) { showNotification("Nothing to undo.", type = "warning"); return() }
       rv$working_data <- prev
-      dataset_pool[[act]] <- prev
+      dataset_pool[[active_dataset()]] <- prev
       prev_state(NULL)
       showNotification("Last change undone.", type = "message")
     })
 
-    # ---- Reset active dataset to original upload (top-bar button / shortcut) ----
+    # ---- Reset to original upload (top-bar button) ----
     observeEvent(input$reset_raw, {
-      act <- active_dataset()
-      req(act)
-      orig <- raw_pool[[act]]
-      if (is.null(orig)) { showNotification("No original data found for active dataset.", type = "warning"); return() }
+      req(active_dataset())
+      orig <- raw_pool[[active_dataset()]]
+      if (is.null(orig)) { showNotification("No original data found.", type = "warning"); return() }
       snap()
       rv$working_data <- orig
-      dataset_pool[[act]] <- orig
-      showNotification(sprintf("Active dataset '%s' restored to original upload.", act), type = "message")
+      dataset_pool[[active_dataset()]] <- orig
+      showNotification("Dataset restored to original upload.", type = "message")
     })
 
     # ---- Toolbox picker population ----
