@@ -518,10 +518,35 @@ several scripts as tabs.
 Editor | Results | Environment, with draggable dividers. The pane-splitter pattern from
 round-1 item 12 already exists and should be reused.
 
-### C14. The toolbar fills for plots but not other commands
+### C14. The result area fills for plots but not other commands — FIXED 2026-07-30
 > "the tool bar fills for plots but not for other commands."
+>
+> clarified: the workspace tab strip / result area above the canvas.
 
-Needs clarifying: which toolbar, and what "fills" means.
+**Measured, and it was worse than reported** — the two cases failed in opposite directions.
+On Linear regression, in the same 572px container:
+
+| view | card height | result |
+|---|---|---|
+| Model summary (text) | 444 | 128px of dead space below it |
+| Diagnostic plots | 704 | **overflowed the panel by 132px** |
+
+Cause: a solo plot carries a fixed pixel height from R (`height = if (solo) "560px"`), so the
+card grew past its container, while text panes size to their content and left a gap. Nothing
+in the chain was flex.
+
+**Fix:** the single-card case is a real flex chain now — the card takes the height it is given
+and `.lm-viewport` absorbs the remainder. A solo plot fills the viewport instead of forcing
+560px; the plot is a *grandchild* (`.lm-viewport > uiOutput > plotOutput`) so the wrapper needed
+a definite height before the plot's `100%` could resolve.
+
+`:only-child` throughout, deliberately: screens that stack SEVERAL cards must keep sizing to
+their content. Verified that guard holds — ANOVA's 5 cards still measure 618/398/398/101/101
+rather than all being stretched.
+
+Verified: text view card 556 of 572 (16px is the card's own margin); plot view card 556 with the
+plot 412 inside a 432 viewport, so it fits with no scroll and no overflow; the two-pane split
+still gives 225 + 225 with its divider.
 
 ---
 

@@ -985,6 +985,29 @@ page_fillable(
     .ea-wsx-attrinfo { padding: 10px 4px; font: 400 12px var(--mono); color: var(--bark); }
     /* Step 7: a migrated module's real canvas embedded in the workspace centre */
     .ea-wsx-modcanvas { min-height: 100%; }
+    /* The result area used to fill for a PLOT view and not for the others -- and
+       measured, it was worse than that: the two failed in opposite directions.
+       On Linear regression, in a 572px container, the card was 444 tall for
+       'Model summary' (128px of dead space under it) and 704 tall for
+       'Diagnostic plots' (overflowing the panel by 132px), because a solo plot
+       carries a fixed pixel height from R while text panes size to their content.
+       Make the single-card case a real flex chain so the card takes the height it
+       is given, and the viewport absorbs what is left.
+       :only-child on purpose -- screens that stack SEVERAL cards (ANOVA, Data &
+       Exploration) must keep sizing to their content, or every card would stretch. */
+    .ea-wsx-modcanvas { display: flex; flex-direction: column; }
+    .ea-wsx-modcanvas > .card:only-child,
+    .ea-wsx-modcanvas > div:only-child > .card:only-child {
+                  flex: 1 1 auto; min-height: 0; }
+    .ea-wsx-modcanvas .lm-viewport { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    /* A solo plot should fit the space rather than force a fixed 560px and scroll.
+       The plot is a GRANDchild: .lm-viewport > uiOutput(.shiny-html-output) >
+       plotOutput, so the wrapper needs a definite height before the plot's 100%
+       can resolve against anything. Only when the plot IS the whole pane -- a
+       split keeps each pane's own height. */
+    .ea-wsx-modcanvas .lm-viewport > .shiny-html-output { height: 100%; }
+    .ea-wsx-modcanvas .lm-viewport > .shiny-html-output > .shiny-plot-output:only-child {
+                  height: 100% !important; }
     /* M6: R Console — bottom dock that slides up from the bottom of the workspace */
     /* NOTE: inside this flex chain a plain `height` gets compressed to ~1px, so
        the dock's size must be pinned with min-height (verified in-browser). */
