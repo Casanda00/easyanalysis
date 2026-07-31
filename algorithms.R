@@ -47,42 +47,74 @@ ea_sel <- function(key, label, choices, value = NULL, hint = NULL)
 ea_crs <- function(key, label = "Target CRS (EPSG / PROJ / WKT)", value = "EPSG:4326", hint = NULL)
   list(kind = "crs", key = key, label = label, value = value, hint = hint)
 
-.ea_crs_choices <- function() {
-  c(
-    "Global & Standard" = c(
-      "EPSG:4326 - WGS 84 (Geographic Lat/Lon)" = "EPSG:4326",
-      "EPSG:3857 - WGS 84 / Pseudo-Mercator (Web Mercator)" = "EPSG:3857",
-      "EPSG:4269 - NAD83 (North America)" = "EPSG:4269",
-      "EPSG:4258 - ETRS89 (Europe)" = "EPSG:4258"
-    ),
-    "Finland & Nordic" = c(
-      "EPSG:3067 - ETRS89 / TM35FIN (Finland Transverse Mercator)" = "EPSG:3067",
-      "EPSG:3879 - ETRS89 / GK25FIN (Helsinki)" = "EPSG:3879",
-      "EPSG:25832 - ETRS89 / UTM zone 32N" = "EPSG:25832",
-      "EPSG:25833 - ETRS89 / UTM zone 33N" = "EPSG:25833"
-    ),
-    "UTM Northern Hemisphere (WGS 84)" = c(
-      "EPSG:32630 - WGS 84 / UTM zone 30N" = "EPSG:32630",
-      "EPSG:32631 - WGS 84 / UTM zone 31N" = "EPSG:32631",
-      "EPSG:32632 - WGS 84 / UTM zone 32N" = "EPSG:32632",
-      "EPSG:32633 - WGS 84 / UTM zone 33N" = "EPSG:32633",
-      "EPSG:32634 - WGS 84 / UTM zone 34N" = "EPSG:32634",
-      "EPSG:32635 - WGS 84 / UTM zone 35N" = "EPSG:32635",
-      "EPSG:32610 - WGS 84 / UTM zone 10N (US West)" = "EPSG:32610",
-      "EPSG:32618 - WGS 84 / UTM zone 18N (US East)" = "EPSG:32618"
-    ),
-    "UTM Southern Hemisphere (WGS 84)" = c(
-      "EPSG:32733 - WGS 84 / UTM zone 33S" = "EPSG:32733",
-      "EPSG:32735 - WGS 84 / UTM zone 35S" = "EPSG:32735",
-      "EPSG:32756 - WGS 84 / UTM zone 56S (Australia East)" = "EPSG:32756"
-    ),
-    "North America & UK (NAD83 / OSGB)" = c(
-      "EPSG:26910 - NAD83 / UTM zone 10N" = "EPSG:26910",
-      "EPSG:26912 - NAD83 / UTM zone 12N" = "EPSG:26912",
-      "EPSG:26918 - NAD83 / UTM zone 18N" = "EPSG:26918",
-      "EPSG:2263 - NAD83 / New York Long Island" = "EPSG:2263",
-      "EPSG:27700 - OSGB36 / UK National Grid" = "EPSG:27700"
+# Query GDAL / PROJ proj.db database directly for 7,000+ official EPSG / CRS entries.
+ea_search_crs <- function(query = "", limit = 100) {
+  db_path <- tryCatch(
+    file.path(system.file("proj", package = "sf"), "proj.db"),
+    error = function(e) ""
+  )
+  if (!file.exists(db_path) || !requireNamespace("RSQLite", quietly = TRUE)) {
+    return(.ea_crs_choices_fallback())
+  }
+
+  con <- tryCatch(RSQLite::dbConnect(RSQLite::SQLite(), db_path), error = function(e) NULL)
+  if (is.null(con)) return(.ea_crs_choices_fallback())
+  on.exit(try(RSQLite::dbDisconnect(con), silent = TRUE), add = TRUE)
+
+  q_str <- trimws(query %||% "")
+  if (!nzchar(q_str)) {
+    sql <- sprintf(
+      "SELECT code, name FROM crs_view 
+       WHERE auth_name = 'EPSG' AND deprecated = 0 AND type IN ('projected', 'geographic 2D')
+       ORDER BY CASE WHEN code IN ('4326', '3857', '3067', '4269', '4258', '25832', '25833', '32632') THEN 0 ELSE 1 END,
+                CAST(code AS INTEGER) ASC LIMIT %d", limit
     )
+  } else {
+    clean_q <- gsub("['\"\\]", "", q_str)
+    clean_num <- gsub("[^0-9]", "", clean_q)
+    if (nzchar(clean_num) && (startsWith(clean_q, "EPSG") || startsWith(clean_q, clean_num))) {
+      sql <- sprintf(
+        "SELECT code, name FROM crs_view 
+         WHERE auth_name = 'EPSG' AND deprecated = 0 AND code LIKE '%s%%' 
+         ORDER BY LENGTH(code) ASC, CAST(code AS INTEGER) ASC LIMIT %d", clean_num, limit
+      )
+    } else {
+      sql <- sprintf(
+        "SELECT code, name FROM crs_view 
+         WHERE auth_name = 'EPSG' AND deprecated = 0 AND name LIKE '%%%s%%' 
+         ORDER BY LENGTH(name) ASC LIMIT %d", clean_q, limit
+      )
+    }
+  }
+
+  df <- tryCatch(RSQLite::dbGetQuery(con, sql), error = function(e) NULL)
+  if (is.null(df) || nrow(df) == 0) {
+    if (nzchar(q_str)) {
+      val <- if (grepl("^[0-9]+$", q_str)) paste0("EPSG:", q_str) else q_str
+      return(stats::setNames(val, paste("Custom CRS:", q_str)))
+    }
+    return(.ea_crs_choices_fallback())
+  }
+
+  labels <- sprintf("EPSG:%s - %s", df$code, df$name)
+  values <- sprintf("EPSG:%s", df$code)
+  stats::setNames(values, labels)
+}
+
+.ea_crs_choices <- function() {
+  ea_search_crs("", limit = 100)
+}
+
+.ea_crs_choices_fallback <- function() {
+  c(
+    "EPSG:4326 - WGS 84 (Geographic Lat/Lon)" = "EPSG:4326",
+    "EPSG:3857 - WGS 84 / Pseudo-Mercator (Web Mercator)" = "EPSG:3857",
+    "EPSG:3067 - ETRS89 / TM35FIN (Finland Transverse Mercator)" = "EPSG:3067",
+    "EPSG:4269 - NAD83 (North America)" = "EPSG:4269",
+    "EPSG:4258 - ETRS89 (Europe)" = "EPSG:4258",
+    "EPSG:25832 - ETRS89 / UTM zone 32N" = "EPSG:25832",
+    "EPSG:25833 - ETRS89 / UTM zone 33N" = "EPSG:25833",
+    "EPSG:32632 - WGS 84 / UTM zone 32N" = "EPSG:32632"
   )
 }
 

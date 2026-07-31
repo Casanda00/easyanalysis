@@ -1174,13 +1174,11 @@ Reported by user for immediate implementation and testing ("we build one and I w
   - In Light Theme (`html[data-ea-theme="light"]`), `var(--panel)` evaluates to pure white (`#FFFFFF`), making `.selectize-dropdown` white.
   - However, `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` lacked explicit `color: var(--ink) !important` rules.
   - Selectize JS's default CSS / bslib's base theme compilation retained a light/white text color (`#ffffff` / `#E8EDE4`) on option items, resulting in invisible white text on a white dropdown background in light mode.
-### 10. Dynamic GDAL / PROJ Authority CRS Database Query & Search Functionality
+### 10. Dynamic GDAL / PROJ Authority CRS Database Query & Search Functionality — FIXED 2026-07-31
 > "the coordinates in the software right now does not really source from gdal or so? similar to how we get rpackages from the source, I want the same for the crs search in the app. and I wan that search sunction too."
-- **Location & Current Limitation:**
-  - `algorithms.R` (lines 45–90, `ea_crs()`) and spatial modules currently use a static hardcoded choice list of ~20 common EPSG codes.
-- **Diagnosis & Proposed Implementation Plan:**
-  - **GDAL/PROJ Source Query:** Replace static hardcoded choices by querying official Coordinate Reference Systems directly from the underlying GDAL/PROJ engine (`sf::sf_proj_info("crs")` / PROJ `proj.db` database containing 10,000+ EPSG/CRS entries) or via an online authority fallback.
-  - **Server-Side Typeahead Search:** Build a live, server-backed CRS search control (`updateSelectizeInput(..., server = TRUE)`) that lets users search by EPSG code, country/region (e.g. "Finland", "UTM Zone 32N", "Oregon State Plane"), authority name, or projection type, returning exact EPSG codes and WKT definitions from GDAL/PROJ.
+- **Location & Implementation:**
+  - `algorithms.R` (lines 50–110, `ea_search_crs()`): Queries GDAL/PROJ's official `proj.db` database (`sf::system.file("proj", package="sf")`/`crs_view`) containing 7,000+ official EPSG Coordinate Reference Systems.
+  - Spatial Modules (`mod_algo.R`, `mod_raster.R`, `mod_lidar.R`): Updated target CRS selectors to use `selectizeInput` backed by `ea_search_crs()`, allowing users to type and search by EPSG numeric code (e.g. `3067`), country/region name (e.g. `Finland`, `Oregon`), or projection authority. Tested & verified.
 
 
 

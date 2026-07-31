@@ -271,8 +271,10 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
           tags$p(class = "text-muted small mb-1",
             "CRS not embedded. Option 1: assign an EPSG code to geolocate automatically."),
           div(class = "d-flex gap-2 align-items-end mb-2",
-            textInput(ns("epsg_code"), "EPSG Code:", value = "3067",
-                      placeholder = "e.g. 3067 (Finland ETRS-TM35FIN)", width = "200px"),
+            selectizeInput(ns("epsg_code"), "EPSG Code:",
+              choices = .ea_crs_choices(), selected = "EPSG:3067",
+              options = list(create = TRUE, createOnBlur = TRUE,
+                             placeholder = "Search EPSG code or name..."), width = "260px"),
             div(style = "margin-bottom: 1px;",
               actionButton(ns("apply_epsg"), "Apply CRS", class = "btn-sm btn-primary"))),
           tags$p(class = "text-muted small mb-0",
@@ -283,9 +285,11 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
 
     observeEvent(input$apply_epsg, {
       req(rv_lidar$las, input$epsg_code)
-      code <- suppressWarnings(as.integer(trimws(input$epsg_code)))
+      raw_code <- trimws(input$epsg_code)
+      num_str <- gsub("[^0-9]", "", raw_code)
+      code <- suppressWarnings(as.integer(num_str))
       if (is.na(code)) {
-        showNotification("Enter a valid numeric EPSG code (e.g. 3067).", type = "warning"); return()
+        showNotification("Select or enter a valid EPSG code (e.g. EPSG:3067).", type = "warning"); return()
       }
       tryCatch({
         lidR::crs(rv_lidar$las) <- sf::st_crs(code)

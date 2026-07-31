@@ -724,9 +724,11 @@ rasterServer <- function(id, dataset_pool, active_dataset,
             choices = nms_r, selected = nms_r),
 
         reproject = tagList(
-          textInput(ns("target_crs"), "Target CRS", value = "EPSG:4326",
-            placeholder = "e.g. EPSG:3067"),
-          tags$p(class = "small text-muted", "EPSG:3067 = Finnish TM35FIN national grid")
+          selectizeInput(ns("target_crs"), "Target CRS",
+            choices = .ea_crs_choices(), selected = "EPSG:4326",
+            options = list(create = TRUE, createOnBlur = TRUE,
+                           placeholder = "Search EPSG code or CRS name...")),
+          tags$p(class = "small text-muted", "Querying 7,000+ official GDAL/PROJ EPSG coordinate reference systems.")
         ),
 
         resample = tagList(
