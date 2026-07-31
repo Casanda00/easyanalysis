@@ -1174,11 +1174,41 @@ Reported by user for immediate implementation and testing ("we build one and I w
   - In Light Theme (`html[data-ea-theme="light"]`), `var(--panel)` evaluates to pure white (`#FFFFFF`), making `.selectize-dropdown` white.
   - However, `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` lacked explicit `color: var(--ink) !important` rules.
   - Selectize JS's default CSS / bslib's base theme compilation retained a light/white text color (`#ffffff` / `#E8EDE4`) on option items, resulting in invisible white text on a white dropdown background in light mode.
+- **Fix Applied:**
+  - Added explicit CSS rules in `ui.R` forcing `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` to dynamically bind to `color: var(--ink) !important` and `background: var(--panel) !important`, with `:hover` and `.active` using `background: var(--sunk) !important; color: var(--ink) !important`. Tested & verified.
+
 ### 10. Dynamic GDAL / PROJ Authority CRS Database Query & Search Functionality — FIXED 2026-07-31
 > "the coordinates in the software right now does not really source from gdal or so? similar to how we get rpackages from the source, I want the same for the crs search in the app. and I wan that search sunction too."
 - **Location & Implementation:**
   - `algorithms.R` (lines 50–110, `ea_search_crs()`): Queries GDAL/PROJ's official `proj.db` database (`sf::system.file("proj", package="sf")`/`crs_view`) containing 7,000+ official EPSG Coordinate Reference Systems.
   - Spatial Modules (`mod_algo.R`, `mod_raster.R`, `mod_lidar.R`): Updated target CRS selectors to use `selectizeInput` backed by `ea_search_crs()`, allowing users to type and search by EPSG numeric code (e.g. `3067`), country/region name (e.g. `Finland`, `Oregon`), or projection authority. Tested & verified.
+
+### 11. Comprehensive Raster & Vector Layer Symbology Toolbox
+> "building a symbology tool for the raster and vector layers. document the tools needed in symbology"
+- **Diagnosis & Proposed Tool Specifications:**
+  - **Vector Symbology Tools (`sf` Layers: Points, Lines, Polygons):**
+    1. *Single Symbol (Uniform Styling):* Custom fill color, stroke color, line weight, point radius, and marker shape (circle, square, triangle).
+    2. *Categorized / Unique Values (Qualitative Classification):* Color-code geometries by a categorical attribute field (e.g. land use, soil class, state) with curated color palettes (Viridis, ColorBrewer, HSL gradients).
+    3. *Graduated / Choropleth (Quantitative Classification):* Bin numeric attributes into statistical classes:
+       - Equal Interval
+       - Quantiles (Quartiles / Deciles)
+       - Natural Breaks (Jenks)
+       - Standard Deviation
+    4. *Proportional Symbols (Bubble Map):* Scale point radius continuously based on a numeric column (e.g. population, biomass).
+    5. *Layer Opacity & Stroke Controls:* Sliders for fill transparency (0%–100%), stroke weight, and stroke opacity.
+    6. *Dynamic Map Legend:* Auto-generate Leaflet map legend keys with editable class labels and decimal formatting.
+
+  - **Raster Symbology Tools (`terra` Layers: Continuous & Discrete):**
+    1. *Singleband Pseudocolor (Continuous Elevation / NDVI / Climate):*
+       - Color Ramps: Viridis, Magma, Plasma, Inferno, YlOrRd, Spectral, RdYlBu, Greys, Terrain, Rainbow.
+       - Contrast Stretch Methods: Min/Max clipping, Percentile Stretch (2%–98%), Standard Deviation stretch (1.5σ / 2σ).
+    2. *RGB / Multi-Band Composite (Satellite Imagery):*
+       - Band assignment pickers: Red Channel, Green Channel, Blue Channel (e.g. Sentinel-2 / Landsat True Color R=4,G=3,B=2; False Color NIR R=8,G=4,B=3).
+       - Per-band histogram contrast enhancement.
+    3. *Paletted / Discrete Raster Symbology (Land Cover / Classifications):* Assign distinct colors and labels to discrete integer class values (e.g. 1 = Water, 2 = Forest, 3 = Urban, 4 = Agriculture).
+    4. *Hillshade / 3D Relief Blend:* Blend DEM rasters with hillshade relief shading or slope aspect for 3D terrain representation.
+    5. *NoData / NA Cell Masking:* Transparent color for NA/NoData cells and per-layer opacity sliders.
+
 
 
 
