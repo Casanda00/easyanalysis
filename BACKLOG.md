@@ -1151,10 +1151,32 @@ Reported by user for immediate implementation and testing ("we build one and I w
   - "Reset to Raw Data" currently resets all loaded datasets globally.
   - Scope the default reset action to **only** the active dataset (`active_dataset()`), with an optional toggle/modal option to "Reset All Datasets in Project".
 
-### 6. R Console Session Data Sync & Clickable Pre-built Commands Library
-> "i ran a code in the terminal to add a column to the dataset, it says the code executed well but the existing data wasnt updated - the data is the same, the card info is the same. this is quote useful becuase users would like to manipulate their data and click at the same time... I meant, we should build new commands that are useful. commands that are clickable."
+
+### 7. Data & Exploration Export (CSV/Excel) & Save Copy to Project — FIXED 2026-07-31
+> "the export function should be able to export the data... export format should be excel or csv. the button next to the download 'Save Copy to project' sends a copy to the project."
+- **Problem 1 (Downloading):** The old export handler used WebSocket string concatenation (`sendCustomMessage("ea-download")`), which corrupts binary files and failed on multi-line text. Downloading lacked native Excel support.
+- **Fix 1 (Downloading Works):** Replaced with native `downloadHandler` supplying **CSV (`.csv`)** and **Excel (`.xlsx`)** via `writexl::write_xlsx()`. Verified working.
+- **Problem 2 (Save Copy Error):** Clicking "Save Copy to Project" raised `Warning: Error in active_ds: could not find function "active_ds"` because `dataServer` in `mod_data.R` received `active_dataset` (a reactive) instead of the `active_ds` `reactiveVal` from `server.R`.
+- **Fix 2 (Save Copy Fixed):** Passed `active_ds = active_ds` from `server.R` to `dataServer` and safely guarded the `active_ds(new_name)` invocation inside `mod_data.R`.
+
+### 8. Session Resiliency & Error Recovery (Avoid Forced Terminal Restart)
+> "when something does not work, the app breaks and kinda forces the user to restart from the terminal by killing everything. only document this part in backlog."
 - **Diagnosis & Plan:**
-  - **Console Reactive Sync:** When users run custom R code in the console modifying `dataset_pool[[active_ds]]` (or assigning `df`), trigger reactive invalidation (`ds_refresh` / dataset pool update) so tables, cards, and summary stats refresh immediately.
-  - **Clickable Pre-built Command Library:** Build a library of pre-packaged, point-and-click data manipulation commands (dropdown/picker of ~100 common R data engineering actions like log transform, missing value removal, column type conversion, string cleanup, scaling, lag/lead creation) that users can click to execute directly on the active dataset without writing manual R code.
+  - Unhandled exceptions inside Shiny observers halt reactive execution or hang the session, forcing users to kill the R process in the terminal and restart.
+  - **Plan:** Wrap observer handlers in structured `tryCatch` error handlers that log the error trace silently and display a user-friendly notification (`showNotification(err, type = "error")`), preserving session state so users never need to restart the terminal on an error.
+
+### 9. Light Mode Selectize Dropdown Text Visibility Bug ("Show" Picker in Data & Exploration) — FIXED 2026-07-31
+> "in light screen mode, 'show' on the data and exploration page gives ptions to see dataset overview and more by selecting. in light mode we cannot see the options because the text color is light. search and identify it. dont fix yet. document too"
+- **Location & Component:**
+  - UI Header: `helpers.R` (lines 605–615, `ea_view_header()`) renders `selectizeInput(ns("view_pick"), ...)` inside `mod_data.R` (line 175).
+  - Stylesheet: `ui.R` (lines 394–397 and 1425–1435) contains global `.selectize-input` and `.selectize-dropdown` rules.
+- **Diagnosis / Root Cause:**
+  - In Light Theme (`html[data-ea-theme="light"]`), `var(--panel)` evaluates to pure white (`#FFFFFF`), making `.selectize-dropdown` white.
+  - However, `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` lacked explicit `color: var(--ink) !important` rules.
+  - Selectize JS's default CSS / bslib's base theme compilation retained a light/white text color (`#ffffff` / `#E8EDE4`) on option items, resulting in invisible white text on a white dropdown background in light mode.
+- **Fix Applied:**
+  - Added explicit CSS rules in `ui.R` forcing `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` to dynamically bind to `color: var(--ink) !important` and `background: var(--panel) !important`, with `:hover` and `.active` using `background: var(--sunk) !important; color: var(--ink) !important`. Tested & verified.
+
+
 
 

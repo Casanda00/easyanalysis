@@ -178,7 +178,7 @@ dataCanvasUI <- function(id) {
 }
 
 dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset,
-                       view_request = reactive(NULL)) {
+                       active_ds = NULL, view_request = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
 
     # ---- Select-and-split canvas (B6) --------------------------------------
@@ -199,13 +199,15 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
           card(
             card_header(class = "bg-light", "Dataset Structure"),
             div(style = "padding: 8px 10px 0;",
-              layout_columns(col_widths = c(4, 5, 3),
+              layout_columns(col_widths = c(3, 4, 5),
                 selectInput(ns("dl_format"), "Export format",
-                            choices = c("CSV" = "csv", "TSV (opens in Excel)" = "tsv")),
+                            choices = c("CSV (.csv)" = "csv", "Excel (.xlsx)" = "xlsx")),
                 textInput(ns("dl_name"), "File name (optional)", placeholder = "dataset"),
-                tags$div(style = "margin-top:32px;",
-                  actionButton(ns("do_download"), "Download", icon = icon("download"),
-                               class = "btn-sm btn-outline-success")))),
+                tags$div(style = "margin-top:32px;", class = "d-flex gap-2 align-items-center",
+                  downloadButton(ns("do_download"), "Download",
+                                icon = icon("download"), class = "btn-sm btn-outline-success"),
+                  actionButton(ns("save_copy_proj"), "Save Copy to Project",
+                               icon = icon("copy"), class = "btn-sm btn-outline-primary")))),
             div(style = "padding: 5px;", uiOutput(ns("eng_str")))
           )),
 
@@ -393,30 +395,76 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       updateSelectInput(session, "tf_col_target_ds", choices = dn, selected = act_str)
     })
 
-    # Download via a custom message (R builds the text, JS saves a Blob) — the
-    # standard downloadHandler does not reliably trigger a download under webR.
-    observeEvent(input$do_download, {
+    # Download handler for CSV and Excel (.xlsx) formats.
+    output$do_download <- downloadHandler(
+      filename = function() {
+        base <- if (isTruthy(input$dl_name)) input$dl_name else {
+          nm <- tryCatch(active_dataset(), error = function(e) NULL)
+          if (isTruthy(nm)) paste0(nm, "_cleaned") else "dataset"
+        }
+        base <- gsub("[^A-Za-z0-9._-]+", "_", base)
+        ext <- if (identical(input$dl_format, "xlsx")) ".xlsx" else ".csv"
+        paste0(base, "_", Sys.Date(), ext)
+      },
+      content = function(file) {
+        df <- rv$working_data
+        req(!is.null(df), is.data.frame(df), nrow(df) > 0)
+        fmt <- input$dl_format %||% "csv"
+        if (identical(fmt, "xlsx")) {
+          if (requireNamespace("writexl", quietly = TRUE)) {
+            writexl::write_xlsx(df, path = file)
+          } else if (requireNamespace("openxlsx", quietly = TRUE)) {
+            openxlsx::write.xlsx(df, file = file)
+          } else {
+            write.csv(df, file, row.names = FALSE)
+          }
+        } else {
+          write.csv(df, file, row.names = FALSE)
+        }
+      }
+    )
+
+    # Save Copy to Project handler
+    observeEvent(input$save_copy_proj, {
+      req(active_dataset(), rv$working_data)
+      cur_name <- active_dataset()
+      default_copy_name <- paste0(cur_name, "_copy")
+      showModal(modalDialog(
+        title = "Save Copy to Project",
+        easyClose = TRUE,
+        size = "m",
+        div(style = "padding: 10px;",
+          tags$p("Save the current working dataset (with all edits applied) as a new dataset copy in the project:"),
+          textInput(ns("copy_ds_name"), "New Dataset Name", value = default_copy_name),
+          tags$small(class = "text-muted",
+                     sprintf("Current dimensions: %d rows \u00d7 %d columns",
+                             nrow(rv$working_data), ncol(rv$working_data)))
+        ),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("confirm_save_copy"), "Save Copy", class = "btn-primary")
+        )
+      ))
+    })
+
+    observeEvent(input$confirm_save_copy, {
+      req(active_dataset(), rv$working_data)
+      raw_name <- trimws(input$copy_ds_name %||% "")
+      if (!nzchar(raw_name)) {
+        showNotification("Please enter a valid dataset name.", type = "warning")
+        return()
+      }
+      new_name <- make.names(raw_name)
       df <- rv$working_data
-      if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
-        showNotification("No data to download.", type = "warning"); return()
+      
+      snap()
+      raw_pool[[new_name]] <- df
+      dataset_pool[[new_name]] <- df
+      removeModal()
+      if (is.function(active_ds)) {
+        active_ds(new_name)
       }
-      base <- if (isTruthy(input$dl_name)) input$dl_name else {
-        nm <- tryCatch(active_dataset(), error = function(e) NULL)
-        if (isTruthy(nm)) paste0(nm, "_cleaned") else "dataset"
-      }
-      base <- gsub("[^A-Za-z0-9._-]+", "_", base)
-      fmt  <- input$dl_format %||% "csv"
-      tc <- textConnection("dl_txt", "w", local = TRUE)
-      if (fmt == "tsv") { write.table(df, tc, sep = "\t", row.names = FALSE, quote = FALSE)
-                          ext <- ".tsv"; mime <- "text/tab-separated-values" }
-      else             { write.csv(df, tc, row.names = FALSE)
-                          ext <- ".csv"; mime <- "text/csv" }
-      close(tc)
-      session$sendCustomMessage("ea-download", list(
-        name    = paste0(base, "_", Sys.Date(), ext),
-        content = paste(dl_txt, collapse = "\n"),
-        mime    = paste0(mime, ";charset=utf-8")))
-      showNotification("Download started.", type = "message", duration = 2)
+      showNotification(paste0("Dataset copy '", new_name, "' saved to project."), type = "message")
     })
 
     # ---- Column ops ----

@@ -1425,8 +1425,13 @@ page_fillable(
     .form-control, .form-select, .selectize-input, textarea {
       background: var(--sunk) !important; color: var(--ink) !important;
       border-color: var(--line) !important; }
-    .selectize-dropdown { background: var(--panel); color: var(--ink);
-                          border-color: var(--line); }
+    .selectize-dropdown, .selectize-dropdown .option, .selectize-dropdown-content,
+    .selectize-input .item {
+      background: var(--panel) !important; color: var(--ink) !important;
+      border-color: var(--line) !important; }
+    .selectize-dropdown .active, .selectize-dropdown .option.active,
+    .selectize-dropdown .option:hover {
+      background: var(--sunk) !important; color: var(--ink) !important; }
     .form-control::placeholder { color: var(--bark); }
     /* ===== Glassy popups — a frosted translucent panel over a blurred, dark
        backdrop. Never the white-ish default. ===== */

@@ -965,6 +965,7 @@ server <- function(input, output, session) {
   # module's picker across namespaces, so it names the command here and the Data
   # module selects it.
   data_ctx  <- dataServer("data", raw_pool, dataset_pool, dataset_names, active_dataset,
+                          active_ds = active_ds,
                           view_request = reactive(input$data_op_request))
   lm_ctx    <- lmServer("lm", dataset_pool, active_dataset)
   lme_ctx   <- lmeServer("lme", dataset_pool, active_dataset)
