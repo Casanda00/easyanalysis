@@ -1209,16 +1209,20 @@ Reported by user for immediate implementation and testing ("we build one and I w
     4. *Hillshade / 3D Relief Blend:* Blend DEM rasters with hillshade relief shading or slope aspect for 3D terrain representation.
     5. *NoData / NA Cell Masking:* Transparent color for NA/NoData cells and per-layer opacity sliders.
 
-### 12. GeoLibre Open GIS Toolset & Platform Integration
-> "there should be a way to call geolibre tools into the app."
+### 12. GeoLibre Open GIS & GeoAI Toolset Integration
+> "there should be a way to call geolibre tools into the app... i think geolibre has tools from geoai and others, right?"
 - **Diagnosis & Integration Architecture:**
-  - **GeoLibre Overview:** GeoLibre is an open-source, local-first, cloud-native GIS platform (built with Tauri, React, DuckDB-WASM, and Python) featuring hundreds of GIS algorithms and a `leafmap`-style Python SDK (`geolibre`).
-  - **GeoLibre Toolsets to Call/Integrate into EasyAnalysis:**
-    1. *DuckDB Spatial SQL Engine:* High-speed Spatial SQL processing (`ST_Buffer`, `ST_Intersects`, `ST_Contains`, `ST_Within`, `ST_Difference`, `ST_Union`, `ST_Area`, `ST_Centroid`, `ST_Length`) operating directly on Parquet, GeoPackage, and Shapefile layers via R's `duckdb` spatial extension.
-    2. *Vector Processing Tools (Turf.js / GeoPandas Bridge):* Client & server tools for Convex Hull, Voronoi Diagram, Polygon Dissolve, Geometry Simplify, Spatial Join, Point-in-Polygon Overlay, and Feature Centroid Extraction.
-    3. *Raster Processing & Spectral Tools:* Raster Reprojection, Resampling, Extent Clipping, Raster Calculator (Band Math: NDVI, NDWI, NBR), Hillshade, Slope, and Zonal Statistics.
-    4. *Python `geolibre` SDK & `reticulate` Sidecar Bridge:* Call GeoLibre's Python package (`geolibre`) and FastAPI processing sidecar via R `reticulate` or CLI subprocesses to execute GeoLibre automated processing workflows.
-    5. *Embedded Interactive Map Panel:* Add an embedded GeoLibre web canvas viewer (`iframe` or web component window) into EasyAnalysis's workspace view for interactive cloud GIS projects.
+  - **GeoLibre & OpenGeos Ecosystem Overview:** GeoLibre is an open-source, local-first, cloud-native GIS platform (part of the `opengeos` ecosystem created by Qiusheng Wu & collaborators) featuring spatial SQL, Whitebox integration, Python `leafmap` SDK (`geolibre`), and **GeoAI deep learning tools**.
+  - **GeoLibre & GeoAI Toolsets to Call/Integrate into EasyAnalysis:**
+    1. *GeoAI Deep Learning Suite (`geoai` / `samgeo` / YOLO):*
+       - **Segment Anything Model (SAM / SamGeo):** AI-powered zero-shot image segmentation for automated extraction of building footprints, tree canopies, water bodies, and roads from satellite/aerial imagery via point or text prompts.
+       - **YOLO & ONNX Object Detection:** Real-time bounding-box object detection (detecting vehicles, solar panels, buildings, ships) in imagery tiles.
+       - **Hybrid YOLO+SAM Feature Extraction:** Pipeline combining YOLO fast detection with SAM boundary refinement, outputting georeferenced GeoJSON/Shapefile polygons.
+    2. *DuckDB Spatial SQL Engine:* High-speed Spatial SQL processing (`ST_Buffer`, `ST_Intersects`, `ST_Contains`, `ST_Within`, `ST_Difference`, `ST_Union`, `ST_Area`, `ST_Centroid`, `ST_Length`) operating directly on Parquet, GeoPackage, and Shapefile layers via R's `duckdb` spatial extension.
+    3. *Vector Processing Tools (Turf.js / GeoPandas Bridge):* Client & server tools for Convex Hull, Voronoi Diagram, Polygon Dissolve, Geometry Simplify, Spatial Join, Point-in-Polygon Overlay, and Feature Centroid Extraction.
+    4. *Raster Processing & Spectral Tools:* Raster Reprojection, Resampling, Extent Clipping, Raster Calculator (Band Math: NDVI, NDWI, NBR), Hillshade, Slope, and Zonal Statistics.
+    5. *Python `geolibre` SDK & `reticulate` Sidecar Bridge:* Call GeoLibre's Python package (`geolibre`), `samgeo`, and FastAPI sidecar via R `reticulate` or CLI subprocesses to execute GeoLibre & GeoAI automated processing workflows.
+    6. *Embedded Interactive Map Panel:* Add an embedded GeoLibre web canvas viewer (`iframe` or web component window) into EasyAnalysis's workspace view for interactive cloud GIS projects.
 
 ### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite
 > "do the sme for whitebox tools"
