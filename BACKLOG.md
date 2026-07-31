@@ -1236,6 +1236,18 @@ Reported by user for immediate implementation and testing ("we build one and I w
        - **LiDAR & DEM Processing:** LiDAR Ground Filter (`wbt_lidar_ground_point_filter`), DEM Generation (`wbt_lidar_digital_elevation_model`), Canopy Height Model (`wbt_lidar_to_chm`).
     3. *Seamless Layer Interop:* `whitebox` outputs GeoTIFF and Shapefile files on disk, which are automatically read into `raster_pool` and `vector_pool` for instant Leaflet map display and stats calculation.
 
+### 14. Installation Failure Diagnosis & Fix (`lidR` Missing Binary on R 4.5.1) — FIXED 2026-07-31
+> "deps: binary install warning: package 'lidR' is not available as a binary package for this version of R... deps: ERROR — missing CORE packages: lidR"
+- **Location & Component:** `launcher/deps.R` (lines 19–21, repository configuration) & `install.ps1`.
+- **Root Cause Diagnosis:**
+  - The user attempted installation using R version `R-4.5.1` (`C:\Users\khanish\AppData\Local\Programs\R\R-4.5.1`).
+  - Primary CRAN (`cloud.r-project.org`) periodically lacks pre-compiled Windows binary packages (`.zip`) for development/patch builds of R 4.5.x.
+  - When `type = "binary"` failed, `launcher/deps.R` attempted fallback source compilation (`type = "source"`), which failed because standard user environments lack the C++ Rtools compiler toolchain.
+- **Fix Applied:**
+  - Added `lidar = "https://r-lidar.r-universe.dev"` to `options(repos = ...)` in `launcher/deps.R`. R-Universe maintains pre-compiled Windows binaries for `lidR` across all R versions (including R 4.5.x).
+  - Now `install.ps1` automatically downloads the pre-built `lidR` binary from R-Universe whenever primary CRAN binary builds are missing, preventing core package installation failures.
+
+
 
 
 

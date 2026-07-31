@@ -16,8 +16,10 @@ lib  <- if (length(args) >= 1 && nzchar(args[1])) args[1] else .libPaths()[1]
 dir.create(lib, showWarnings = FALSE, recursive = TRUE)
 .libPaths(c(lib, .libPaths()))
 
-options(repos = c(CRAN = "https://cloud.r-project.org"),
-        timeout = max(600, getOption("timeout")))   # big spatial binaries
+options(repos = c(
+  lidar = "https://r-lidar.r-universe.dev",
+  CRAN  = "https://cloud.r-project.org"
+), timeout = max(600, getOption("timeout")))   # big spatial binaries
 
 # --- CORE: the app will not boot without these (library() in global.R) -----
 core <- c(
