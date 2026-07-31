@@ -102,7 +102,7 @@ ea_search_crs <- function(query = "", limit = 100) {
 }
 
 .ea_crs_choices <- function() {
-  ea_search_crs("", limit = 100)
+  ea_search_crs("", limit = 500)
 }
 
 .ea_crs_choices_fallback <- function() {

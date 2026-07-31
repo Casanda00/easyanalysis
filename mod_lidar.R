@@ -125,6 +125,7 @@ lidarMetricsToolsUI <- function(id) {
 lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
     rv_lidar <- reactiveValues(raw_las = NULL, las = NULL, dtm = NULL, chm = NULL, tops = NULL, plot_shp = NULL, itd_metrics = NULL)
 
     # Auto-load newest LAS from the centralized las_pool (set by the global upload handler).
