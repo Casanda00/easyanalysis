@@ -1243,9 +1243,25 @@ Reported by user for immediate implementation and testing ("we build one and I w
   - The user attempted installation using R version `R-4.5.1` (`C:\Users\khanish\AppData\Local\Programs\R\R-4.5.1`).
   - Primary CRAN (`cloud.r-project.org`) periodically lacks pre-compiled Windows binary packages (`.zip`) for development/patch builds of R 4.5.x.
   - When `type = "binary"` failed, `launcher/deps.R` attempted fallback source compilation (`type = "source"`), which failed because standard user environments lack the C++ Rtools compiler toolchain.
-- **Fix Applied:**
+- **Fix Applied / Documented:**
   - Added `lidar = "https://r-lidar.r-universe.dev"` to `options(repos = ...)` in `launcher/deps.R`. R-Universe maintains pre-compiled Windows binaries for `lidR` across all R versions (including R 4.5.x).
   - Now `install.ps1` automatically downloads the pre-built `lidR` binary from R-Universe whenever primary CRAN binary builds are missing, preventing core package installation failures.
+
+### 15. Peer-Host Live Collaboration Engine (Decentralized Local-Host Collaboration)
+> "live collaboration. i am thinking instead of a cloud for collaboaration, can we use one of the users computer as the host or something?"
+- **Diagnosis & Architecture Specifications:**
+  - **Decentralized Host Concept:** Instead of requiring third-party cloud infrastructure or external SaaS servers, a single user's computer acts as the **Host Server / Session Leader** for real-time multiplayer spatial analysis.
+  - **Proposed Implementation Architecture:**
+    1. *Host Session Initialization:* When a user clicks "Start Host Session", EasyAnalysis binds its local server instance to network interfaces (`host = "0.0.0.0"`) and generates:
+       - **Local LAN Link:** For team members on the same Wi-Fi / local network (`http://192.168.x.x:7788`).
+       - **Zero-Config Remote Tunnel Link:** A secure encrypted URL (via Cloudflare Tunnel, Ngrok, or Tailscale sidecar) for remote collaborators outside the local network.
+    2. *Real-Time State & Map Canvas Synchronization:*
+       - Utilizes WebSocket event broadcasting / CRDT state sync to mirror active map layer selections, Leaflet pan/zoom extents, raster color ramps, and spatial algorithm parameters live across all connected guest browsers.
+       - Heavy computations (e.g. LiDAR filtering, Whitebox terrain processing, raster classification) run on the Host machine's hardware, streaming updated results instantly to guest clients.
+    3. *Access Control & Security:*
+       - **Data Privacy:** Raw spatial files and project assets remain securely stored on the Host computer's local storage.
+       - **Permission Modes:** Host user can toggle guest roles (**Spectator / Read-Only** vs **Co-Editor / Contributor**) and disconnect guests at any time.
+
 
 
 
