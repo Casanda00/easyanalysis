@@ -1209,6 +1209,28 @@ Reported by user for immediate implementation and testing ("we build one and I w
     4. *Hillshade / 3D Relief Blend:* Blend DEM rasters with hillshade relief shading or slope aspect for 3D terrain representation.
     5. *NoData / NA Cell Masking:* Transparent color for NA/NoData cells and per-layer opacity sliders.
 
+### 12. GeoLibre Cloud GIS Platform Integration & Map Canvas Bridge
+> "there should be a way to call geolibre tools into the app."
+- **Diagnosis & Integration Architecture:**
+  - **GeoLibre Overview:** GeoLibre is an open-source, cloud-native web GIS platform and Python/Jupyter-compatible spatial application for web, desktop, and mobile.
+  - **Integration Architecture Options for EasyAnalysis:**
+    1. *Embedded GeoLibre View Panel:* Add an interactive GeoLibre map canvas viewer panel (`iframe` / web component modal) into the unified workspace view to view cloud-hosted spatial layers.
+    2. *GeoLibre REST & Layer Sync Connector:* Build R helpers to export/stream active `sf` vector layers and `terra` rasters to GeoLibre cloud endpoints.
+    3. *Python Subprocess / reticulate Bridge:* Invoke GeoLibre's Python client package (`geolibre`) via R `reticulate` or background system commands to trigger cloud geoprocessing workflows.
+
+### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite
+> "do the sme for whitebox tools"
+- **Diagnosis & Integration Architecture:**
+  - **WhiteboxTools Overview:** WhiteboxTools (developed by Prof. John Lindsay) is a Rust-based, high-performance geospatial analysis engine with over 700 algorithms spanning hydrology, terrain analysis, LiDAR processing, and remote sensing. The official `whitebox` R package provides direct R function wrappers (`whitebox::wbt_*`).
+  - **Integration Architecture for EasyAnalysis:**
+    1. *Backend Installation:* Add automatic package loading (`library(whitebox)`) and auto-binary installation via `whitebox::install_whitebox()` in `global.R` / system setup.
+    2. *Algorithm Catalog Expansion (`algorithms.R`):* Wrap key `wbt_*` tools into EasyAnalysis algorithm definitions:
+       - **Terrain & Surface Analysis:** Slope (`wbt_slope`), Aspect (`wbt_aspect`), Curvature (`wbt_profile_curvature`), Hillshade (`wbt_hillshade`), Topographic Position Index (`wbt_tpi`).
+       - **Hydrological Modeling:** D8 Flow Accumulation (`wbt_d8_flow_accumulation`), Watershed Delineation (`wbt_watershed`), Topographic Wetness Index (`wbt_wetness_index`), Stream Network Extraction (`wbt_extract_streams`).
+       - **LiDAR & DEM Processing:** LiDAR Ground Filter (`wbt_lidar_ground_point_filter`), DEM Generation (`wbt_lidar_digital_elevation_model`), Canopy Height Model (`wbt_lidar_to_chm`).
+    3. *Seamless Layer Interop:* `whitebox` outputs GeoTIFF and Shapefile files on disk, which are automatically read into `raster_pool` and `vector_pool` for instant Leaflet map display and stats calculation.
+
+
 
 
 
