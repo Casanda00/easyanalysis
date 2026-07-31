@@ -1262,6 +1262,24 @@ Reported by user for immediate implementation and testing ("we build one and I w
        - **Data Privacy:** Raw spatial files and project assets remain securely stored on the Host computer's local storage.
        - **Permission Modes:** Host user can toggle guest roles (**Spectator / Read-Only** vs **Co-Editor / Contributor**) and disconnect guests at any time.
 
+### 16. Custom Domain Migration (`easyanalysis.dev`) & Name.com / Vercel DNS Setup
+> "we have bought the domain: easyanalysis.dev. we need to change the vercel url to it and point name.com to vercel."
+- **Diagnosis & DNS Migration Steps:**
+  - **Overview:** Migration from default Vercel staging URL (`easyanalysis.vercel.app`) to custom branded domain `easyanalysis.dev` registered on Name.com.
+  - **Required Setup & DNS Configuration:**
+    1. *Name.com DNS Records:*
+       - **A Record:** Host `@` -> Points to Vercel IPv4 `76.76.21.21`.
+       - **CNAME Record:** Host `www` -> Points to `cname.vercel-dns.com`.
+       - *(Alternative Nameserver Delegation):* Update Name.com custom nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`.
+    2. *Vercel Custom Domain Assignment:*
+       - Open Vercel Dashboard -> EasyAnalysis Project Settings -> **Domains**.
+       - Add `easyanalysis.dev` and `www.easyanalysis.dev` with automatic SSL certificate provisioning and 301 HTTPS redirect.
+    3. *Repository Installer URL Updates:*
+       - Update one-line terminal installer commands across `README.md`, `DEPLOY.md`, `install.ps1`, and `install.sh`:
+         - **Windows (PowerShell):** `iwr -useb https://easyanalysis.dev/install.ps1 | iex`
+         - **macOS / Linux (Bash):** `curl -fsSL https://easyanalysis.dev/install.sh | bash`
+
+
 
 
 
