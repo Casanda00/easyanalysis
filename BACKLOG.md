@@ -1273,11 +1273,24 @@ Reported by user for immediate implementation and testing ("we build one and I w
        - *(Alternative Nameserver Delegation):* Update Name.com custom nameservers to `ns1.vercel-dns.com` and `ns2.vercel-dns.com`.
     2. *Vercel Custom Domain Assignment:*
        - Open Vercel Dashboard -> EasyAnalysis Project Settings -> **Domains**.
-       - Add `easyanalysis.dev` and `www.easyanalysis.dev` with automatic SSL certificate provisioning and 301 HTTPS redirect.
+       - Add `easyanalysis.dev` and `www.easyanalysis.dev` with automatic SSL certificate provisioning.
+       - **CRITICAL:** Set `easyanalysis.dev` as the **Primary Domain** (no redirect). Setting `www` as primary causes Vercel to issue HTTP `308 Permanent Redirect` for `easyanalysis.dev`, which breaks Windows PowerShell 5.1 (`iwr`).
     3. *Repository Installer URL Updates:*
        - Update one-line terminal installer commands across `README.md`, `DEPLOY.md`, `install.ps1`, and `install.sh`:
          - **Windows (PowerShell):** `iwr -useb https://easyanalysis.dev/install.ps1 | iex`
          - **macOS / Linux (Bash):** `curl -fsSL https://easyanalysis.dev/install.sh | bash`
+
+- **Terminal Installer (308 Permanent Redirect & 404 Resolution):**
+  - **Symptom:** Running `iwr -useb https://easyanalysis.dev/install.ps1 | iex` in PowerShell returned `(308) Permanent Redirect` error.
+  - **Root Cause Analysis:**
+    1. *HTTP 308 Redirect in Windows PowerShell 5.1:* Vercel issued HTTP 308 redirects from `easyanalysis.dev` to `www.easyanalysis.dev`. Standard Windows PowerShell 5.1 `Invoke-WebRequest` uses .NET Framework's `HttpWebRequest` which automatically handles 301, 302, 303, and 307, but throws `WebException` on HTTP 308 (RFC 7538).
+    2. *Missing Static Assets on Landing Project:* The landing page project (`landing/`) lacked static copies of `install.ps1` and `install.sh`, returning `404 Not Found` when following installer paths directly.
+  - **Fix Applied & Verified:**
+    1. *Static Assets:* Added `landing/install.ps1` and `landing/install.sh` to the landing deployment folder.
+    2. *MIME Headers:* Updated `landing/vercel.json` with static headers (`text/plain; charset=utf-8` for `.ps1` and `text/x-shellscript` for `.sh`).
+    3. *Domain Configuration:* Documented requirement to set `easyanalysis.dev` as Primary Domain on Vercel so requests return `200 OK` directly without triggering a 308 redirect.
+    4. *Pushed to GitHub:* Commit `4949579` pushed to `main`.
+
 
 ### 17. Detailed User Documentation & Interactive Tours
 > "we need a very detailed, clear and practical and intuitive documentation for users. so far, users try the app and have no idea what it does. so the goal is to have a proper documentation in the landing page and a button what points to it on the first page the app loads and this button goes on the projects and analysis area pages too. detailed tour with more information. tour 1 on the first page, tour 2 on the project page, tour 3 on the analysis area page both for map view and for data view."
