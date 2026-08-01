@@ -2,7 +2,7 @@
 #  EasyAnalysis - Windows one-command launcher (no Docker, no admin)
 # --------------------------------------------------------------------------
 #  Usage (end users):
-#     iwr -useb https://easyanalysis.vercel.app/install.ps1 | iex
+#     iwr -useb https://easyanalysis.dev/install.ps1 | iex
 #
 #  What it does, in order:
 #     1. Ensure R          - use a system R if present, else download a
@@ -20,24 +20,24 @@ param(
   # folder is given it is used IN PLACE (no copy) - ideal for dev testing.
   [string]$AppSource = $env:EASYANALYSIS_SRC,
   # R version to download if no system R is found.
-  [string]$RVersion  = "4.5.3",
+  [string]$RVersion = "4.5.3",
   # Re-run dependency installation even if the cache marker says it is done.
   [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
-$ProgressPreference     = "SilentlyContinue"   # faster Invoke-WebRequest
+$ProgressPreference = "SilentlyContinue"   # faster Invoke-WebRequest
 
-function Say($msg)  { Write-Host "[EasyAnalysis] $msg" -ForegroundColor Green }
+function Say($msg) { Write-Host "[EasyAnalysis] $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "[EasyAnalysis] $msg" -ForegroundColor Yellow }
-function Die($msg)  { Write-Host "[EasyAnalysis] $msg" -ForegroundColor Red; exit 1 }
+function Die($msg) { Write-Host "[EasyAnalysis] $msg" -ForegroundColor Red; exit 1 }
 
 # --- Paths -----------------------------------------------------------------
 # NB: do NOT use $Home - it is a PowerShell automatic variable (user profile).
 $AppHome = Join-Path $env:LOCALAPPDATA "EasyAnalysis"
-$RDir    = Join-Path $AppHome "R"
-$LibDir  = Join-Path $AppHome "library"
-$AppDir  = Join-Path $AppHome "app"
+$RDir = Join-Path $AppHome "R"
+$LibDir = Join-Path $AppHome "library"
+$AppDir = Join-Path $AppHome "app"
 New-Item -ItemType Directory -Force -Path $AppHome, $LibDir | Out-Null
 
 # Default download source: GitHub's auto-generated archive of main. It always
@@ -58,9 +58,9 @@ function Get-Rscript {
   if ($cmd) { return $cmd.Source }
   # (c) standard install locations, newest first
   $found = Get-ChildItem "C:\Program Files\R\R-*\bin\Rscript.exe",
-                         "$env:LOCALAPPDATA\Programs\R\R-*\bin\Rscript.exe" `
-             -ErrorAction SilentlyContinue |
-           Sort-Object FullName -Descending | Select-Object -First 1
+  "$env:LOCALAPPDATA\Programs\R\R-*\bin\Rscript.exe" `
+    -ErrorAction SilentlyContinue |
+  Sort-Object FullName -Descending | Select-Object -First 1
   if ($found) { return $found.FullName }
   return $null
 }
@@ -69,11 +69,11 @@ function Install-PortableR {
   Say "No R found - downloading portable R $RVersion (one-time, ~90 MB)..."
   $exe = Join-Path $env:TEMP "R-$RVersion-win.exe"
   $url = "https://cran.r-project.org/bin/windows/base/R-$RVersion-win.exe"
-  try   { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $exe }
+  try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $exe }
   catch { Die "Could not download R from $url : $($_.Exception.Message)" }
   Say "Installing R into $RDir (silent, no admin)..."
   # R's Inno Setup installer: silent, user-dir target => no admin needed.
-  $rargs = @("/VERYSILENT","/SUPPRESSMSGBOXES","/NOICONS","/DIR=`"$RDir`"")
+  $rargs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NOICONS", "/DIR=`"$RDir`"")
   Start-Process -FilePath $exe -ArgumentList $rargs -Wait
   Remove-Item $exe -ErrorAction SilentlyContinue
   $rs = Join-Path $RDir "bin\Rscript.exe"
@@ -99,14 +99,14 @@ function Resolve-AppDir {
   $zipUrl = if ($AppSource -and $AppSource -match '^https?://') { $AppSource } else { $DefaultZip }
   Say "Downloading app from $zipUrl ..."
   $zip = Join-Path $env:TEMP "easyanalysis-app.zip"
-  try   { Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zip }
+  try { Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zip }
   catch { Die "Could not download app zip: $($_.Exception.Message)" }
   if (Test-Path $AppDir) { Remove-Item $AppDir -Recurse -Force }
   $tmp = Join-Path $env:TEMP ("ea-unzip-" + [guid]::NewGuid().ToString("N"))
   Expand-Archive -Path $zip -DestinationPath $tmp -Force
   # zip may nest the app one level deep (repo-name folder) - find global.R
   $g = Get-ChildItem $tmp -Recurse -Filter global.R -ErrorAction SilentlyContinue |
-       Select-Object -First 1
+  Select-Object -First 1
   if (-not $g) { Die "Downloaded zip has no global.R." }
   $src = Split-Path $g.FullName -Parent
   New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
@@ -122,16 +122,17 @@ if (-not (Test-Path (Join-Path $App "launcher\deps.R"))) {
 
 # --- 3. Ensure packages (cached via a marker) ------------------------------
 $marker = Join-Path $LibDir ".deps-ok"
-$depsR  = Join-Path $App "launcher\deps.R"
+$depsR = Join-Path $App "launcher\deps.R"
 $needDeps = $Force -or -not (Test-Path $marker) -or `
-            ((Get-Item $depsR).LastWriteTimeUtc -gt (Get-Item $marker).LastWriteTimeUtc)
+((Get-Item $depsR).LastWriteTimeUtc -gt (Get-Item $marker).LastWriteTimeUtc)
 
 if ($needDeps) {
   Say "Checking / installing R packages (first run can take several minutes)..."
   & $Rscript $depsR $LibDir
   if ($LASTEXITCODE -ne 0) { Die "Package installation failed (see messages above)." }
   Set-Content -Path $marker -Value (Get-Date -Format o)
-} else {
+}
+else {
   Say "Packages already installed (cached). Use -Force to re-check."
 }
 

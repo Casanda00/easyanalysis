@@ -1,226 +1,404 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EasyAnalysis — Documentation</title>
-<meta name="description" content="EasyAnalysis reference: installation, the workspace, every menu, the methods available, projects and file formats, privacy, and troubleshooting.">
-<link rel="stylesheet" href="assets/site.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EasyAnalysis — Documentation</title>
+  <meta name="description"
+    content="EasyAnalysis reference: installation, the workspace, every menu, the methods available, projects and file formats, privacy, and troubleshooting.">
+  <link rel="stylesheet" href="assets/site.css">
 </head>
+
 <body>
 
-<nav>
-  <div class="wrap">
-    <a class="brand" href="index.html">
-      <span class="mk"><svg viewBox="0 0 24 24"><path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2z"/></svg></span>
-      EasyAnalysis
-    </a>
-    <span class="links">
-      <a href="index.html">Home</a>
-      <a href="how-to-use.html">How to use</a>
-      <a class="on" href="documentation.html">Documentation</a>
-      <a class="btn go sm" href="index.html#get">Download</a>
-    </span>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="index.html">
+        <span class="mk"><svg viewBox="0 0 24 24">
+            <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2z" />
+          </svg></span>
+        EasyAnalysis
+      </a>
+      <span class="links">
+        <a href="index.html">Home</a>
+        <a href="how-to-use.html">How to use</a>
+        <a class="on" href="documentation.html">Documentation</a>
+        <a class="btn go sm" href="index.html#get">Download</a>
+      </span>
+    </div>
+  </nav>
+
+  <div class="wrap doc">
+    <aside>
+      <div class="t">Reference</div>
+      <a href="#install">Installation</a>
+      <a href="#requirements">Requirements</a>
+      <a href="#workspace">The workspace</a>
+      <a href="#menus">Menu reference</a>
+      <a href="#methods">Methods available</a>
+      <a href="#formats">Supported files</a>
+      <a href="#projects">Projects &amp; storage</a>
+      <a href="#packages">Packages</a>
+      <a href="#privacy">Privacy &amp; security</a>
+      <a href="#trouble">Troubleshooting</a>
+      <a href="#cite">How to cite</a>
+    </aside>
+
+    <article>
+      <div class="eyebrow">Reference</div>
+      <h1>Documentation</h1>
+      <p class="sub">Everything the app can do, where to find it, and what happens to your data.
+        New here? Start with the <a href="how-to-use.html">walkthrough</a>.</p>
+
+      <section id="install">
+        <h2>Installation</h2>
+        <p>One line installs and launches everything — R (if you don't have it), the app, and its
+          R packages, into your user folder. No admin rights, no Docker.</p>
+        <div class="code">
+          <div class="top">Windows · PowerShell <button class="copy" data-copy="i">Copy</button></div>
+          <pre id="cmd-i">iwr -useb https://easyanalysis.dev/install.ps1 | iex</pre>
+        </div>
+        <div class="code">
+          <div class="top">macOS &amp; Linux · Terminal <button class="copy" data-copy="j">Copy</button></div>
+          <pre id="cmd-j">curl -fsSL https://easyanalysis.dev/install.sh | sh</pre>
+        </div>
+        <p>What it does, in order: finds or downloads a portable R → downloads the app →
+          installs missing packages into a private library → starts the app and opens your browser.
+          The first run can take several minutes; later runs start in seconds because each step is
+          cached.</p>
+        <p>On <strong>Windows</strong> R is downloaded automatically if you don't have it. On
+          <strong>macOS/Linux</strong> an existing R is used; if there is none the script installs it
+          with Homebrew where available, or tells you the single command for your system. Spatial
+          packages compile from source on macOS/Linux, so the first run takes longer there.
+        </p>
+      </section>
+
+      <section id="requirements">
+        <h2>Requirements</h2>
+        <table>
+          <tr>
+            <th>Item</th>
+            <th>Needed</th>
+          </tr>
+          <tr>
+            <td><strong>OS</strong></td>
+            <td>Windows, macOS and Linux</td>
+          </tr>
+          <tr>
+            <td><strong>R</strong></td>
+            <td>Windows: downloaded automatically if missing. macOS/Linux: an existing R is used, or installed via
+              Homebrew / your package manager</td>
+          </tr>
+          <tr>
+            <td><strong>Disk</strong></td>
+            <td>~2 GB for R and the spatial packages</td>
+          </tr>
+          <tr>
+            <td><strong>Memory</strong></td>
+            <td>8 GB is comfortable; large point clouds want more</td>
+          </tr>
+          <tr>
+            <td><strong>Internet</strong></td>
+            <td>Only for install, package downloads, basemap tiles and satellite search</td>
+          </tr>
+          <tr>
+            <td><strong>Account</strong></td>
+            <td>None. There is no sign-in and no cloud service.</td>
+          </tr>
+        </table>
+      </section>
+
+      <section id="workspace">
+        <h2>The workspace</h2>
+        <p>One frame holds everything, so you never switch screens mid-analysis.</p>
+        <table>
+          <tr>
+            <th>Region</th>
+            <th>What it holds</th>
+          </tr>
+          <tr>
+            <td><strong>Menu bar</strong></td>
+            <td>Project · Edit · View · Add Data · Processing · Controls · Packages · Settings · Help, plus a tool
+              search box</td>
+          </tr>
+          <tr>
+            <td><strong>Layers panel</strong> (left)</td>
+            <td>Every dataset and layer, each with a visibility switch and an expandable legend / styling</td>
+          </tr>
+          <tr>
+            <td><strong>Canvas</strong> (centre)</td>
+            <td>The map, the chart builder, or the active tool's results</td>
+          </tr>
+          <tr>
+            <td><strong>Tool panel</strong> (right)</td>
+            <td>The open tool's settings; can be floated or minimised</td>
+          </tr>
+          <tr>
+            <td><strong>Results dock</strong> (far right)</td>
+            <td>Past results, as chips — click to pop one out, drag and resize it</td>
+          </tr>
+          <tr>
+            <td><strong>R console</strong> (bottom)</td>
+            <td>Slides up on demand for direct R</td>
+          </tr>
+          <tr>
+            <td><strong>Status bar</strong></td>
+            <td>Project, active dataset, dimensions, memory in use, and where the project is saved</td>
+          </tr>
+        </table>
+        <p><strong>Views:</strong> <em>Map view</em> for spatial layers, <em>Data view</em> for tables and
+          charts, and <em>Split</em> for both with a draggable divider. The app opens on whichever
+          suits your data and then leaves the choice to you.</p>
+      </section>
+
+      <section id="menus">
+        <h2>Menu reference</h2>
+        <table>
+          <tr>
+            <th>Menu</th>
+            <th>Contains</th>
+          </tr>
+          <tr>
+            <td><strong>Project</strong></td>
+            <td>New · Open From · Open Recent · Save · Save As (.eap) · Import project · Export report (HTML) · Share ·
+              Close</td>
+          </tr>
+          <tr>
+            <td><strong>Edit</strong></td>
+            <td>Undo · Reset to uploaded file · Edit the data table</td>
+          </tr>
+          <tr>
+            <td><strong>View</strong></td>
+            <td>Theme (six colour sets) · Basemap (14 options) · Map / Data / Split</td>
+          </tr>
+          <tr>
+            <td><strong>Add Data</strong></td>
+            <td>From file · Create a table · Download spatial data</td>
+          </tr>
+          <tr>
+            <td><strong>Processing</strong></td>
+            <td>Every analysis, grouped: Data · Statistics · Machine Learning · Spatial &amp; LiDAR — plus the AI
+              Assistant and the R console</td>
+          </tr>
+          <tr>
+            <td><strong>Controls</strong></td>
+            <td>Zoom to layers · show/hide each panel · attribute table · R console</td>
+          </tr>
+          <tr>
+            <td><strong>Packages</strong></td>
+            <td>Find &amp; install a package · optional packages · installed packages</td>
+          </tr>
+          <tr>
+            <td><strong>Settings</strong></td>
+            <td>Preferences, display and import defaults, keyboard shortcuts</td>
+          </tr>
+          <tr>
+            <td><strong>Help</strong></td>
+            <td>Documentation · References · the Co-Analyst · guided tour · About</td>
+          </tr>
+        </table>
+        <div class="callout">Can't find something? Use the <strong>search box</strong> in the menu bar —
+          it searches every tool by name.</div>
+      </section>
+
+      <section id="methods">
+        <h2>Methods available</h2>
+        <table>
+          <tr>
+            <th>Group</th>
+            <th>Methods</th>
+          </tr>
+          <tr>
+            <td><strong>Data</strong></td>
+            <td>Column management, row filtering, type conversion, factor levels, aggregation, binning, imputation,
+              joins, batch apply; descriptive statistics and correlation</td>
+          </tr>
+          <tr>
+            <td><strong>Statistics</strong></td>
+            <td>t-tests and non-parametric tests, chi-square, ANOVA with Tukey HSD, linear regression (multiple,
+              polynomial, ridge/lasso, Poisson), logistic and multinomial regression, linear mixed effects, GAM,
+              survival analysis, SEM and mediation, Bayesian analysis, time series</td>
+          </tr>
+          <tr>
+            <td><strong>Machine learning</strong></td>
+            <td>Random forest, XGBoost, decision trees, support vector machines, neural networks, discriminant analysis
+              (LDA, WLDA, QDA, RLDA, KDA, LLDA, MMC), clustering (k-means, hierarchical, Gower/PAM), one-vs-all
+              classification, PCA and dimension reduction</td>
+          </tr>
+          <tr>
+            <td><strong>Spatial &amp; LiDAR</strong></td>
+            <td>Raster and vector analysis, surface models (DTM/DSM/CHM), terrain analysis, hydrology, suitability
+              modelling, land classification, night-time lights, climate trend, wind, satellite search and download,
+              point cloud viewing, canopy height models, individual tree detection, LiDAR metrics</td>
+          </tr>
+        </table>
+        <p>Model screens report <strong>R², RMSE, bias and relative RMSE</strong>, and increasingly a
+          plain-English reading of the result. Models only run when you press <strong>Run</strong>.</p>
+      </section>
+
+      <section id="formats">
+        <h2>Supported files</h2>
+        <table>
+          <tr>
+            <th>Kind</th>
+            <th>Extensions</th>
+            <th>Notes</th>
+          </tr>
+          <tr>
+            <td><strong>Tables</strong></td>
+            <td>.csv .txt .xlsx .xls</td>
+            <td>Separator and numeric detection configurable in Settings</td>
+          </tr>
+          <tr>
+            <td><strong>Raster</strong></td>
+            <td>.tif .tiff .img .asc .nc .grd</td>
+            <td>Drawn on the map; large rasters are downsampled for display only</td>
+          </tr>
+          <tr>
+            <td><strong>Vector</strong></td>
+            <td>.shp .gpkg .geojson .json</td>
+            <td>Shapefiles need all their sidecar files selected together</td>
+          </tr>
+          <tr>
+            <td><strong>Point cloud</strong></td>
+            <td>.las .laz</td>
+            <td>Decimated on read to protect memory</td>
+          </tr>
+          <tr>
+            <td><strong>Project</strong></td>
+            <td>.eap</td>
+            <td>A whole project in one file</td>
+          </tr>
+        </table>
+        <div class="callout">An unrecognised extension isn't rejected outright — the app inspects the
+          file and loads it as a raster or vector if it can.</div>
+      </section>
+
+      <section id="projects">
+        <h2>Projects &amp; storage</h2>
+        <p>A project is a folder on your machine. Tables are stored inside it; large spatial files are
+          referenced in place so nothing is duplicated. Work is saved as you go — there is no Save button
+          to forget.</p>
+        <ul>
+          <li><strong>Where:</strong> your local app-data folder; the exact path is shown in the status bar.</li>
+          <li><strong>Save As (.eap):</strong> zips the project into one shareable file.</li>
+          <li><strong>Import:</strong> opens a <code>.eap</code> someone sent you.</li>
+          <li><strong>Export report:</strong> a self-contained HTML summary of the project.</li>
+        </ul>
+      </section>
+
+      <section id="packages">
+        <h2>Packages</h2>
+        <p>Core methods work out of the box. Some optional ones need an extra R package — the app tells
+          you which, and installs it for you.</p>
+        <ul>
+          <li><strong>Packages ▸ Find &amp; install</strong> — search CRAN (typos are tolerated) and install from the
+            result row.</li>
+          <li><strong>Optional packages</strong> — the list of extras, showing what's already installed.</li>
+          <li>After installing, the package is loaded immediately — <strong>no restart</strong>.</li>
+        </ul>
+      </section>
+
+      <section id="privacy">
+        <h2>Privacy &amp; security</h2>
+        <p><strong>The app runs entirely on your machine.</strong> There is no account, no cloud storage
+          and no telemetry. It listens only on <code>127.0.0.1</code>, so nothing is exposed to your network.</p>
+        <table>
+          <tr>
+            <th>Goes online</th>
+            <th>When</th>
+            <th>What is sent</th>
+          </tr>
+          <tr>
+            <td><strong>OpenAI</strong></td>
+            <td>Only if you use the Co-Analyst</td>
+            <td>The current screen's context and a picture of the current plot, with your own API key</td>
+          </tr>
+          <tr>
+            <td><strong>CRAN</strong></td>
+            <td>Installing packages</td>
+            <td>Package names only</td>
+          </tr>
+          <tr>
+            <td><strong>Basemap tiles</strong></td>
+            <td>Viewing the map</td>
+            <td>Standard map tile requests</td>
+          </tr>
+          <tr>
+            <td><strong>Satellite archives</strong></td>
+            <td>Only when you search for imagery</td>
+            <td>Your search area and dates</td>
+          </tr>
+        </table>
+        <p>Your data files are never uploaded anywhere. Close the Co-Analyst and the app makes no calls
+          that involve your data at all.</p>
+      </section>
+
+      <section id="trouble">
+        <h2>Troubleshooting</h2>
+        <table>
+          <tr>
+            <th>Symptom</th>
+            <th>What to do</th>
+          </tr>
+          <tr>
+            <td>The browser tab is blank or stale</td>
+            <td>Hard-refresh (<code>Ctrl+Shift+R</code>)</td>
+          </tr>
+          <tr>
+            <td>"Port in use"</td>
+            <td>An older copy is still running — close that terminal window, then start again</td>
+          </tr>
+          <tr>
+            <td>The app stops when I close the terminal</td>
+            <td>Expected: that window <em>is</em> the app. Keep it open.</td>
+          </tr>
+          <tr>
+            <td>A large .laz is slow or fails</td>
+            <td>Point clouds are decimated on read, but very large files still need memory. Watch the memory reading in
+              the status bar.</td>
+          </tr>
+          <tr>
+            <td>My raster is in the wrong place on the map</td>
+            <td>Its CRS is missing or wrong; set it in the raster tools before mapping.</td>
+          </tr>
+          <tr>
+            <td>A method says a package is missing</td>
+            <td><strong>Packages ▸ Find &amp; install</strong>, then run it again</td>
+          </tr>
+          <tr>
+            <td>The Co-Analyst won't answer</td>
+            <td>Add your OpenAI key with the gear icon in its panel</td>
+          </tr>
+        </table>
+      </section>
+
+      <section id="cite">
+        <h2>How to cite</h2>
+        <p>If EasyAnalysis contributed to your work, please cite it. A formal citation file is being
+          prepared; in the meantime the version number is in <strong>Help ▸ About</strong>.</p>
+      </section>
+    </article>
   </div>
-</nav>
 
-<div class="wrap doc">
-  <aside>
-    <div class="t">Reference</div>
-    <a href="#install">Installation</a>
-    <a href="#requirements">Requirements</a>
-    <a href="#workspace">The workspace</a>
-    <a href="#menus">Menu reference</a>
-    <a href="#methods">Methods available</a>
-    <a href="#formats">Supported files</a>
-    <a href="#projects">Projects &amp; storage</a>
-    <a href="#packages">Packages</a>
-    <a href="#privacy">Privacy &amp; security</a>
-    <a href="#trouble">Troubleshooting</a>
-    <a href="#cite">How to cite</a>
-  </aside>
+  <footer>
+    <div class="wrap">
+      <span>EasyAnalysis</span>
+      <span style="margin-left:auto"><a href="how-to-use.html">How to use</a></span>
+    </div>
+  </footer>
 
-  <article>
-    <div class="eyebrow">Reference</div>
-    <h1>Documentation</h1>
-    <p class="sub">Everything the app can do, where to find it, and what happens to your data.
-      New here? Start with the <a href="how-to-use.html">walkthrough</a>.</p>
-
-    <section id="install">
-      <h2>Installation</h2>
-      <p>One line installs and launches everything — R (if you don't have it), the app, and its
-         R packages, into your user folder. No admin rights, no Docker.</p>
-      <div class="code">
-        <div class="top">Windows · PowerShell <button class="copy" data-copy="i">Copy</button></div>
-<pre id="cmd-i">iwr -useb https://easyanalysis.vercel.app/install.ps1 | iex</pre>
-      </div>
-      <div class="code">
-        <div class="top">macOS &amp; Linux · Terminal <button class="copy" data-copy="j">Copy</button></div>
-<pre id="cmd-j">curl -fsSL https://easyanalysis.vercel.app/install.sh | sh</pre>
-      </div>
-      <p>What it does, in order: finds or downloads a portable R → downloads the app →
-         installs missing packages into a private library → starts the app and opens your browser.
-         The first run can take several minutes; later runs start in seconds because each step is
-         cached.</p>
-      <p>On <strong>Windows</strong> R is downloaded automatically if you don't have it. On
-         <strong>macOS/Linux</strong> an existing R is used; if there is none the script installs it
-         with Homebrew where available, or tells you the single command for your system. Spatial
-         packages compile from source on macOS/Linux, so the first run takes longer there.</p>
-    </section>
-
-    <section id="requirements">
-      <h2>Requirements</h2>
-      <table>
-        <tr><th>Item</th><th>Needed</th></tr>
-        <tr><td><strong>OS</strong></td><td>Windows, macOS and Linux</td></tr>
-        <tr><td><strong>R</strong></td><td>Windows: downloaded automatically if missing. macOS/Linux: an existing R is used, or installed via Homebrew / your package manager</td></tr>
-        <tr><td><strong>Disk</strong></td><td>~2 GB for R and the spatial packages</td></tr>
-        <tr><td><strong>Memory</strong></td><td>8 GB is comfortable; large point clouds want more</td></tr>
-        <tr><td><strong>Internet</strong></td><td>Only for install, package downloads, basemap tiles and satellite search</td></tr>
-        <tr><td><strong>Account</strong></td><td>None. There is no sign-in and no cloud service.</td></tr>
-      </table>
-    </section>
-
-    <section id="workspace">
-      <h2>The workspace</h2>
-      <p>One frame holds everything, so you never switch screens mid-analysis.</p>
-      <table>
-        <tr><th>Region</th><th>What it holds</th></tr>
-        <tr><td><strong>Menu bar</strong></td><td>Project · Edit · View · Add Data · Processing · Controls · Packages · Settings · Help, plus a tool search box</td></tr>
-        <tr><td><strong>Layers panel</strong> (left)</td><td>Every dataset and layer, each with a visibility switch and an expandable legend / styling</td></tr>
-        <tr><td><strong>Canvas</strong> (centre)</td><td>The map, the chart builder, or the active tool's results</td></tr>
-        <tr><td><strong>Tool panel</strong> (right)</td><td>The open tool's settings; can be floated or minimised</td></tr>
-        <tr><td><strong>Results dock</strong> (far right)</td><td>Past results, as chips — click to pop one out, drag and resize it</td></tr>
-        <tr><td><strong>R console</strong> (bottom)</td><td>Slides up on demand for direct R</td></tr>
-        <tr><td><strong>Status bar</strong></td><td>Project, active dataset, dimensions, memory in use, and where the project is saved</td></tr>
-      </table>
-      <p><strong>Views:</strong> <em>Map view</em> for spatial layers, <em>Data view</em> for tables and
-         charts, and <em>Split</em> for both with a draggable divider. The app opens on whichever
-         suits your data and then leaves the choice to you.</p>
-    </section>
-
-    <section id="menus">
-      <h2>Menu reference</h2>
-      <table>
-        <tr><th>Menu</th><th>Contains</th></tr>
-        <tr><td><strong>Project</strong></td><td>New · Open From · Open Recent · Save · Save As (.eap) · Import project · Export report (HTML) · Share · Close</td></tr>
-        <tr><td><strong>Edit</strong></td><td>Undo · Reset to uploaded file · Edit the data table</td></tr>
-        <tr><td><strong>View</strong></td><td>Theme (six colour sets) · Basemap (14 options) · Map / Data / Split</td></tr>
-        <tr><td><strong>Add Data</strong></td><td>From file · Create a table · Download spatial data</td></tr>
-        <tr><td><strong>Processing</strong></td><td>Every analysis, grouped: Data · Statistics · Machine Learning · Spatial &amp; LiDAR — plus the AI Assistant and the R console</td></tr>
-        <tr><td><strong>Controls</strong></td><td>Zoom to layers · show/hide each panel · attribute table · R console</td></tr>
-        <tr><td><strong>Packages</strong></td><td>Find &amp; install a package · optional packages · installed packages</td></tr>
-        <tr><td><strong>Settings</strong></td><td>Preferences, display and import defaults, keyboard shortcuts</td></tr>
-        <tr><td><strong>Help</strong></td><td>Documentation · References · the Co-Analyst · guided tour · About</td></tr>
-      </table>
-      <div class="callout">Can't find something? Use the <strong>search box</strong> in the menu bar —
-        it searches every tool by name.</div>
-    </section>
-
-    <section id="methods">
-      <h2>Methods available</h2>
-      <table>
-        <tr><th>Group</th><th>Methods</th></tr>
-        <tr><td><strong>Data</strong></td><td>Column management, row filtering, type conversion, factor levels, aggregation, binning, imputation, joins, batch apply; descriptive statistics and correlation</td></tr>
-        <tr><td><strong>Statistics</strong></td><td>t-tests and non-parametric tests, chi-square, ANOVA with Tukey HSD, linear regression (multiple, polynomial, ridge/lasso, Poisson), logistic and multinomial regression, linear mixed effects, GAM, survival analysis, SEM and mediation, Bayesian analysis, time series</td></tr>
-        <tr><td><strong>Machine learning</strong></td><td>Random forest, XGBoost, decision trees, support vector machines, neural networks, discriminant analysis (LDA, WLDA, QDA, RLDA, KDA, LLDA, MMC), clustering (k-means, hierarchical, Gower/PAM), one-vs-all classification, PCA and dimension reduction</td></tr>
-        <tr><td><strong>Spatial &amp; LiDAR</strong></td><td>Raster and vector analysis, surface models (DTM/DSM/CHM), terrain analysis, hydrology, suitability modelling, land classification, night-time lights, climate trend, wind, satellite search and download, point cloud viewing, canopy height models, individual tree detection, LiDAR metrics</td></tr>
-      </table>
-      <p>Model screens report <strong>R², RMSE, bias and relative RMSE</strong>, and increasingly a
-         plain-English reading of the result. Models only run when you press <strong>Run</strong>.</p>
-    </section>
-
-    <section id="formats">
-      <h2>Supported files</h2>
-      <table>
-        <tr><th>Kind</th><th>Extensions</th><th>Notes</th></tr>
-        <tr><td><strong>Tables</strong></td><td>.csv .txt .xlsx .xls</td><td>Separator and numeric detection configurable in Settings</td></tr>
-        <tr><td><strong>Raster</strong></td><td>.tif .tiff .img .asc .nc .grd</td><td>Drawn on the map; large rasters are downsampled for display only</td></tr>
-        <tr><td><strong>Vector</strong></td><td>.shp .gpkg .geojson .json</td><td>Shapefiles need all their sidecar files selected together</td></tr>
-        <tr><td><strong>Point cloud</strong></td><td>.las .laz</td><td>Decimated on read to protect memory</td></tr>
-        <tr><td><strong>Project</strong></td><td>.eap</td><td>A whole project in one file</td></tr>
-      </table>
-      <div class="callout">An unrecognised extension isn't rejected outright — the app inspects the
-        file and loads it as a raster or vector if it can.</div>
-    </section>
-
-    <section id="projects">
-      <h2>Projects &amp; storage</h2>
-      <p>A project is a folder on your machine. Tables are stored inside it; large spatial files are
-         referenced in place so nothing is duplicated. Work is saved as you go — there is no Save button
-         to forget.</p>
-      <ul>
-        <li><strong>Where:</strong> your local app-data folder; the exact path is shown in the status bar.</li>
-        <li><strong>Save As (.eap):</strong> zips the project into one shareable file.</li>
-        <li><strong>Import:</strong> opens a <code>.eap</code> someone sent you.</li>
-        <li><strong>Export report:</strong> a self-contained HTML summary of the project.</li>
-      </ul>
-    </section>
-
-    <section id="packages">
-      <h2>Packages</h2>
-      <p>Core methods work out of the box. Some optional ones need an extra R package — the app tells
-         you which, and installs it for you.</p>
-      <ul>
-        <li><strong>Packages ▸ Find &amp; install</strong> — search CRAN (typos are tolerated) and install from the result row.</li>
-        <li><strong>Optional packages</strong> — the list of extras, showing what's already installed.</li>
-        <li>After installing, the package is loaded immediately — <strong>no restart</strong>.</li>
-      </ul>
-    </section>
-
-    <section id="privacy">
-      <h2>Privacy &amp; security</h2>
-      <p><strong>The app runs entirely on your machine.</strong> There is no account, no cloud storage
-         and no telemetry. It listens only on <code>127.0.0.1</code>, so nothing is exposed to your network.</p>
-      <table>
-        <tr><th>Goes online</th><th>When</th><th>What is sent</th></tr>
-        <tr><td><strong>OpenAI</strong></td><td>Only if you use the Co-Analyst</td><td>The current screen's context and a picture of the current plot, with your own API key</td></tr>
-        <tr><td><strong>CRAN</strong></td><td>Installing packages</td><td>Package names only</td></tr>
-        <tr><td><strong>Basemap tiles</strong></td><td>Viewing the map</td><td>Standard map tile requests</td></tr>
-        <tr><td><strong>Satellite archives</strong></td><td>Only when you search for imagery</td><td>Your search area and dates</td></tr>
-      </table>
-      <p>Your data files are never uploaded anywhere. Close the Co-Analyst and the app makes no calls
-         that involve your data at all.</p>
-    </section>
-
-    <section id="trouble">
-      <h2>Troubleshooting</h2>
-      <table>
-        <tr><th>Symptom</th><th>What to do</th></tr>
-        <tr><td>The browser tab is blank or stale</td><td>Hard-refresh (<code>Ctrl+Shift+R</code>)</td></tr>
-        <tr><td>"Port in use"</td><td>An older copy is still running — close that terminal window, then start again</td></tr>
-        <tr><td>The app stops when I close the terminal</td><td>Expected: that window <em>is</em> the app. Keep it open.</td></tr>
-        <tr><td>A large .laz is slow or fails</td><td>Point clouds are decimated on read, but very large files still need memory. Watch the memory reading in the status bar.</td></tr>
-        <tr><td>My raster is in the wrong place on the map</td><td>Its CRS is missing or wrong; set it in the raster tools before mapping.</td></tr>
-        <tr><td>A method says a package is missing</td><td><strong>Packages ▸ Find &amp; install</strong>, then run it again</td></tr>
-        <tr><td>The Co-Analyst won't answer</td><td>Add your OpenAI key with the gear icon in its panel</td></tr>
-      </table>
-    </section>
-
-    <section id="cite">
-      <h2>How to cite</h2>
-      <p>If EasyAnalysis contributed to your work, please cite it. A formal citation file is being
-         prepared; in the meantime the version number is in <strong>Help ▸ About</strong>.</p>
-    </section>
-  </article>
-</div>
-
-<footer>
-  <div class="wrap">
-    <span>EasyAnalysis</span>
-    <span style="margin-left:auto"><a href="how-to-use.html">How to use</a></span>
-  </div>
-</footer>
-
-<script>
-document.querySelectorAll('.copy').forEach(function(b){
-  b.addEventListener('click', function(){
-    var el=document.getElementById('cmd-'+b.dataset.copy); if(!el) return;
-    navigator.clipboard.writeText(el.innerText.trim()).then(function(){
-      var o=b.textContent; b.textContent='Copied'; setTimeout(function(){b.textContent=o;},1400);
-    }).catch(function(){ b.textContent='Select & copy'; });
-  });
-});
-</script>
+  <script>
+    document.querySelectorAll('.copy').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var el = document.getElementById('cmd-' + b.dataset.copy); if (!el) return;
+        navigator.clipboard.writeText(el.innerText.trim()).then(function () {
+          var o = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = o; }, 1400);
+        }).catch(function () { b.textContent = 'Select & copy'; });
+      });
+    });
+  </script>
 </body>
+
 </html>

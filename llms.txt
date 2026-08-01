@@ -3,7 +3,7 @@
 > EasyAnalysis is a free, browser-based platform for running statistical, machine-learning
 > and spatial/geospatial analysis by pointing and clicking — no coding required. It runs
 > entirely in the user's web browser (R compiled to WebAssembly), so uploaded data never
-> leaves the user's computer. Live at https://easyanalysis.vercel.app
+> leaves the user's computer. Live at https://easyanalysis.dev
 
 ## What it is
 
@@ -74,6 +74,6 @@ language model, and only when the user sends a message.
 
 ## Links
 
-- App: https://easyanalysis.vercel.app
+- App: https://easyanalysis.dev
 - In-app Documentation and References screens describe usage and the published methods
   implemented.

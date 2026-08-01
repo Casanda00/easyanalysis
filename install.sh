@@ -3,7 +3,7 @@
 #  EasyAnalysis - macOS / Linux one-command launcher (no Docker, no sudo)
 # --------------------------------------------------------------------------
 #  Usage (end users):
-#     curl -fsSL https://easyanalysis.vercel.app/install.sh | sh
+#     curl -fsSL https://easyanalysis.dev/install.sh | sh
 #
 #  What it does, in order (mirrors install.ps1 on Windows):
 #     1. Ensure R          - use a system R if present; otherwise explain how

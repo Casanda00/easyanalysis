@@ -1,214 +1,298 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to use EasyAnalysis</title>
-<meta name="description" content="A walkthrough of EasyAnalysis: create a project, add data, run an analysis, and map the result.">
-<link rel="stylesheet" href="assets/site.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to use EasyAnalysis</title>
+  <meta name="description"
+    content="A walkthrough of EasyAnalysis: create a project, add data, run an analysis, and map the result.">
+  <link rel="stylesheet" href="assets/site.css">
 </head>
+
 <body>
 
-<nav>
-  <div class="wrap">
-    <a class="brand" href="index.html">
-      <span class="mk"><svg viewBox="0 0 24 24"><path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2z"/></svg></span>
-      EasyAnalysis
-    </a>
-    <span class="links">
-      <a href="index.html">Home</a>
-      <a class="on" href="how-to-use.html">How to use</a>
-      <a href="documentation.html">Documentation</a>
-      <a class="btn go sm" href="index.html#get">Download</a>
-    </span>
-  </div>
-</nav>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="index.html">
+        <span class="mk"><svg viewBox="0 0 24 24">
+            <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2z" />
+          </svg></span>
+        EasyAnalysis
+      </a>
+      <span class="links">
+        <a href="index.html">Home</a>
+        <a class="on" href="how-to-use.html">How to use</a>
+        <a href="documentation.html">Documentation</a>
+        <a class="btn go sm" href="index.html#get">Download</a>
+      </span>
+    </div>
+  </nav>
 
-<div class="wrap doc">
-  <aside>
-    <div class="t">On this page</div>
-    <a href="#start">1 · Start the app</a>
-    <a href="#project">2 · Create a project</a>
-    <a href="#data">3 · Add your data</a>
-    <a href="#views">4 · Map view &amp; Data view</a>
-    <a href="#analyse">5 · Run an analysis</a>
-    <a href="#spatial">6 · Model spatial data</a>
-    <a href="#assistant">7 · Ask the Co-Analyst</a>
-    <a href="#save">8 · Save &amp; share</a>
-    <a href="#tips">Tips &amp; shortcuts</a>
-  </aside>
+  <div class="wrap doc">
+    <aside>
+      <div class="t">On this page</div>
+      <a href="#start">1 · Start the app</a>
+      <a href="#project">2 · Create a project</a>
+      <a href="#data">3 · Add your data</a>
+      <a href="#views">4 · Map view &amp; Data view</a>
+      <a href="#analyse">5 · Run an analysis</a>
+      <a href="#spatial">6 · Model spatial data</a>
+      <a href="#assistant">7 · Ask the Co-Analyst</a>
+      <a href="#save">8 · Save &amp; share</a>
+      <a href="#tips">Tips &amp; shortcuts</a>
+    </aside>
 
-  <article>
-    <div class="eyebrow">Walkthrough</div>
-    <h1>How to use EasyAnalysis</h1>
-    <p class="sub">From a fresh install to a modelled map. Nothing here needs code — but the
-      R console is there if you want it.</p>
+    <article>
+      <div class="eyebrow">Walkthrough</div>
+      <h1>How to use EasyAnalysis</h1>
+      <p class="sub">From a fresh install to a modelled map. Nothing here needs code — but the
+        R console is there if you want it.</p>
 
-    <section id="start">
-      <h2>1 · Start the app</h2>
-      <p>One line in a terminal installs and starts everything — R, the app and its
-         packages. No admin rights, no Docker, nothing to configure.</p>
-      <div class="code">
-        <div class="top">Windows · PowerShell <button class="copy" data-copy="a">Copy</button></div>
-<pre id="cmd-a">iwr -useb https://easyanalysis.vercel.app/install.ps1 | iex</pre>
-      </div>
-      <div class="code">
-        <div class="top">macOS &amp; Linux · Terminal <button class="copy" data-copy="b">Copy</button></div>
-<pre id="cmd-b">curl -fsSL https://easyanalysis.vercel.app/install.sh | sh</pre>
-      </div>
-      <p>The first run downloads what it needs and can take a few minutes. Every run after that
-         starts in seconds, because everything is cached. When it's ready the app opens in your
-         browser at <code>http://127.0.0.1:7788</code>.</p>
-      <p><strong>Keep the terminal window open</strong> while you work — closing it stops the app.
-         To start it again later, run the same line.</p>
-      <div class="callout"><strong>First run takes a moment.</strong> The spatial libraries load
-        once at startup; you'll see a short "Starting up…" screen.</div>
-    </section>
+      <section id="start">
+        <h2>1 · Start the app</h2>
+        <p>One line in a terminal installs and starts everything — R, the app and its
+          packages. No admin rights, no Docker, nothing to configure.</p>
+        <div class="code">
+          <div class="top">Windows · PowerShell <button class="copy" data-copy="a">Copy</button></div>
+          <pre id="cmd-a">iwr -useb https://easyanalysis.dev/install.ps1 | iex</pre>
+        </div>
+        <div class="code">
+          <div class="top">macOS &amp; Linux · Terminal <button class="copy" data-copy="b">Copy</button></div>
+          <pre id="cmd-b">curl -fsSL https://easyanalysis.dev/install.sh | sh</pre>
+        </div>
+        <p>The first run downloads what it needs and can take a few minutes. Every run after that
+          starts in seconds, because everything is cached. When it's ready the app opens in your
+          browser at <code>http://127.0.0.1:7788</code>.</p>
+        <p><strong>Keep the terminal window open</strong> while you work — closing it stops the app.
+          To start it again later, run the same line.</p>
+        <div class="callout"><strong>First run takes a moment.</strong> The spatial libraries load
+          once at startup; you'll see a short "Starting up…" screen.</div>
+      </section>
 
-    <section id="project">
-      <h2>2 · Create a project</h2>
-      <p>The app opens on <strong>Projects</strong>. A project is a folder on your computer that
-         holds your data, your analyses and your results — so you can close the app and pick up
-         exactly where you stopped.</p>
-      <div class="how">
-        <div class="step"><span class="n">1</span><div>
-          <h3>Click "+ New project"</h3>
-          <p>Give it a name. That's the only thing you have to decide.</p></div></div>
-        <div class="step"><span class="n">2</span><div>
-          <h3>You land on the project Overview</h3>
-          <p>This is the project's home: what's inside it, and one button — <strong>Open project</strong> — to start working.</p></div></div>
-        <div class="step"><span class="n">3</span><div>
-          <h3>Coming back later</h3>
-          <p>Projects appear on the welcome screen. <strong>One click on a card opens it.</strong></p></div></div>
-      </div>
-    </section>
+      <section id="project">
+        <h2>2 · Create a project</h2>
+        <p>The app opens on <strong>Projects</strong>. A project is a folder on your computer that
+          holds your data, your analyses and your results — so you can close the app and pick up
+          exactly where you stopped.</p>
+        <div class="how">
+          <div class="step"><span class="n">1</span>
+            <div>
+              <h3>Click "+ New project"</h3>
+              <p>Give it a name. That's the only thing you have to decide.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">2</span>
+            <div>
+              <h3>You land on the project Overview</h3>
+              <p>This is the project's home: what's inside it, and one button — <strong>Open project</strong> — to start
+                working.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">3</span>
+            <div>
+              <h3>Coming back later</h3>
+              <p>Projects appear on the welcome screen. <strong>One click on a card opens it.</strong></p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="data">
-      <h2>3 · Add your data</h2>
-      <p>Use <strong>Add Data ▸ From file…</strong> in the menu bar, or the Add-data button on the
-         project page. EasyAnalysis works out what each file is:</p>
-      <table>
-        <tr><th>You add</th><th>It becomes</th><th>Where it shows</th></tr>
-        <tr><td><strong>.csv .txt .xlsx</strong></td><td>a table</td><td>Data view (chart + table)</td></tr>
-        <tr><td><strong>.tif .img .asc</strong></td><td>a raster layer</td><td>drawn on the map</td></tr>
-        <tr><td><strong>.shp .gpkg .geojson</strong></td><td>a vector layer</td><td>drawn on the map</td></tr>
-        <tr><td><strong>.las .laz</strong></td><td>a point cloud</td><td>LiDAR tools</td></tr>
-      </table>
-      <p>Everything you add appears in the <strong>Layers panel</strong> on the left. Each layer has a
-         switch to show/hide it and an arrow to open its legend and styling.</p>
-      <div class="callout">Adding a file <strong>does not</strong> jump you somewhere else. You stay
-        where you are; the layer simply appears in the list.</div>
-    </section>
+      <section id="data">
+        <h2>3 · Add your data</h2>
+        <p>Use <strong>Add Data ▸ From file…</strong> in the menu bar, or the Add-data button on the
+          project page. EasyAnalysis works out what each file is:</p>
+        <table>
+          <tr>
+            <th>You add</th>
+            <th>It becomes</th>
+            <th>Where it shows</th>
+          </tr>
+          <tr>
+            <td><strong>.csv .txt .xlsx</strong></td>
+            <td>a table</td>
+            <td>Data view (chart + table)</td>
+          </tr>
+          <tr>
+            <td><strong>.tif .img .asc</strong></td>
+            <td>a raster layer</td>
+            <td>drawn on the map</td>
+          </tr>
+          <tr>
+            <td><strong>.shp .gpkg .geojson</strong></td>
+            <td>a vector layer</td>
+            <td>drawn on the map</td>
+          </tr>
+          <tr>
+            <td><strong>.las .laz</strong></td>
+            <td>a point cloud</td>
+            <td>LiDAR tools</td>
+          </tr>
+        </table>
+        <p>Everything you add appears in the <strong>Layers panel</strong> on the left. Each layer has a
+          switch to show/hide it and an arrow to open its legend and styling.</p>
+        <div class="callout">Adding a file <strong>does not</strong> jump you somewhere else. You stay
+          where you are; the layer simply appears in the list.</div>
+      </section>
 
-    <section id="views">
-      <h2>4 · Map view &amp; Data view</h2>
-      <p>The workspace has two views, plus a split. They share the same project, the same layers
-         and the same tools.</p>
-      <ul>
-        <li><strong>Map view</strong> — your spatial layers on a basemap, with the active layer's
+      <section id="views">
+        <h2>4 · Map view &amp; Data view</h2>
+        <p>The workspace has two views, plus a split. They share the same project, the same layers
+          and the same tools.</p>
+        <ul>
+          <li><strong>Map view</strong> — your spatial layers on a basemap, with the active layer's
             attribute table docked underneath.</li>
-        <li><strong>Data view</strong> — the active table with a plot builder: pick the chart type,
+          <li><strong>Data view</strong> — the active table with a plot builder: pick the chart type,
             X and Y, and switch between <strong>Static</strong> and <strong>Interactive</strong>
             (hover, zoom, pan).</li>
-        <li><strong>Split</strong> — both at once, with a divider you can drag.</li>
-      </ul>
-      <p>The app picks a sensible view for you: a project with spatial data opens on the map, a
-         table-only project opens on Data view. Change it any time and it stops guessing.</p>
-    </section>
+          <li><strong>Split</strong> — both at once, with a divider you can drag.</li>
+        </ul>
+        <p>The app picks a sensible view for you: a project with spatial data opens on the map, a
+          table-only project opens on Data view. Change it any time and it stops guessing.</p>
+      </section>
 
-    <section id="analyse">
-      <h2>5 · Run an analysis</h2>
-      <div class="how">
-        <div class="step"><span class="n">1</span><div>
-          <h3>Pick a tool from <strong>Processing</strong></h3>
-          <p>Hover a group — Statistics, Machine Learning, Spatial &amp; LiDAR — and choose a method.</p></div></div>
-        <div class="step"><span class="n">2</span><div>
-          <h3>Set it up in the side panel</h3>
-          <p>Choose your response and predictors. Nothing runs until you say so.</p></div></div>
-        <div class="step"><span class="n">3</span><div>
-          <h3>Press <strong>Run</strong></h3>
-          <p>Results appear in the middle: plots, fit metrics (R², RMSE, bias) and a plain-English
-             reading of what they mean.</p></div></div>
-        <div class="step"><span class="n">4</span><div>
-          <h3>Compare runs</h3>
-          <p>Results park on the right-hand dock. Click one to pop it out — drag it, resize it, and
-             put two side by side to compare models.</p></div></div>
-      </div>
-    </section>
+      <section id="analyse">
+        <h2>5 · Run an analysis</h2>
+        <div class="how">
+          <div class="step"><span class="n">1</span>
+            <div>
+              <h3>Pick a tool from <strong>Processing</strong></h3>
+              <p>Hover a group — Statistics, Machine Learning, Spatial &amp; LiDAR — and choose a method.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">2</span>
+            <div>
+              <h3>Set it up in the side panel</h3>
+              <p>Choose your response and predictors. Nothing runs until you say so.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">3</span>
+            <div>
+              <h3>Press <strong>Run</strong></h3>
+              <p>Results appear in the middle: plots, fit metrics (R², RMSE, bias) and a plain-English
+                reading of what they mean.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">4</span>
+            <div>
+              <h3>Compare runs</h3>
+              <p>Results park on the right-hand dock. Click one to pop it out — drag it, resize it, and
+                put two side by side to compare models.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="spatial">
-      <h2>6 · Model spatial data</h2>
-      <p>This is the part that usually means exporting to another program. Here it's one loop:</p>
-      <div class="how">
-        <div class="step"><span class="n">1</span><div>
-          <h3>Extract values to a table</h3>
-          <p><strong>Processing ▸ Spatial &amp; LiDAR ▸ Raster &amp; vector analysis</strong> samples your
-             raster at each point or zone. The result is a normal table.</p></div></div>
-        <div class="step"><span class="n">2</span><div>
-          <h3>Model that table</h3>
-          <p>Switch to Data view and fit a regression, random forest — whatever suits.</p></div></div>
-        <div class="step"><span class="n">3</span><div>
-          <h3>Send predictions back to the map</h3>
-          <p>Outputs become layers, so they draw on the same map and appear in the Layers panel.</p></div></div>
-      </div>
-      <div class="callout">Spatial tools always draw on the <strong>workspace map</strong> — there is
-        never a second map to keep track of.</div>
-    </section>
+      <section id="spatial">
+        <h2>6 · Model spatial data</h2>
+        <p>This is the part that usually means exporting to another program. Here it's one loop:</p>
+        <div class="how">
+          <div class="step"><span class="n">1</span>
+            <div>
+              <h3>Extract values to a table</h3>
+              <p><strong>Processing ▸ Spatial &amp; LiDAR ▸ Raster &amp; vector analysis</strong> samples your
+                raster at each point or zone. The result is a normal table.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">2</span>
+            <div>
+              <h3>Model that table</h3>
+              <p>Switch to Data view and fit a regression, random forest — whatever suits.</p>
+            </div>
+          </div>
+          <div class="step"><span class="n">3</span>
+            <div>
+              <h3>Send predictions back to the map</h3>
+              <p>Outputs become layers, so they draw on the same map and appear in the Layers panel.</p>
+            </div>
+          </div>
+        </div>
+        <div class="callout">Spatial tools always draw on the <strong>workspace map</strong> — there is
+          never a second map to keep track of.</div>
+      </section>
 
-    <section id="assistant">
-      <h2>7 · Ask the Co-Analyst</h2>
-      <p>Click <strong>Co-Analyst</strong> in the top bar. It opens on <strong>Recommend</strong>:
-         describe what you want to find out in plain language and it suggests the right method.
-         Switch to <strong>Ask</strong> to have it run the analysis on your data and explain the
-         result — it shows exactly which steps it took.</p>
-      <div class="callout"><strong>Privacy:</strong> this is the one feature that sends anything
-        off your machine. It sends the current screen's context and a picture of the current plot
-        to OpenAI, using your own API key. Don't open it and nothing is ever sent.</div>
-    </section>
+      <section id="assistant">
+        <h2>7 · Ask the Co-Analyst</h2>
+        <p>Click <strong>Co-Analyst</strong> in the top bar. It opens on <strong>Recommend</strong>:
+          describe what you want to find out in plain language and it suggests the right method.
+          Switch to <strong>Ask</strong> to have it run the analysis on your data and explain the
+          result — it shows exactly which steps it took.</p>
+        <div class="callout"><strong>Privacy:</strong> this is the one feature that sends anything
+          off your machine. It sends the current screen's context and a picture of the current plot
+          to OpenAI, using your own API key. Don't open it and nothing is ever sent.</div>
+      </section>
 
-    <section id="save">
-      <h2>8 · Save &amp; share</h2>
-      <ul>
-        <li><strong>Saving is automatic.</strong> Your project is written to disk as you work.</li>
-        <li><strong>Project ▸ Save As… (.eap)</strong> packs the whole project into one file.</li>
-        <li><strong>Project ▸ Import project (.eap)…</strong> opens one you were sent.</li>
-        <li><strong>Project ▸ Export report (HTML)</strong> writes a summary you can share or archive.</li>
-      </ul>
-    </section>
+      <section id="save">
+        <h2>8 · Save &amp; share</h2>
+        <ul>
+          <li><strong>Saving is automatic.</strong> Your project is written to disk as you work.</li>
+          <li><strong>Project ▸ Save As… (.eap)</strong> packs the whole project into one file.</li>
+          <li><strong>Project ▸ Import project (.eap)…</strong> opens one you were sent.</li>
+          <li><strong>Project ▸ Export report (HTML)</strong> writes a summary you can share or archive.</li>
+        </ul>
+      </section>
 
-    <section id="tips">
-      <h2>Tips &amp; shortcuts</h2>
-      <table>
-        <tr><th>Want to…</th><th>Do this</th></tr>
-        <tr><td>Find a tool fast</td><td>Type in the <strong>search box</strong> in the top bar</td></tr>
-        <tr><td>Change the look</td><td><strong>View ▸ Theme</strong> — six colour sets, light and dark</td></tr>
-        <tr><td>Change the basemap</td><td><strong>View ▸ Basemap</strong> — your map position is kept</td></tr>
-        <tr><td>Zoom to your data</td><td><strong>Controls ▸ Zoom to layers</strong></td></tr>
-        <tr><td>Write R directly</td><td><strong>Processing ▸ R Console</strong> — slides up from the bottom</td></tr>
-        <tr><td>Install a package</td><td><strong>Packages ▸ Find &amp; install</strong> — search tolerates typos</td></tr>
-        <tr><td>Undo a data edit</td><td><code>Ctrl+Z</code> · reset to the uploaded file with <code>Ctrl+Shift+Z</code></td></tr>
-        <tr><td>More room</td><td><strong>Controls ▸ Panels</strong> to hide the side panels</td></tr>
-      </table>
-    </section>
-  </article>
-</div>
-
-<footer>
-  <div class="wrap">
-    <span>EasyAnalysis</span>
-    <span style="margin-left:auto"><a href="documentation.html">Documentation</a></span>
+      <section id="tips">
+        <h2>Tips &amp; shortcuts</h2>
+        <table>
+          <tr>
+            <th>Want to…</th>
+            <th>Do this</th>
+          </tr>
+          <tr>
+            <td>Find a tool fast</td>
+            <td>Type in the <strong>search box</strong> in the top bar</td>
+          </tr>
+          <tr>
+            <td>Change the look</td>
+            <td><strong>View ▸ Theme</strong> — six colour sets, light and dark</td>
+          </tr>
+          <tr>
+            <td>Change the basemap</td>
+            <td><strong>View ▸ Basemap</strong> — your map position is kept</td>
+          </tr>
+          <tr>
+            <td>Zoom to your data</td>
+            <td><strong>Controls ▸ Zoom to layers</strong></td>
+          </tr>
+          <tr>
+            <td>Write R directly</td>
+            <td><strong>Processing ▸ R Console</strong> — slides up from the bottom</td>
+          </tr>
+          <tr>
+            <td>Install a package</td>
+            <td><strong>Packages ▸ Find &amp; install</strong> — search tolerates typos</td>
+          </tr>
+          <tr>
+            <td>Undo a data edit</td>
+            <td><code>Ctrl+Z</code> · reset to the uploaded file with <code>Ctrl+Shift+Z</code></td>
+          </tr>
+          <tr>
+            <td>More room</td>
+            <td><strong>Controls ▸ Panels</strong> to hide the side panels</td>
+          </tr>
+        </table>
+      </section>
+    </article>
   </div>
-</footer>
 
-<script>
-document.querySelectorAll('.copy').forEach(function(b){
-  b.addEventListener('click', function(){
-    var el=document.getElementById('cmd-'+b.dataset.copy); if(!el) return;
-    navigator.clipboard.writeText(el.innerText.trim()).then(function(){
-      var o=b.textContent; b.textContent='Copied'; setTimeout(function(){b.textContent=o;},1400);
-    }).catch(function(){ b.textContent='Select & copy'; });
-  });
-});
-</script>
+  <footer>
+    <div class="wrap">
+      <span>EasyAnalysis</span>
+      <span style="margin-left:auto"><a href="documentation.html">Documentation</a></span>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.copy').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var el = document.getElementById('cmd-' + b.dataset.copy); if (!el) return;
+        navigator.clipboard.writeText(el.innerText.trim()).then(function () {
+          var o = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = o; }, 1400);
+        }).catch(function () { b.textContent = 'Select & copy'; });
+      });
+    });
+  </script>
 </body>
+
 </html>
