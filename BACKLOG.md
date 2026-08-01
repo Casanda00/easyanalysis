@@ -1279,12 +1279,16 @@ Reported by user for immediate implementation and testing ("we build one and I w
          - **Windows (PowerShell):** `iwr -useb https://easyanalysis.dev/install.ps1 | iex`
          - **macOS / Linux (Bash):** `curl -fsSL https://easyanalysis.dev/install.sh | bash`
 
-
-
-
-
-
-
-
-
-
+### 17. Detailed User Documentation & Interactive Tours
+> "we need a very detailed, clear and practical and intuitive documentation for users. so far, users try the app and have no idea what it does. so the goal is to have a proper documentation in the landing page and a button what points to it on the first page the app loads and this button goes on the projects and analysis area pages too. detailed tour with more information. tour 1 on the first page, tour 2 on the project page, tour 3 on the analysis area page both for map view and for data view."
+- **Diagnosis & Requirements:**
+  - Users are struggling to understand the app's capabilities upon first use.
+  - **Comprehensive Documentation:** Create detailed, clear, practical, and intuitive documentation explaining what the app does and how to use it.
+  - **Documentation Access:** Add a prominent button linking to the documentation on:
+    - The landing page (first page the app loads).
+    - The projects page.
+    - The analysis area pages.
+  - **Interactive Onboarding Tours:** Implement guided tours for different sections of the app:
+    - **Tour 1:** On the first page/landing page.
+    - **Tour 2:** On the project page.
+    - **Tour 3:** On the analysis area page, covering both the **map view** and the **data view**.
