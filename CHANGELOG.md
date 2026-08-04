@@ -8,6 +8,33 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.0 — 2026-08-04
+
+### Added
+- **Five new analyses**, and a registry so the next ones are cheap:
+  **Ordinal regression**, **Robust regression**, **Poisson regression (counts)**,
+  **Negative binomial**, and **GLMM (generalised mixed effects)**. Find them under
+  Regression, or search for them.
+- **GLMM fills a real gap.** The existing Mixed effects screen is `nlme::lme`, which fits
+  Gaussian responses only — it has no `family` argument at all, so a yes/no or count outcome
+  with random effects could not be fitted anywhere in the app. The new screen does binomial
+  and Poisson with random intercepts, random slopes, and crossed or nested grouping
+  variables, and reports singular fits and convergence trouble in plain language with the
+  usual remedies rather than as a raw error.
+- **`statistics.R` + `mod_stat.R`** — one spec per method, one generic runner, the same move
+  `algorithms.R` made for spatial operations. Adding an analysis is now a list entry: no new
+  module, no new variable pickers, no new view plumbing. Methods that genuinely do not fit
+  (Tests, Discriminant analysis, Descriptive, Clustering) stay as they are.
+- Every registry method shares one variable picker, generated from the roles the method
+  declares — so predictor selection is finally identical across them, and the Co-Analyst sees
+  a registry method exactly as it sees a hand-written screen.
+- `lme4` added to the optional packages.
+
+### Fixed
+- `CLAUDE.md`'s note that `uef_evaluation()` was "available but unused" was out of date — it
+  is called by the LME, Random forest and Linear regression screens, and now by the registry
+  too. Corrected so the next reader does not wire up something that already works.
+
 ## v0.8.4 — 2026-08-04
 
 ### Fixed

@@ -999,6 +999,11 @@ server <- function(input, output, session) {
                       vector = vector_pool, table = dataset_pool)
   algo_ctx <- lapply(ea_algorithms(), function(a)
     algoServer(paste0("algo_", a$id), a, .algo_pools))
+  # One statServer per registry entry, namespaced "stat_<id>" to match the tool
+  # key the workspace registers. Adding an analysis needs no change here.
+  stat_ctx <- lapply(ea_statistics(), function(s)
+    statServer(paste0("stat_", s$id), s, dataset_pool, active_dataset))
+  names(stat_ctx) <- vapply(ea_statistics(), function(s) s$id, character(1))
   # terrainServer/hydroServer are NOT bound: their operations are algorithms.R
   # entries now (see .ea_terrain_algs / .ea_hydro_algs).
   suit_ctx       <- suitabilityServer("suitability", raster_pool)
@@ -1139,6 +1144,9 @@ server <- function(input, output, session) {
   # Every processing algorithm reports what it produced, keyed by its tool key,
   # so the Co-Analyst can see it the same way it sees a model screen.
   module_ctx[paste0("algo_", names(algo_ctx))] <- algo_ctx
+  # Statistical methods report their fit the same way, so the Co-Analyst sees
+  # a registry-hosted analysis exactly as it sees a hand-written screen.
+  module_ctx[paste0("stat_", names(stat_ctx))] <- stat_ctx
 
   chatServer("chat", dataset_pool, active_dataset, reactive(input$current_view), module_ctx)
 

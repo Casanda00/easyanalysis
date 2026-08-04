@@ -36,7 +36,7 @@ core <- c(
 extras <- c(
   "BayesFactor", "mgcv", "klaR", "kernlab", "heplots", "rpart", "Hmisc",
   "trend", "car", "glmnet", "exactextractr", "rstac", "survival", "tseries",
-  "e1071", "xgboost", "whitebox", "lavaan", "writexl", "plotly"
+  "e1071", "xgboost", "whitebox", "lavaan", "writexl", "plotly", "lme4"
 )
 # NOTE: ggord (DA biplot) is GitHub-only (fawda123/ggord) and optional — not
 # installed here; its screen path is requireNamespace()-guarded.

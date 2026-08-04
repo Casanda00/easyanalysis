@@ -1583,6 +1583,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           canvas = NULL, map_based = TRUE)
       })
     }
+
+    # ---- Statistical methods: one searchable tool each (statistics.R) -------
+    # Same treatment as the algorithms above, with one difference: a method
+    # produces a RESULT, not a layer, so it has a canvas and is NOT map_based.
+    for (s in ea_statistics()) {
+      local({
+        spec <- s
+        MODUI[[paste0("stat_", spec$id)]] <<- list(
+          nm = spec$label, grp = spec$group,
+          tools  = function(nsid) statToolsUI(nsid, spec),
+          canvas = function(nsid) statCanvasUI(nsid, spec),
+          map_based = FALSE)
+      })
+    }
     for (k in names(MODUI)) MODUI[[k]]$id <- k   # original namespace = the tool key
     # Built-in scaffold tools (no dedicated module) keep working alongside.
     TOOLS <- list(

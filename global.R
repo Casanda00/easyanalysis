@@ -9,7 +9,7 @@
 # App version — single source of truth. Bump on every build/push and add a
 # matching entry to CHANGELOG.md. Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.8.4"
+APP_VERSION <- "0.9.0"
 
 library(shiny)
 library(bslib)
@@ -170,6 +170,12 @@ source("algorithms.R")
 # instead of Ctrl-C in the terminal (see the note at the top of the file).
 source("compute_worker.R")
 source("mod_algo.R")
+# Statistical methods: the same move for analyses that algorithms.R made for
+# spatial operations. statistics.R is the registry, mod_stat.R renders and runs
+# any entry. Sourced AFTER algorithms.R because the specs reuse its parameter
+# constructors (ea_sel/ea_num/ea_txt) rather than defining a second set.
+source("statistics.R")
+source("mod_stat.R")
 # mod_surface.R is RETIRED: its DTM/DSM/CHM/nDSM now live in algorithms.R as
 # four separate tools, so "Surface models" no longer hides four operations
 # behind a radio button. Left sourced only so nothing that still references

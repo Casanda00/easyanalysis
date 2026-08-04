@@ -2285,7 +2285,7 @@ same idea and should be scoped to the active dataset. Worth doing in one visit.
 
 ---
 
-### 33. More statistical analyses, and more inside each one
+### 33. More statistical analyses, and more inside each one — REGISTRY BUILT 2026-08-04
 > "more and more functionalities in the statistical analyses."
 > "more and more statistical analyses."
 
@@ -2354,19 +2354,74 @@ plus ONE generic runner, proven on a few real entries before anything is migrate
 convert 35 modules up front. `mod_algo.R` is the working reference for the runner, and
 `ea_algorithms()` for the spec shape.
 
+#### BUILT 2026-08-04 — `statistics.R` + `mod_stat.R`, with 5 new analyses
+
+**The registry exists and hosts five methods the app did not have.** Deliberately proven on
+NEW methods rather than by porting existing screens: nothing could regress, and the work
+delivers "more analyses" immediately.
+
+| method | engine | new dependency |
+|---|---|---|
+| Ordinal regression | `MASS::polr` | none — `MASS` was already core |
+| Robust regression | `MASS::rlm` | none |
+| Poisson (counts) | `stats::glm` | none |
+| Negative binomial | `MASS::glm.nb` | none |
+| **GLMM** (item 34) | `lme4::glmer` | `lme4`, added to `extras` |
+
+**What it settles beyond "more analyses":**
+
+- **E19 + E20 are solved structurally** for everything the registry hosts. The variable picker
+  is generated from the spec's declared **roles**, so every method gets the same
+  `selectizeInput(multiple = TRUE)` (UX rule 11) without a line of per-screen UI. Role naming
+  is normalised too — the survey found the response variously called `y`, `y_var`, `target`,
+  `response` and `category` across the hand-written screens.
+- **Gotchas 18/26 are made impossible here.** Role pickers are `renderUI`, never
+  `update*Input`. The survey found **9 of 17** existing modules use `update*Input` and so
+  depend on the `ds_refresh` workaround; the registry needs none of it.
+- Runner rules carried over from `mod_algo.R` for reasons already paid for: an empty first
+  choice so nothing is auto-selected (G27), the isolate/keep pattern so a re-render does not
+  wipe a selection (gotcha 21), and results through `ea_view_header()`/`ea_view_panes()` so
+  the select-and-split pattern matches the ten screens already using it.
+- Each entry returns `list(context=, plot=)`, so the **Co-Analyst sees a registry method
+  exactly as it sees a hand-written screen**.
+
+**Two real bugs the tests caught, both worth recording:**
+
+1. **`glm(offset = ...)` does not see a local variable.** `glm()` deparses that argument and
+   evaluates it in the model frame, so `offset = off` failed with `object 'off' not found`.
+   The offset goes into the **formula** as `offset(col)` instead, referencing a real column.
+2. **The binomial guard only checked non-factors,** so a 4-level *factor* response slipped
+   past it into `glmer` and fitted something meaningless. It counts levels for factors too
+   now and refuses with a message naming the actual level count.
+
+**Verified:** all 5 fit through the runner against realistic data and render every declared
+view; Run with nothing chosen refuses; role type-filtering accepts a count column and rejects
+a continuous one; all 5 appear in the workspace menu (with an existing algorithm as the
+control that the check is valid); and the tool panel + canvas build with the roles
+placeholder, the Run button and the shared view header.
+
+**NOT done, deliberately:** migrating the 9 spec-able existing screens (xgboost, dtree, svm,
+nnet_ml, gam, pca, survival, anova, rf). That is a separate decision now that the pattern is
+proven, and it carries regression risk that none of this work did. The 5 genuinely irregular
+ones (`mod_tests`, `mod_da`, `mod_descriptive`, `mod_clustering`) should stay modules — see
+the survey notes above.
+
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:
 
-- **`uef_evaluation()` is defined, sourced, and called by nothing** (CLAUDE.md gotcha 9). It
-  returns RMSE / R² / Bias / RelBias / RRMSE and was meant for the LM, LME and RF metric
-  cards.
+- ~~**`uef_evaluation()` is defined, sourced, and called by nothing**~~ — **WRONG, corrected
+  2026-08-04.** I repeated a stale claim from CLAUDE.md gotcha 9 without checking. It *is*
+  called, by `mod_lme.R:188`, `mod_rf.R:127`/`:147` and
+  `mod_linear_regression.R:630`/`:769`. Gotcha 9 has been rewritten. The registry's shared
+  `.ea_v_metrics()` calls it too, so registry-hosted methods report the same numbers as the
+  hand-written screens.
 - **Plain-English interpretations** — the "Future Work Queue" in CLAUDE.md already specifies
   this with a worked `.interp_ttest()` template. It is the single highest-value addition for
   the stated audience, who can run a model but not read one.
 
 ---
 
-### 34. A very detailed GLMM
+### 34. A very detailed GLMM — BUILT 2026-08-04
 > "a very detailed GLMM analyses."
 
 **Not an extension of the existing screen — the engine cannot do it.** `mod_lme.R` uses
@@ -2413,6 +2468,36 @@ app already installs, and matches what the reference workflows (VMI/NFI) would u
 is worth confirming whether it should be its own screen or a mode of a combined
 "Mixed models" screen alongside the existing LMM — two screens that differ only by `family`
 would be the same duplication E22 is complaining about on the regression side.
+
+#### BUILT 2026-08-04 — as a registry entry, not a module
+
+**The open question is answered: the random-effects part DOES fit a static spec.** A grouping
+role (`multiple = TRUE`, for crossed effects) plus an optional random-slope role is enough to
+build `(1 | g)`, `(slope | g)`, `(1|a) + (1|b)` and `(1|a/b)`. So GLMM is an entry in
+`statistics.R`, not a new module — and it did not force the registry to model something it
+could not express.
+
+**Built LAST on purpose, and that ordering paid off:** the four `MASS`/base methods proved the
+spec, runner and wiring against zero install risk first, so when GLMM was attempted any
+failure would clearly have been GLMM-specific rather than a registry problem.
+
+- `lme4` added to `extras` in `launcher/deps.R`. The `lme4::` call sits **inside `fit`**,
+  which only runs on Run, so it cannot break server construction (gotcha 27) — and it is
+  still `requireNamespace`-guarded with a message naming the package, because the workspace
+  has a package installer that can fetch it.
+- **Convergence is treated as a first-class result, not a footnote** (gotcha 7 warns that
+  `nlme::lme` frequently fails to converge and `glmer` is worse). The "Convergence & fit" view
+  reports singular fits in plain language with the standard remedies, plus Nakagawa R² via
+  `MuMIn` — which the app already installs.
+- Views: Model summary, Fixed effects, Random effects (variance components), Convergence & fit.
+
+**Verified** against simulated grouped data: binomial and Poisson random-intercept fits,
+a random slope, crossed `(1|site)+(1|blk)`, nested `(1|site/blk)`, all rendering every view;
+a 3+-level response is refused with a message naming the level count; and a deliberately
+singular fit still returns a usable model whose Convergence view renders rather than crashing.
+
+**Not done:** `glmmTMB` (zero-inflation, negative-binomial mixed models) — add later if counts
+with excess zeros turn up, per the engine comparison above.
 
 ---
 

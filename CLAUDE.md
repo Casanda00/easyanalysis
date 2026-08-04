@@ -54,6 +54,8 @@ adding features — prefer general-purpose capability over forestry-specific ass
 | `agent_tools.R` | AI Co-Pilot agent: OpenAI tool registry + dispatcher (runs the app's models). |
 | `algorithms.R` | **Processing algorithm registry** — one spec per operation (QGIS Processing style). |
 | `mod_algo.R` | Generic runner for any `algorithms.R` entry: pick layer → set params → Run → layer. |
+| `statistics.R` | **Statistical method registry** — one spec per analysis, declaring its variable ROLES. Same idea as `algorithms.R`. |
+| `mod_stat.R` | Generic runner for any `statistics.R` entry: pick columns by role → set options → Run → result views. |
 | `compute_worker.R` | **Killable background R session** so a heavy run can be Stopped from the app. |
 | `helpers.R`, `evaluation_function.R` | Shared plot engines + `uef_evaluation()`. |
 | `webapp/` | Browser-build source (clean, secrets-free copy of the app). |
@@ -308,11 +310,14 @@ browser (or the whole app) and coming back resumes where the user stopped.
    `input$delete_lvl_col` changes, NOT after merge/rename operations. **Fix:** call
    `updateSelectInput(session, "delete_levels", choices = ...)` at the end of each
    `apply_rename`, `apply_merge`, and `apply_delete_lvl` observer in `mod_data.R`.
-9. **`uef_evaluation()` is available but unused:** `evaluation_function.R` defines
-   `uef_evaluation(pred, obs)` → list(RMSE, R2, Bias, RelBias, RRMSE). It is sourced in
-   `global.R` but NOT called in any model module. Use it in `lmServer`, `lmeServer`, and
-   `rfServer` for the model metrics cards (call after fitting, pass `fitted(model)` and the
-   observed response vector).
+9. **`uef_evaluation()` is the app's shared metrics function — USE IT, don't write another.**
+   `evaluation_function.R` defines `uef_evaluation(pred, obs)` → list(RMSE, R2, Bias,
+   RelBias, RRMSE). **Corrected 2026-08-04:** this entry used to say it was "available but
+   unused" and told you to wire it into lm/lme/rf. That is out of date — it *is* called, by
+   `mod_lme.R:188`, `mod_rf.R:127`/`:147` and `mod_linear_regression.R:630`/`:769`, and by
+   `statistics.R`'s shared `.ea_v_metrics()`. So a new model screen should call it for its
+   metrics card rather than computing RMSE/R² by hand, which is how the numbers stay
+   comparable across screens.
 
 ## Verify a change builds (without launching)
 ```sh
