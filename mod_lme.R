@@ -12,7 +12,7 @@ lmeToolsUI <- function(id) {
     hr(),
     markdown("**Fixed Effects Formula**\n*Predictors (X)*"),
     textAreaInput(ns("fixed_text"), "Fixed Effects (~):", value = "", rows = 3, placeholder = "e.g., ih5_dm + Soiltype2 * Texture"),
-    div(style = "background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #dee2e6;",
+    div(class = "ea-subpanel",
         markdown("**Quick Builder**"),
         selectInput(ns("build_var"), "Select Variable:", choices = NULL),
         selectInput(ns("build_trans"), "Apply Transformation:", choices = c("None (Raw)" = "raw", "Logarithm (log)" = "log", "Square Root (sqrt)" = "sqrt", "Quadratic (^2)" = "poly")),
@@ -26,15 +26,14 @@ lmeToolsUI <- function(id) {
     hr(),
     markdown("**Random Effects Formula**"),
     textInput(ns("random_text"), "Random structure (e.g., ~1 | Group):", placeholder = "~ 1 | PlotID"),
-    div(style = "background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #dee2e6;",
+    div(class = "ea-subpanel",
         markdown("**Quick Builder**"),
         selectInput(ns("re_group"), "Grouping Variable:", choices = NULL),
         selectInput(ns("re_slope"), "Random Slope (optional):", choices = c("(Intercept only)" = "")),
         actionButton(ns("re_insert"), "Insert Random Effect", class = "btn-primary btn-sm", width = "100%")
     ),
     hr(),
-    div(
-      style = "background-color:#fff8e1; padding:10px; border-radius:5px; border:1px solid #ffe082;",
+    div(class = "ea-subpanel ea-subpanel-warn",
       markdown("**Convergence Options**"),
       checkboxInput(ns("auto_scale"), "Auto-scale numeric predictors (helps convergence)", value = FALSE),
       tags$p(class = "small text-muted mb-0",
@@ -61,7 +60,7 @@ lmeCanvasUI <- function(id) {
         card_header(class = "d-flex justify-content-between align-items-center bg-light",
           "Model Summary",
           downloadButton(ns("dl_fixed_effects"), "CSV", class = "btn-sm btn-outline-secondary")),
-        div(class = "formula-box", style = "padding: 10px; background-color: #e9ecef; border-bottom: 1px solid #dee2e6;", textOutput(ns("formula_display"))),
+        div(class = "formula-box", textOutput(ns("formula_display"))),
         div(style = "overflow-y: auto; height: 400px; padding: 5px;", verbatimTextOutput(ns("summary")))
       ),
       card(

@@ -61,7 +61,7 @@ daToolsUI <- function(id) {
         selected = "LDA"),
       markdown("**Formula Editor**\n*Type freely or use the builder buttons below.*"),
       textAreaInput(ns("lda_formula_text"), "Predictors (X):", value = "", rows = 3, placeholder = "e.g., Sepal.Length + Sepal.Width"),
-      div(style = "background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #dee2e6;",
+      div(class = "ea-subpanel",
           markdown("**Quick Builder**"),
           selectInput(ns("lda_build_var"), "Select Variable:", choices = NULL),
           fluidRow(
@@ -743,7 +743,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
         else if (view == "2. Equal Variance (Boxplots)") card(make_header("Equal Variance Check"), plotOutput(ns("plot_box"), height = "500px"))
         else if (view == "3. Normality (Q-Q Plots)") card(make_header("Multivariate Normality (Q-Q)"), plotOutput(ns("plot_qq"), height = "500px"))
         else if (view == "4. Distribution Density") card(make_header("Density Overlap"), plotOutput(ns("plot_density"), height = "500px"))
-        else if (view == "5. Statistical Tests") card(card_header(class = "bg-dark text-white", "Statistical Assumption Checks"), div(style = "padding: 15px; background-color: #f8f9fa; height: 400px; overflow-y: auto;", verbatimTextOutput(ns("stat_test_results"))))
+        else if (view == "5. Statistical Tests") card(card_header(class = "bg-dark text-white", "Statistical Assumption Checks"), div(class = "ea-subpanel", style = "height: 400px; overflow-y: auto;", verbatimTextOutput(ns("stat_test_results"))))
       } else {
         div(
           card(
@@ -759,7 +759,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
             col_widths = c(6, 6),
             card(
               card_header(class = "bg-light", "Model Summary"),
-              div(class = "formula-box", style = "padding: 10px; background-color: #e9ecef; border-bottom: 1px solid #dee2e6;", textOutput(ns("lda_formula_display"))),
+              div(class = "formula-box", textOutput(ns("lda_formula_display"))),
               div(style = "overflow-y: auto; height: 300px; padding: 5px;", verbatimTextOutput(ns("lda_summary")))
             ),
             card(

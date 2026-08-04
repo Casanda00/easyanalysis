@@ -56,6 +56,17 @@ ea_theme <- function(p = ea_palette) {
 
 # The same palette as CSS custom properties, for the hand-written CSS in ui.R.
 # Generated from the list above so the two can never drift apart.
+# Bootstrap colours <pre>, <code>, .well, .navbar and .link-body-emphasis from
+# --bs-emphasis-color-rgb, an R,G,B TRIPLET -- not from --bs-emphasis-color,
+# which is what ui.R overrides. bslib compiles the triplet once from the default
+# (dark) palette, so it stays 232,237,228 on every theme: light text, which on a
+# light page is the unreadable grey-on-white reported for every model screen's
+# Model Summary / Performance Metrics block.
+#
+# Derived from the set's own `ink` rather than written out per palette, so it
+# cannot drift from the colour it is supposed to match.
+.ea_rgb <- function(hex) paste(as.integer(grDevices::col2rgb(hex)), collapse = ",")
+
 ea_css_vars <- function(p = ea_palette) {
   # The default palette is DARK, and a first-time visitor has no
   # data-ea-theme attribute yet (ui.R only sets it when localStorage holds
@@ -65,6 +76,7 @@ ea_css_vars <- function(p = ea_palette) {
   paste0(
     ":root{\n",
     "  color-scheme: dark;\n",
+    "  --bs-emphasis-color-rgb: ", .ea_rgb(p$ink), ";\n",
     paste0("  --", names(p), ": ", unlist(p), ";", collapse = "\n"),
     "\n}\n"
   )
@@ -133,6 +145,10 @@ ea_theme_css <- function(sets = ea_palettes, base = ea_palette) {
     # that nothing reads and the native popups would stay broken.
     scheme <- p$scheme; p$scheme <- NULL
     decls <- c(if (!is.null(scheme)) paste0("  color-scheme: ", scheme, ";"),
+               # Only when this set changes `ink` -- a set that inherits the
+               # default ink inherits :root's triplet too.
+               if (!is.null(p$ink))
+                 paste0("  --bs-emphasis-color-rgb: ", .ea_rgb(p$ink), ";"),
                if (length(p)) paste0("  --", names(p), ": ", unlist(p), ";"))
     if (!length(decls)) return("")             # default set = :root already
     paste0("html[data-ea-theme=\"", nm, "\"]{\n",

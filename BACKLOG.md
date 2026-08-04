@@ -1534,6 +1534,59 @@ panel is a hardcoded light surface that never follows the theme — the same cla
 Both screenshots are on the **Mixed effects** screen, so start there and use it as the
 reference while sweeping the rest.
 
+#### FIXED 2026-08-04 — both reported symptoms, traced to two distinct causes
+
+**1. Light mode / unreadable result text — one variable, app-wide.** Bootstrap colours
+`<pre>` from **`--bs-emphasis-color-rgb`**, an `R,G,B` *triplet* — **not** from
+`--bs-emphasis-color`, which is the one `ui.R` was overriding. bslib compiles the triplet once
+from the default (dark) palette, so it stayed `232,237,228` on every theme: light text, which
+on a light page is exactly the reported grey-on-white. Confirmed by compiling the real theme
+and reading the rule:
+
+```css
+pre { color: RGB(var(--bs-emphasis-color-rgb, 0,0,0)); … }
+```
+
+It was never only `pre` — the same triplet colours **`code`, `.well`, `.navbar` and
+`.link-body-emphasis`**, which is why the reporter saw it "for many of the views".
+
+**Fixed in `theme.R`, derived rather than written out:** `.ea_rgb()` converts the set's own
+`ink` with `grDevices::col2rgb()`, and both `ea_css_vars()` and `ea_theme_css()` emit
+`--bs-emphasis-color-rgb`. It cannot drift from `ink` because it is computed from it. `pre` and
+`.well` are also restated explicitly, because bootstrap derives their *background* from the
+same triplet at 4% alpha — a barely-visible wash rather than a panel.
+
+**2. Dark mode / fixed light panels — 12 sites across 6 modules.** Inline
+`background-color: #f8f9fa` / `#fff8e1` / `#e9ecef` blocks: fixed **light** surfaces that keep
+their colour on a dark theme while the app's light text runs across them. Replaced with three
+reusable classes in `ui.R`:
+
+| class | replaces | used by |
+|---|---|---|
+| `.ea-subpanel` | `#f8f9fa` sidebar blocks | lme (×2), logistic, classification, da (×2), recommend |
+| `.ea-subpanel-warn` | `#fff8e1` Convergence Options | lme |
+| `.formula-box` | inline `#e9ecef` (the class existed but was styled inline) | lme, logistic, classification, da |
+| `.ea-row-warn` / `.ea-row-flat` | `#fff8e1` / `#fce4ec` table row flags | data, recommend |
+
+The warn variants are **translucent tints** (`color-mix(… var(--warn) 14%, transparent)`), so
+they take their lightness from whatever is behind them and work on every set — the approach
+round-1 item 10 already proved, reused rather than reinvented.
+
+**Deliberately NOT changed:** the two `strip.background = "#e9ecef"` values in `mod_da.R`
+(lines 365, 381). Those are *inside a ggplot*, and `ea_style_gg()` (helpers.R:506-526) only
+touches titles, labels and fixed-layer colours — it never re-themes the plot background. So
+plots render on their own light canvas regardless of the app theme, exactly like base graphics
+(round-1 item 8). A themed colour there would be wrong, not right. **Checked, not assumed.**
+
+**Verified:** `:root` emits `232,237,228`, the light set `16,21,15` and paperwhite `26,23,18`,
+each matching its palette's `ink`; all six new rules present in the served markup; and **no
+fixed-light panel hex remains in any module** outside the two ggplot strips.
+
+**Still open in this item:** the wider taste half (screen background, results-surface colours),
+and a per-mode contrast measurement across all 6 sets — which wants a real browser, so it is
+flagged for the reporter rather than claimed. Item 25's black & white set should land before
+that pass.
+
 ---
 
 ### 25. A black & white theme

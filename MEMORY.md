@@ -185,6 +185,22 @@ it's built) and [DESIGN.md](DESIGN.md) (what it should feel like).
   native `<select>` popups, scrollbars and other OS-drawn controls ignore page CSS.
   Each set in `ea_palettes` declares `scheme = "light"|"dark"`; it must be emitted as a
   real declaration, not swept into the `--name: value` loop. See CLAUDE.md gotcha 28.
+- **Bootstrap reads `--bs-*-rgb` triplets, not the variable you overrode**
+  (2026-08-04). `ui.R` set `--bs-emphasis-color`, but `<pre>`, `code`, `.well`,
+  `.navbar` and `.link-body-emphasis` are coloured from
+  **`--bs-emphasis-color-rgb`** — an `R,G,B` triplet bslib compiles once from the
+  default (dark) palette. Result: every model screen's Model Summary rendered
+  light-grey on white in light mode, unreachable by any `--bs-emphasis-color`
+  override. `theme.R` derives the triplet from each set's own `ink` via
+  `.ea_rgb()`. When a bootstrap rule ignores a token, check for a `-rgb` variant.
+  See CLAUDE.md gotcha 30.
+- **A fixed LIGHT panel is as broken as a fixed dark one** (2026-08-04). Earlier
+  sweeps hunted dark literals, so inline light backgrounds (`#f8f9fa`, `#fff8e1`,
+  `#e9ecef`) survived — they look right in light mode and keep a cream surface
+  under light text on every dark set. 12 sites across 6 modules; replaced with
+  `.ea-subpanel` / `.formula-box` / `.ea-row-*`. Colours *inside* a ggplot are the
+  legitimate exception — `ea_style_gg()` never re-themes the plot background, so
+  plots render on their own light canvas. See CLAUDE.md gotcha 31.
 - **Running feedback has to be client-side** (2026-08-04): Shiny is single-threaded, so
   during a fit the server cannot animate anything. `#ea-busy` is CSS keyed off Shiny's
   own `shiny-busy` class on `<html>` — no per-module wiring, so it covers every screen.

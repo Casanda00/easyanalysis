@@ -8,6 +8,28 @@ breaking changes. Newest first.
 
 ---
 
+## v0.8.4 — 2026-08-04
+
+### Fixed
+- **Model results were unreadable in light mode.** The Model Summary, Performance Metrics and
+  Cross-Validation blocks rendered light grey on white on every model screen. Bootstrap
+  colours `<pre>` from `--bs-emphasis-color-rgb` — an `R,G,B` **triplet**, not the
+  `--bs-emphasis-color` the app was overriding — and bslib compiles that triplet once from the
+  default dark palette, so it stayed light text on every theme. It was never only `<pre>`: the
+  same variable colours `code`, `.well`, `.navbar` and `.link-body-emphasis`, which is why the
+  problem showed up across many screens. Each palette now emits the triplet, **derived from
+  its own `ink`** with `grDevices::col2rgb()` so it cannot drift.
+- **Fixed light panels stayed light in dark mode.** Twelve inline
+  `background-color: #f8f9fa` / `#fff8e1` / `#e9ecef` blocks across six modules kept a cream
+  or pale background while the app's light text ran across them — the Quick Builder and
+  Convergence Options panels on Mixed effects being the reported case. Replaced with reusable
+  classes (`.ea-subpanel`, `.ea-subpanel-warn`, `.formula-box`, `.ea-row-warn`,
+  `.ea-row-flat`). The warn variants are translucent tints of the semantic colour, so they
+  take their lightness from whatever is behind them and work on every set.
+- No fixed-light panel hex remains in any module. The two `strip.background` values inside
+  `mod_da.R`'s ggplots are deliberately kept: plots render on their own light canvas
+  regardless of theme, so a themed colour there would be wrong.
+
 ## v0.8.3 — 2026-08-04
 
 ### Changed

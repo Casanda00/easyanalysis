@@ -147,6 +147,26 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+30. **Bootstrap reads `--bs-*-rgb` TRIPLETS, not the colour variables you overrode.**
+    `ui.R` sets `--bs-emphasis-color: var(--ink)`, but bootstrap colours `<pre>`, `code`,
+    `.well`, `.navbar` and `.link-body-emphasis` from **`--bs-emphasis-color-rgb`**, a
+    literal `R,G,B` triplet compiled once from the default (dark) palette. So every model
+    screen's Model Summary / Performance Metrics block rendered light-grey text on white in
+    light mode, and no `--bs-emphasis-color` override could reach it. `theme.R` now derives
+    the triplet from each set's own `ink` via `.ea_rgb()` (`grDevices::col2rgb`) — derived,
+    never hand-written, so it cannot drift. **When a bootstrap rule ignores your token, check
+    whether it reads the `-rgb` variant.** Related: gotcha 22 (component-level variables).
+31. **A fixed LIGHT panel is as broken as a fixed dark one.** The sweep for hardcoded colour
+    kept finding dark literals (gotcha 22), so inline *light* backgrounds
+    (`#f8f9fa`, `#fff8e1`, `#e9ecef`) went unnoticed — they look right in light mode and keep
+    their cream background under the app's light text on every dark set. Use `.ea-subpanel`,
+    `.ea-subpanel-warn`, `.formula-box`, `.ea-row-warn` / `.ea-row-flat` (ui.R) rather than an
+    inline background, and make any tinted state a **translucent** `color-mix()` of a semantic
+    token so it takes its lightness from whatever is behind it.
+    **Legitimate exception:** colours *inside a ggplot or base plot* (e.g.
+    `strip.background`). `ea_style_gg()` only rewrites titles, labels and fixed-layer colours —
+    it never re-themes the plot background — so plots render on their own light canvas and a
+    themed colour there would be wrong. Do not "fix" those.
 27. **Guard an OPTIONAL package at the SERVER binding, not just in the UI.**
     `output$x <- pkg::renderFoo({...})` resolves `pkg::` when the module server is
     **constructed**, not when the output renders — so `::` calls `loadNamespace()` at

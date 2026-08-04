@@ -11,7 +11,7 @@ logisticToolsUI <- function(id) {
     hr(),
     markdown("**Formula Editor**\n*Type freely or use the builder buttons below.*"),
     textAreaInput(ns("formula_text"), "Predictors (X):", value = "", rows = 3, placeholder = "e.g., ih5_dm + Organic_depth"),
-    div(style = "background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #dee2e6;",
+    div(class = "ea-subpanel",
         markdown("**Quick Builder**"),
         selectInput(ns("build_var"), "Select Variable:", choices = NULL),
         selectInput(ns("build_trans"), "Apply Transformation:", choices = c("None (Raw)" = "raw", "Logarithm (log)" = "log", "Square Root (sqrt)" = "sqrt", "Quadratic (^2)" = "poly")),
@@ -41,7 +41,7 @@ logisticCanvasUI <- function(id) {
       col_widths = c(6, 6),
       card(
         card_header(class = "bg-light", "Model Summary"),
-        div(class = "formula-box", style = "padding: 10px; background-color: #e9ecef; border-bottom: 1px solid #dee2e6;", textOutput(ns("formula_display"))),
+        div(class = "formula-box", textOutput(ns("formula_display"))),
         div(style = "overflow-y: auto; height: 300px; padding: 5px;", verbatimTextOutput(ns("summary")))
       ),
       card(

@@ -454,8 +454,8 @@ recommendToolsUI <- function(id) {
                     "All recommendations"="all"))
       )
     ),
-    tags$div(class="mt-2 p-2 small text-muted",
-      style="background:#f8f9fa;border-radius:4px;font-size:11px;",
+    tags$div(class="mt-2 p-2 small text-muted ea-subpanel",
+      style="font-size:11px;",
       icon("circle-info"),
       " Type a question, then select which column you want to analyse."
     )
@@ -627,19 +627,18 @@ recommendServer <- function(id, dataset_pool, active_dataset) {
         } else "—"
 
         flag <- pct_na > 5 || (is_cat && length(unique(xc)) > 25)
-        bg   <- if (flag) "#fff8e1" else "transparent"
 
         na_td <- if (n_na == 0)
-          tags$td(style="padding:3px 8px;color:#4caf50;font-size:12px;", "0")
+          tags$td(style="padding:3px 8px;color:var(--forest);font-size:12px;", "0")
         else
-          tags$td(style="padding:3px 8px;color:#e65100;font-size:12px;",
+          tags$td(style="padding:3px 8px;color:var(--warn);font-size:12px;",
                   sprintf("%d (%.1f%%)", n_na, pct_na))
 
-        tags$tr(style = paste0("background:", bg, ";"),
+        tags$tr(class = if (flag) "ea-row-warn" else NULL,
           tags$td(style="padding:3px 8px;font-weight:600;font-size:12px;", col),
-          tags$td(style="padding:3px 8px;color:#888;font-size:11px;", type_l),
+          tags$td(style="padding:3px 8px;color:var(--bark);font-size:11px;", type_l),
           na_td,
-          tags$td(style="padding:3px 8px;font-size:11px;color:#555;", detail)
+          tags$td(style="padding:3px 8px;font-size:11px;color:var(--bark);", detail)
         )
       })
 

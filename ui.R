@@ -1469,6 +1469,52 @@ page_fillable(
     .nav-tabs .nav-link.active { background: var(--panel); border-color: var(--line) var(--line) var(--panel);
                                  color: var(--ink); }
 
+    /* ===== Result text: <pre>, <code>, .well =====================
+       Bootstrap colours all three from --bs-emphasis-color-rgb, which theme.R
+       now sets per palette. These restate background and border too, because
+       bootstrap derives the background from the SAME triplet at 4% alpha --
+       which on a dark set is a barely-visible wash rather than a panel. */
+    pre, .well {
+      color: var(--ink); background: var(--sunk);
+      border: 1px solid var(--line); border-radius: 8px;
+    }
+    pre code, code { background: transparent; }
+    code { color: var(--canopy); }
+
+    /* ===== Sub-panel inside a tool sidebar ==========================
+       Replaces the inline `background-color:#f8f9fa` / `#fff8e1` blocks that
+       several modules hand-rolled. Those were fixed LIGHT surfaces, so on a
+       dark theme they kept a cream background while the app's light text ran
+       across them -- unreadable, and the reason the Convergence Options and
+       Quick Builder panels were reported. The warn variant is a translucent
+       TINT of the semantic colour, so it takes its lightness from whatever is
+       behind it and works on every set (same approach as round-1 item 10). */
+    .ea-subpanel {
+      background: var(--sunk); border: 1px solid var(--line);
+      border-radius: 6px; padding: 10px; color: var(--ink);
+    }
+    .ea-subpanel-warn {
+      background: color-mix(in srgb, var(--warn) 14%, transparent);
+      border-color: color-mix(in srgb, var(--warn) 38%, transparent);
+    }
+    .ea-subpanel .form-label, .ea-subpanel label, .ea-subpanel strong,
+    .ea-subpanel p { color: var(--ink); }
+    .ea-subpanel .text-muted { color: var(--bark) !important; }
+
+    /* The formula strip above a model's results. Four modules carried the class
+       but styled it inline with a fixed #e9ecef, so it never followed a theme. */
+    .formula-box {
+      padding: 8px 10px; background: var(--sunk); color: var(--ink);
+      border-bottom: 1px solid var(--line);
+      font-family: var(--mono); font-size: 12px;
+    }
+
+    /* Row flags in the data/profile tables. Translucent tints of the semantic
+       colour rather than fixed pastels, so the row takes its lightness from the
+       surface behind it and stays legible on every set (round-1 item 10). */
+    .ea-row-warn { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+    .ea-row-flat { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
     /* form controls */
     .form-control, .form-select, .selectize-input, textarea {
       background: var(--sunk) !important; color: var(--ink) !important;

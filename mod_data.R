@@ -1190,17 +1190,20 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
                  if (length(lvls) > 4) "…" else "")
         } else "—"
 
-        bg <- if (pct_na > 5) "#fff8e1"
-              else if (length(unique(xc)) <= 1 && length(xc) > 0) "#fce4ec"
-              else "transparent"
+        # Theme-following tints, not fixed pastels: a translucent wash of the
+        # semantic colour takes its lightness from the surface behind it, so the
+        # row stays legible on light AND dark sets (round-1 item 10).
+        row_cls <- if (pct_na > 5) "ea-row-warn"
+                   else if (length(unique(xc)) <= 1 && length(xc) > 0) "ea-row-flat"
+                   else NULL
 
         na_td <- if (n_na == 0)
-          tags$td(style="padding:4px 10px;color:#4caf50;font-size:12px;", "0")
+          tags$td(style="padding:4px 10px;color:var(--forest);font-size:12px;", "0")
         else
-          tags$td(style="padding:4px 10px;color:#e65100;font-size:12px;",
+          tags$td(style="padding:4px 10px;color:var(--warn);font-size:12px;",
                   sprintf("%d (%.1f%%)", n_na, pct_na))
 
-        tags$tr(style=paste0("background:", bg, ";"),
+        tags$tr(class = row_cls,
           tags$td(style="padding:4px 10px;font-weight:600;font-size:12px;", col),
           # Plain text, matching the Recommend screen's Data Profile table. The
           # coloured badge this replaced carried six hardcoded hex values that
@@ -1209,7 +1212,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
           tags$td(style="padding:4px 10px;font-size:11px;color:var(--bark);",
                   title = paste0("R type: ", .tclass(x)), lbl),
           na_td,
-          tags$td(style="padding:4px 10px;font-size:11px;color:#555;", detail)
+          tags$td(style="padding:4px 10px;font-size:11px;color:var(--bark);", detail)
         )
       })
 
