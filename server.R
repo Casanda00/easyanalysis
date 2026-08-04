@@ -990,7 +990,7 @@ server <- function(input, output, session) {
   # retired spatial bundles got in D18).
   dtree_ctx <- dtreeServer("dtree", dataset_pool, active_dataset)
   nnet_ctx  <- nnetMlServer("nnet_ml", dataset_pool, active_dataset)
-  svm_ctx   <- svmServer("svm", dataset_pool, active_dataset)
+  # svmServer is NOT bound: SVM is a statistics.R entry now (stat_svm).
   # Spatial modules
   lidar_ctx      <- lidarServer("lidar", dataset_pool, las_pool, vector_pool)
   raster_ctx     <- rasterServer("raster", dataset_pool, active_dataset, raster_pool, vector_pool)
@@ -1133,7 +1133,7 @@ server <- function(input, output, session) {
     lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
     survival = surv_ctx, sem = sem_ctx, bayesian = bayes_ctx,
     rf = rf_ctx, dtree = dtree_ctx,
-    nnet_ml = nnet_ctx, svm = svm_ctx,
+    nnet_ml = nnet_ctx,
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
     pca = pca_ctx, timeseries = ts_ctx,
     pointcloud = lidar_ctx, metrics = lidar_ctx,

@@ -2408,8 +2408,13 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**1 of 9 done: XGBoost.** Progress: **xgboost ✅** · dtree · svm · nnet_ml · gam · pca ·
+**2 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · dtree · nnet_ml · gam · pca ·
 survival · anova · rf.
+
+**Running score: 2 screens migrated, 3 latent bugs found.** Both ports were bit-for-bit
+faithful, and both turned up something broken that nobody had noticed — see each below. That
+is now the strongest argument for finishing the migration: these screens are not being
+exercised, and porting is what exercises them.
 
 **The first migration paid for itself twice over, in ways worth recording:**
 
@@ -2449,6 +2454,37 @@ rewritten.
 sourced so nothing referencing its UI functions breaks, but the hardcoded `MODUI` line and
 the `server.R` binding are removed — otherwise the screen appears in the menu **twice**, from
 two different implementations. Verified: XGBoost appears exactly once, as `stat_xgboost`.
+
+##### Migration 2 — SVM (2026-08-04)
+
+**Third latent bug, and the worst of the three: SVM's cross-validation had NEVER produced a
+result.** The screen showed "Awaiting SVM CV results…" indefinitely. Cause: the refit inside
+each fold passed the fitted model's `kernel` back into `svm()`
+(`mod_svm.R:210`, `:267`) — but an e1071 model stores the kernel as an integer **code**
+(`radial` = 2), and `svm(kernel = 2)` fails with `wrong kernel specification!`. That error was
+swallowed by `tryCatch(..., error = function(e) NULL)`, so every fold failed silently, the
+prediction vector stayed empty, and the CV reactive returned `NULL` forever.
+
+Verified directly: `fit$kernel` is `2` (numeric), and refitting with it errors while refitting
+with `"radial"` succeeds. The port passes the kernel NAME, and also passes the cost, gamma and
+scaling the user actually set — the old fold refits silently used defaults for all three, so
+even had it worked it would have been validating a different model than the one on screen.
+
+**Two structural improvements the port brought:**
+
+1. **Validation is computed ONCE, in `fit`.** The module ran the whole k-fold loop inside its
+   render outputs, so every redraw of the metrics table refitted k SVMs. It now runs under the
+   Run progress bar, which is where a slow job belongs.
+2. **The two cross-validation controls are labelled.** SVM had a "5-fold" checkbox wired to
+   e1071's own `cross=` AND the shared `.cv_ui` block driving the manual loop, with nothing to
+   distinguish them. Both are kept; both now say what they are.
+
+**Parity verified:** identical predictions and identical support-vector counts against the
+module's own `svm()` call, for eps-regression, C-classification, and a non-default
+(polynomial, cost = 4) kernel; the gamma default (`1/n predictors`) matches; LOOCV is
+honoured; predictor-equals-response is refused; all 3 views render for both task types.
+Conditional visibility (gamma hidden for a linear kernel, degree only for polynomial, epsilon
+only for eps-regression) is preserved via the new `show_if`.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

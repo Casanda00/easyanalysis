@@ -31,16 +31,22 @@
 ea_in  <- function(key, label, pool, hint = NULL, multiple = FALSE)
   list(key = key, label = label, pool = pool, hint = hint, multiple = multiple)
 
-ea_num <- function(key, label, value, min = NA, max = NA, step = NA, hint = NULL)
+# `show_if` is a JS condition (as for conditionalPanel) that hides a parameter
+# until it applies -- polynomial degree only matters for a polynomial kernel.
+# mod_algo.R ignores it; mod_stat.R honours it. Kept on the shared constructors
+# so both registries take exactly the same parameter shapes.
+ea_num <- function(key, label, value, min = NA, max = NA, step = NA, hint = NULL,
+                   show_if = NULL)
   list(kind = "num", key = key, label = label, value = value,
-       min = min, max = max, step = step, hint = hint)
+       min = min, max = max, step = step, hint = hint, show_if = show_if)
 
-ea_txt <- function(key, label, value = "", hint = NULL, rows = 1)
-  list(kind = "txt", key = key, label = label, value = value, hint = hint, rows = rows)
+ea_txt <- function(key, label, value = "", hint = NULL, rows = 1, show_if = NULL)
+  list(kind = "txt", key = key, label = label, value = value, hint = hint,
+       rows = rows, show_if = show_if)
 
-ea_sel <- function(key, label, choices, value = NULL, hint = NULL)
+ea_sel <- function(key, label, choices, value = NULL, hint = NULL, show_if = NULL)
   list(kind = "sel", key = key, label = label, choices = choices,
-       value = value %||% unname(choices)[1], hint = hint)
+       value = value %||% unname(choices)[1], hint = hint, show_if = show_if)
 
 # A searchable CRS selector with typeahead matching for global, regional, and UTM EPSGs.
 # Supports custom entry (create = TRUE) for any EPSG code, PROJ string, or WKT.

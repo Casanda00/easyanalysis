@@ -472,6 +472,178 @@ ea_statistics <- function() {
                  options = list(pageLength = 10, scrollX = TRUE)))))
     ),
 
+    # ---- SVM -- MIGRATION 2 of 9 -------------------------------------------
+    # Ported from mod_svm.R. Two behaviour notes, both deliberate:
+    #
+    #  * The module ran its k-fold CV INSIDE render outputs (mod_svm.R:197-284),
+    #    so every re-render of the metrics table re-fitted k SVMs. Here the CV
+    #    runs once in `fit` and the result is stored, which is both faster and
+    #    the reason a slow CV now sits under the Run progress bar where it
+    #    belongs.
+    #  * The module had TWO cross-validation controls: a "5-fold" checkbox
+    #    wired to e1071's own `cross=` argument, and the shared .cv_ui block
+    #    (LOOCV / k-fold) driving the manual loop. Both are kept so nothing is
+    #    lost, but they are labelled to say which is which -- previously you
+    #    could not tell them apart.
+    list(
+      id = "svm", label = "Support Vector Machine", group = "Machine learning",
+      summary = paste("SVM for regression or classification. Strong with many",
+                      "predictors; the kernel decides how flexible the boundary is."),
+      roles = list(
+        ea_role("y", "Response variable (Y)", "any"),
+        ea_role("x", "Predictor variables (X)", "numeric", multiple = TRUE,
+                hint = "Numeric columns only.")),
+      params = list(
+        ea_sel("svm_type", "Task type",
+               c("Regression (eps-SVR)" = "eps-regression",
+                 "Classification (C)" = "C-classification",
+                 "Classification (nu)" = "nu-classification"), "eps-regression"),
+        ea_sel("kernel", "Kernel",
+               c("Radial (RBF)" = "radial", "Linear" = "linear",
+                 "Polynomial" = "polynomial", "Sigmoid" = "sigmoid"), "radial"),
+        ea_num("cost", "Cost (C)", 1, 0.001, NA, 0.5),
+        # Same conditional visibility the module had: a linear kernel has no
+        # gamma, only a polynomial kernel has a degree, and epsilon is an
+        # eps-regression parameter. Ids are namespaced p_<key> here.
+        ea_num("gamma", "Gamma (0 = 1/n predictors)", 0, 0, NA, 0.01,
+               show_if = "input.p_kernel != 'linear'"),
+        ea_num("degree", "Polynomial degree", 3, 1, 10, 1,
+               show_if = "input.p_kernel == 'polynomial'"),
+        ea_num("epsilon", "Epsilon (tube width)", 0.1, 0, NA, 0.01,
+               show_if = "input.p_svm_type == 'eps-regression'"),
+        ea_chk("scale_x", "Scale predictors", TRUE),
+        ea_chk("cross_val", "e1071 built-in 5-fold check", FALSE,
+               hint = "Reports e1071's own cross-validated score on the fitted model."),
+        ea_sel("cv_method", "Validation",
+               c("K-fold" = "kfold", "LOOCV (leave-one-out)" = "loocv"), "kfold",
+               hint = "A separate hold-out validation, refitted per fold."),
+        ea_num("cv_k", "Number of folds (k)", 5, 2, 20, 1,
+               show_if = "input.p_cv_method == 'kfold'")),
+      views = c(performance = "Performance", support_vector = "Support Vectors",
+                prediction_tab = "Prediction Table"),
+      views_plot = c("performance", "support_vector"),
+      fit = function(df, r, p) {
+        if (!requireNamespace("e1071", quietly = TRUE))
+          stop("SVM needs the 'e1071' package. Install it from the Packages screen.")
+        yv <- r$y; xv <- setdiff(r$x, yv)
+        if (!length(xv)) stop("Choose at least one predictor other than the response.")
+        sub <- df[, c(yv, xv), drop = FALSE]
+        sub <- sub[stats::complete.cases(sub), ]
+        if (nrow(sub) < 10) stop("Need at least 10 complete rows; this has ", nrow(sub), ".")
+        st  <- p$svm_type %||% "eps-regression"
+        reg <- grepl("regression", st)
+        sub[[yv]] <- if (reg) as.numeric(sub[[yv]]) else as.factor(sub[[yv]])
+        if (!reg && nlevels(sub[[yv]]) < 2)
+          stop("Classification needs at least 2 classes in the response.")
+        g <- as.numeric(p$gamma %||% 0); if (g <= 0) g <- 1 / length(xv)
+        fml <- stats::as.formula(paste0("`", yv, "` ~ ",
+                                        paste0("`", xv, "`", collapse = " + ")))
+        fit <- e1071::svm(fml, data = sub, type = st,
+                          kernel = p$kernel %||% "radial",
+                          cost = as.numeric(p$cost %||% 1), gamma = g,
+                          degree = as.integer(p$degree %||% 3L),
+                          epsilon = as.numeric(p$epsilon %||% 0.1),
+                          scale = isTRUE(p$scale_x),
+                          cross = if (isTRUE(p$cross_val)) 5L else 0L)
+        preds <- stats::predict(fit, sub)
+
+        # Hold-out validation, computed ONCE here (the module recomputed it on
+        # every render). k comes from the same two controls .cv_k() reads.
+        n <- nrow(sub)
+        k <- if (identical(p$cv_method, "loocv")) n
+             else max(2L, as.integer(p$cv_k %||% 5L))
+        lbl <- .cv_label(k, n)
+        set.seed(42); folds <- sample(rep_len(seq_len(k), n))
+        ap <- c(); aa <- c()
+        # Pass the kernel NAME, not fit$kernel. An e1071 svm object stores the
+        # kernel as an integer CODE (radial = 2), and feeding that back to
+        # svm(kernel = ) fails with "wrong kernel specification!". mod_svm.R did
+        # exactly that inside a tryCatch that returned NULL, so every fold
+        # silently failed and its cross-validation NEVER produced a result --
+        # the screen just said "Awaiting SVM CV results..." forever.
+        kern <- p$kernel %||% "radial"
+        for (f in seq_len(k)) {
+          tr <- sub[folds != f, , drop = FALSE]; te <- sub[folds == f, , drop = FALSE]
+          m <- tryCatch(e1071::svm(fml, data = tr, type = st,
+                                   kernel = kern, cost = as.numeric(p$cost %||% 1),
+                                   gamma = g, scale = isTRUE(p$scale_x)),
+                        error = function(e) NULL)
+          if (is.null(m)) next
+          pv <- tryCatch(stats::predict(m, newdata = te), error = function(e) NULL)
+          if (is.null(pv)) next
+          ap <- c(ap, if (reg) as.numeric(pv) else as.character(pv))
+          aa <- c(aa, if (reg) as.numeric(te[[yv]]) else as.character(te[[yv]]))
+        }
+        list(fit = fit, preds = preds, y = sub[[yv]], df = sub, yv = yv, xv = xv,
+             svm_type = st, reg = reg,
+             cv = if (length(ap)) list(actual = aa, predicted = ap, lbl = lbl) else NULL)
+      },
+      plots = list(
+        pred = function(fit, f) {
+          if (fit$reg) {
+            graphics::plot(as.numeric(fit$y), as.numeric(fit$preds), pch = 16,
+                           col = "#2e7d3266", xlab = "Observed", ylab = "Predicted",
+                           main = "Observed vs predicted")
+            graphics::abline(0, 1, col = "#c62828", lwd = 2)
+            graphics::grid(col = "grey92")
+          } else {
+            print(.plot_conf_matrix(table(Predicted = fit$preds, Actual = fit$y),
+                                    title = "Confusion matrix (training)"))
+          }
+        },
+        sv = function(fit, f) {
+          SV <- fit$fit$SV
+          if (is.null(SV) || !nrow(SV)) return(show_placeholder("No support vectors."))
+          if (ncol(SV) >= 2) {
+            graphics::plot(as.numeric(SV[, 1]), as.numeric(SV[, 2]), pch = 4,
+                           col = "#c62828", cex = 1.2, xlab = "SV dim 1",
+                           ylab = "SV dim 2",
+                           main = sprintf("Support vectors (%d)", nrow(SV)))
+            graphics::grid(col = "grey92")
+          } else {
+            graphics::hist(as.numeric(SV[, 1]), col = "#4caf5088", border = "white",
+                           main = "Support vectors", xlab = "SV values")
+          }
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        performance = layout_columns(col_widths = c(6, 6),
+          card(card_header("Metrics"), tags$pre(paste(c(
+            sprintf("Task              : %s", fit$svm_type),
+            sprintf("Kernel            : %s", fit$fit$kernel),
+            sprintf("Cost / gamma      : %.4g / %.4g", fit$fit$cost, fit$fit$gamma),
+            sprintf("Support vectors   : %d", nrow(fit$fit$SV)),
+            sprintf("Rows              : %d", nrow(fit$df)),
+            "",
+            if (fit$reg) paste(utils::capture.output(print(signif(unlist(
+                 uef_evaluation(as.numeric(fit$preds), as.numeric(fit$y))), 4))),
+                 collapse = "\n")
+            else sprintf("Training accuracy : %.2f%%",
+                         100 * mean(as.character(fit$preds) == as.character(fit$y))),
+            if (!is.null(fit$cv))
+              sprintf("%-18s: %s", fit$cv$lbl,
+                      if (fit$reg)
+                        sprintf("RMSE %.4g",
+                                sqrt(mean((fit$cv$actual - fit$cv$predicted)^2)))
+                      else sprintf("%.2f%% accuracy",
+                                   100 * mean(fit$cv$predicted == fit$cv$actual)))
+            else "Validation        : not available"),
+            collapse = "\n"))),
+          card(ea_stat_plot(ns, "pred", if (solo) "100%" else "340px"))),
+        support_vector = layout_columns(col_widths = c(8, 4),
+          card(ea_stat_plot(ns, "sv", if (solo) "100%" else "360px")),
+          card(card_header("Support vectors"), tags$pre(paste(c(
+            sprintf("Total: %d", nrow(fit$fit$SV)),
+            if (!is.null(fit$fit$nSV)) c("By class:",
+              sprintf("  %s: %d", fit$fit$levels, fit$fit$nSV))),
+            collapse = "\n")))),
+        prediction_tab = {
+          d <- data.frame(Observed = fit$y, Predicted = fit$preds)
+          if (fit$reg) d$Residual <- signif(as.numeric(fit$y) - as.numeric(fit$preds), 5)
+          DT::datatable(d, rownames = FALSE,
+                        options = list(pageLength = 15, scrollX = TRUE))
+        })
+    ),
+
     # ---- GLMM (backlog item 34) --------------------------------------------
     # The existing Mixed effects screen is nlme::lme, which fits GAUSSIAN
     # responses only -- it has no `family` argument at all, so a binary or count

@@ -8,6 +8,28 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.2 — 2026-08-04
+
+### Fixed
+- **SVM's cross-validation never worked.** It always showed "Awaiting SVM CV results…" and
+  no result ever arrived. The refit inside each fold passed the fitted model's `kernel` back
+  to `svm()` — but an e1071 model stores the kernel as an integer **code** (radial = 2), and
+  feeding that back errors with "wrong kernel specification!". The error was swallowed by a
+  `tryCatch` that returned `NULL`, so every fold failed silently and the screen waited
+  forever. Now the kernel name is passed, and validation produces a result — and it honours
+  the cost, gamma and scaling you actually set, which the old fold refits ignored.
+
+### Changed
+- **SVM is now a registry entry** (migration 2 of 9), verified to produce **identical
+  predictions and identical support vectors** to the module it replaces, for regression,
+  classification and a non-default kernel.
+- **SVM validation is computed once, when you press Run.** The old screen recomputed the
+  whole k-fold loop inside its render outputs, so every time the metrics table redrew it
+  refitted k models. It now runs once under the progress bar, where a slow job belongs.
+- SVM's two cross-validation controls are labelled so you can tell them apart — one is
+  e1071's own built-in check, the other a separate hold-out validation. Both were present
+  before with no indication which was which.
+
 ## v0.9.1 — 2026-08-04
 
 ### Fixed
