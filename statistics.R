@@ -26,6 +26,18 @@
 #            THROW to fail; mod_stat.R reports the message.
 #   views    named character vector: key = label, for the select-and-split header
 #   render   function(fit, key, solo) -> UI for one view
+#   plots    OPTIONAL named list of function(fit) that DRAW a plot. See below.
+#   views_plot OPTIONAL character vector of view keys that contain a plot, so
+#            the plot-appearance control appears only where it does something.
+#
+# Why `plots` is separate from `render`. A table or text pane can be returned
+# straight out of `render` -- a DT widget and tags$pre are just UI. A PLOT
+# cannot: it needs a device, so it must be a `renderPlot` binding created when
+# the module server is built, with `render` emitting only the matching
+# plotOutput. So a spec declares its drawing functions in `plots`, the runner
+# binds one output per entry, and `render` calls ea_stat_plot(ns, "<name>").
+# This gap only showed up when migrating a real screen -- the five methods this
+# registry launched with render text and tables only.
 #
 # NOT everything belongs here. A method whose inputs are variable-length or
 # whose screen is genuinely two screens stays a module -- `mod_tests.R` (its
@@ -42,6 +54,18 @@ ea_role <- function(key, label, types = "any", multiple = FALSE,
                     required = TRUE, hint = NULL)
   list(key = key, label = label, types = types, multiple = multiple,
        required = required, hint = hint)
+
+# A boolean option. algorithms.R has no equivalent because a spatial operation
+# never needed one; a statistical method routinely does (use CV, scale inputs).
+ea_chk <- function(key, label, value = FALSE, hint = NULL, show_if = NULL)
+  list(kind = "chk", key = key, label = label, value = value, hint = hint,
+       show_if = show_if)
+
+# Emit the output tag for a plot the spec declared in `plots`. Specs call this
+# from `render` instead of building a plotOutput by hand, so the id convention
+# stays in one place.
+ea_stat_plot <- function(ns, name, height = "400px")
+  plotOutput(ns(paste0("plot_", name)), height = height)
 
 # Does a column satisfy a role's type filter?
 ea_role_ok <- function(x, types) {
@@ -283,6 +307,169 @@ ea_statistics <- function() {
           tags$p(paste("Smaller theta means more extra-Poisson variation.",
                        "As theta grows large the fit approaches a plain Poisson,",
                        "which is the signal you did not need this model."))))
+    ),
+
+    # ---- XGBoost -- FIRST MIGRATION of an existing screen -------------------
+    # Ported from mod_xgboost.R by reading its own observeEvent, not by
+    # reimplementing the method: same objective mapping, same params list, same
+    # xgb.cv -> best_iteration -> xgboost() sequence, so the numbers match.
+    # `mod_xgboost.R` is retired (still sourced, no longer registered or bound),
+    # exactly how the four bundled spatial screens were retired in D18.
+    list(
+      id = "xgboost", label = "XGBoost", group = "Machine learning",
+      summary = paste("Gradient-boosted trees for regression or classification.",
+                      "Strong on tabular data; cross-validation picks the number",
+                      "of rounds for you."),
+      roles = list(
+        ea_role("y", "Response variable (Y)", "any"),
+        ea_role("x", "Predictor variables (X)", "numeric", multiple = TRUE,
+                hint = "Numeric columns only - XGBoost needs a numeric matrix.")),
+      params = list(
+        ea_sel("obj_type", "Task type",
+               c("Regression" = "reg", "Binary classification" = "bin",
+                 "Multiclass" = "multi"), "reg"),
+        ea_num("nrounds",   "Boosting rounds",   100, 10, 5000, 10),
+        ea_num("eta",       "Learning rate",     0.1, 0.001, 1, 0.01),
+        ea_num("max_depth", "Max tree depth",    6, 1, 20, 1),
+        ea_num("subsample", "Row subsample",     0.8, 0.1, 1, 0.05),
+        ea_num("colsample", "Column subsample",  0.8, 0.1, 1, 0.05),
+        ea_num("min_child", "Min child weight",  1, 0, 100, 1),
+        ea_chk("use_cv",    "Cross-validation (xgb.cv)", TRUE),
+        ea_num("nfold",     "CV folds", 5, 2, 20, 1)),
+      views = c(training_curve = "Training Curve",
+                feature_import = "Feature Importance",
+                predictions    = "Predictions"),
+      views_plot = c("training_curve", "feature_import", "predictions"),
+      fit = function(df, r, p) {
+        if (!requireNamespace("xgboost", quietly = TRUE))
+          stop("XGBoost needs the 'xgboost' package. Install it from the Packages screen.")
+        yv <- r$y; xv <- r$x
+        sub <- df[, c(yv, xv), drop = FALSE]
+        sub <- sub[stats::complete.cases(sub), ]
+        if (nrow(sub) < 10) stop("Need at least 10 complete rows; this has ", nrow(sub), ".")
+        obj <- p$obj_type %||% "reg"
+        y_raw <- sub[[yv]]
+        X <- as.matrix(sub[, xv, drop = FALSE])
+        y_enc <- if (obj == "reg") as.numeric(y_raw)
+                 else as.integer(as.factor(y_raw)) - 1L
+        if (obj == "bin" && length(unique(y_enc)) != 2)
+          stop("Binary classification needs exactly 2 classes; this response has ",
+               length(unique(y_enc)), ".")
+        prm <- list(
+          booster = "gbtree",
+          objective = switch(obj, reg = "reg:squarederror",
+                             bin = "binary:logistic", multi = "multi:softmax"),
+          eta = as.numeric(p$eta %||% 0.1),
+          max_depth = as.integer(p$max_depth %||% 6L),
+          subsample = as.numeric(p$subsample %||% 0.8),
+          colsample_bytree = as.numeric(p$colsample %||% 0.8),
+          min_child_weight = as.numeric(p$min_child %||% 1),
+          eval_metric = switch(obj, reg = "rmse", bin = "logloss", multi = "merror"))
+        if (obj == "multi") prm$num_class <- length(unique(y_enc))
+        nr <- as.integer(p$nrounds %||% 100L)
+        dtrain <- xgboost::xgb.DMatrix(data = X, label = y_enc)
+        cv_hist <- NULL; best <- nr
+        if (isTRUE(p$use_cv)) {
+          cv <- xgboost::xgb.cv(params = prm, data = dtrain, nrounds = nr,
+                                nfold = as.integer(p$nfold %||% 5L),
+                                verbose = 0, early_stopping_rounds = 15)
+          cv_hist <- cv$evaluation_log
+          # WHERE the best iteration lives moved in xgboost 3.x: `best_iteration`
+          # at the top level is NULL now and the value sits under `early_stop`.
+          # mod_xgboost.R read the old location, got NULL, and passed
+          # nrounds = NULL to the trainer -- the second way that screen is broken
+          # on the installed version. Read both, then fall back to the minimum of
+          # the test metric, so a future move degrades instead of erroring.
+          best <- cv$best_iteration %||% cv$early_stop$best_iteration
+          if (!length(best) && !is.null(cv_hist)) {
+            mte <- names(cv_hist)[grep("test.*mean", names(cv_hist))][1]
+            if (!is.na(mte)) best <- which.min(cv_hist[[mte]])
+          }
+          if (!length(best) || !is.finite(best)) best <- nr
+          best <- as.integer(best)
+        }
+        # xgb.train(), NOT xgboost(). mod_xgboost.R called
+        # xgboost(data = , params = , verbose = ), which xgboost 3.x removed --
+        # `params` is gone and `data` was renamed to `x`, so that screen errors
+        # on Run against the installed version (3.2.1.1). xgb.train is the
+        # low-level trainer, still takes params + a DMatrix, and is stable.
+        final <- xgboost::xgb.train(params = prm, data = dtrain, nrounds = best,
+                                    verbose = 0)
+        praw <- stats::predict(final, dtrain)
+        list(model = final, cv_hist = cv_hist, best_nrounds = best,
+             preds = if (obj == "bin") round(praw) else praw, preds_raw = praw,
+             y_enc = y_enc, y_raw = y_raw, obj_type = obj, xv = xv, yv = yv,
+             imp = xgboost::xgb.importance(model = final, feature_names = xv))
+      },
+      plots = list(
+        cv = function(fit, f) {
+          if (is.null(fit$cv_hist))
+            return(show_placeholder(sprintf("Trained for %d rounds (CV off).",
+                                            fit$best_nrounds)))
+          cv <- fit$cv_hist
+          mtr <- names(cv)[grep("train.*mean", names(cv))][1]
+          mte <- names(cv)[grep("test.*mean",  names(cv))][1]
+          graphics::plot(cv$iter, cv[[mtr]], type = "l", lwd = 2, col = "#2e7d32",
+                         xlab = "Round", ylab = "Loss", main = "CV training curve",
+                         ylim = range(c(cv[[mtr]], cv[[mte]]), na.rm = TRUE))
+          graphics::lines(cv$iter, cv[[mte]], col = "#c62828", lwd = 2, lty = 2)
+          graphics::abline(v = fit$best_nrounds, col = "grey40", lty = 3)
+          graphics::legend("topright", c("Train", "CV test", "Best round"),
+                           col = c("#2e7d32", "#c62828", "grey40"),
+                           lwd = c(2, 2, 1), lty = c(1, 2, 3), bty = "n", cex = .85)
+          graphics::grid(col = "grey92")
+        },
+        imp = function(fit, f) {
+          imp <- fit$imp
+          if (is.null(imp) || !nrow(imp)) return(show_placeholder("No importance."))
+          d <- utils::head(as.data.frame(imp), 20)
+          d <- d[order(d$Gain), ]
+          graphics::par(mar = c(4, 9, 3, 2))
+          graphics::barplot(d$Gain, names.arg = d$Feature, horiz = TRUE, las = 1,
+                            col = "#2e7d32", border = NA, xlab = "Gain",
+                            main = "Feature importance", cex.names = .85)
+        },
+        pred = function(fit, f) {
+          if (identical(fit$obj_type, "reg")) {
+            graphics::plot(fit$y_enc, fit$preds, pch = 19, col = "#2e7d3288",
+                           xlab = "Observed", ylab = "Predicted",
+                           main = "Predicted vs observed")
+            graphics::abline(0, 1, col = "#c62828", lwd = 2)
+            graphics::grid(col = "grey92")
+          } else {
+            t <- table(Observed = fit$y_enc, Predicted = fit$preds)
+            graphics::barplot(t, beside = TRUE, col = grDevices::hcl.colors(nrow(t)),
+                              border = NA, main = "Predicted vs observed",
+                              legend.text = rownames(t))
+          }
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        training_curve = layout_columns(col_widths = c(8, 4),
+          card(ea_stat_plot(ns, "cv", if (solo) "100%" else "340px")),
+          card(card_header("Performance"), tags$pre(paste(
+            sprintf("Task        : %s", fit$obj_type),
+            sprintf("Best rounds : %d", fit$best_nrounds),
+            sprintf("Predictors  : %d", length(fit$xv)),
+            sprintf("Rows        : %d", length(fit$y_enc)),
+            if (identical(fit$obj_type, "reg"))
+              paste(utils::capture.output(
+                print(signif(unlist(uef_evaluation(fit$preds, fit$y_enc)), 4))),
+                collapse = "\n")
+            else sprintf("Accuracy    : %.4f", mean(fit$preds == fit$y_enc)),
+            sep = "\n")))),
+        feature_import = layout_columns(col_widths = c(8, 4),
+          card(ea_stat_plot(ns, "imp", if (solo) "100%" else "380px")),
+          card(card_header("Top variables"),
+               DT::datatable(utils::head(as.data.frame(fit$imp), 20),
+                             rownames = FALSE,
+                             options = list(dom = "t", pageLength = 20, scrollX = TRUE)))),
+        predictions = layout_columns(col_widths = c(7, 5),
+          card(ea_stat_plot(ns, "pred", if (solo) "100%" else "340px")),
+          card(card_header("Predictions"),
+               DT::datatable(utils::head(data.frame(
+                 Observed = fit$y_raw, Predicted = fit$preds), 200),
+                 rownames = FALSE,
+                 options = list(pageLength = 10, scrollX = TRUE)))))
     ),
 
     # ---- GLMM (backlog item 34) --------------------------------------------

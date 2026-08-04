@@ -29,9 +29,14 @@ statToolsUI <- function(id, spec) {
       txt = textInput(ns(paste0("p_", p$key)), p$label, value = p$value),
       sel = selectInput(ns(paste0("p_", p$key)), p$label, choices = p$choices,
                         selected = p$value),
+      chk = checkboxInput(ns(paste0("p_", p$key)), p$label, value = isTRUE(p$value)),
       NULL)
-    if (is.null(p$hint)) inp
-    else tagList(inp, tags$p(class = "text-muted small mt-n1 mb-2", p$hint))
+    if (!is.null(p$hint))
+      inp <- tagList(inp, tags$p(class = "text-muted small mt-n1 mb-2", p$hint))
+    # `show_if` keeps a dependent option hidden until it applies (CV folds only
+    # once CV is on). `ns = ns` is required or the JS condition cannot resolve a
+    # namespaced input.
+    if (!is.null(p$show_if)) conditionalPanel(p$show_if, ns = ns, inp) else inp
   }
   tagList(
     tags$p(class = "text-muted small mb-2", spec$summary),
@@ -162,13 +167,44 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
       div(class = "ea-hint mt-2", sprintf("Fitted on %d rows.", f$n))
     })
 
+    # ---- Plot outputs -------------------------------------------------------
+    # One renderPlot per entry in spec$plots, bound HERE (at construction) and
+    # not from inside view_body: a plot needs a device, so it cannot be returned
+    # as UI the way a DT widget or tags$pre can. `local()` captures the name --
+    # without it every binding would close over the last one.
+    for (.nm in names(spec$plots %||% list())) local({
+      nm <- .nm
+      output[[paste0("plot_", nm)]] <- renderPlot({
+        f <- fit_obj()
+        if (is.null(f)) return(show_placeholder("Press Run to see this."))
+        tryCatch(spec$plots[[nm]](f$fit, f),
+                 error = function(e) show_placeholder(conditionMessage(e)))
+      })
+    })
+
+    # The plot-appearance control belongs WITH the plot and only where there is
+    # one, so it follows the current selection (backlog F26).
+    output$view_tools <- renderUI({
+      vp <- spec$views_plot
+      if (!length(vp)) return(NULL)
+      picked <- input$view_pick
+      if (!length(picked)) picked <- names(spec$views)[1]
+      if (any(picked %in% vp)) ea_plot_appearance()
+    })
+
     output$view_body <- renderUI({
       f <- fit_obj()
       if (is.null(f))
         return(show_placeholder(paste0("Set the options, then press Run to fit ",
                                        tolower(spec$label), ".")))
+      # A spec that draws plots needs `ns` to emit their outputs; one that only
+      # returns text and tables does not. Pass it only when the spec asks for
+      # it, so a simple spec keeps a simple signature and adding plots later is
+      # not a breaking change to the others.
+      has_ns <- "ns" %in% names(formals(spec$render))
       ea_view_panes(input$view_pick, spec$views, function(k, solo)
-        tryCatch(spec$render(f$fit, k, solo),
+        tryCatch(if (has_ns) spec$render(f$fit, k, solo, ns)
+                 else spec$render(f$fit, k, solo),
                  error = function(e)
                    show_placeholder(paste("Could not render this view:",
                                           conditionMessage(e)))))

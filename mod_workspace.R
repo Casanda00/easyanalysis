@@ -1533,7 +1533,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       timeseries     = list(nm = "Time series",         grp = "Statistics", tools = timeseriesToolsUI, canvas = timeseriesCanvasUI),
       # --- Machine learning ---
       rf             = list(nm = "Random Forest",       grp = "Machine Learning", tools = rfToolsUI,     canvas = rfCanvasUI),
-      xgboost        = list(nm = "XGBoost",             grp = "Machine Learning", tools = xgboostToolsUI,canvas = xgboostCanvasUI),
+      # xgboost RETIRED 2026-08-04: it is a statistics.R entry now (stat_xgboost),
+      # registered by the loop below. Keeping this line too would put the same
+      # screen in the menu twice, from two different implementations.
       dtree          = list(nm = "Decision tree",       grp = "Machine Learning", tools = dtreeToolsUI,  canvas = dtreeCanvasUI),
       svm            = list(nm = "Support vector machine", grp = "Machine Learning", tools = svmToolsUI, canvas = svmCanvasUI),
       nnet_ml        = list(nm = "Neural network",      grp = "Machine Learning", tools = nnetMlToolsUI, canvas = nnetMlCanvasUI),

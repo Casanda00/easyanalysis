@@ -2406,6 +2406,50 @@ proven, and it carries regression risk that none of this work did. The 5 genuine
 ones (`mod_tests`, `mod_da`, `mod_descriptive`, `mod_clustering`) should stay modules — see
 the survey notes above.
 
+#### MIGRATION STARTED 2026-08-04 — one screen at a time
+
+**1 of 9 done: XGBoost.** Progress: **xgboost ✅** · dtree · svm · nnet_ml · gam · pca ·
+survival · anova · rf.
+
+**The first migration paid for itself twice over, in ways worth recording:**
+
+**a) It exposed a real gap in the registry: it could not render PLOTS.** The five launch
+methods emit text and tables only, and both return fine as UI from `renderUI` — a DT widget
+is just markup. A plot is not: it needs a device, so it must be a `renderPlot` binding
+created when the module server is built. Every one of the 9 screens has plots, so this
+blocked the whole migration and was invisible until a real screen was attempted. Added:
+`plots` (named drawing functions, one output bound per entry), `ea_stat_plot()` for specs to
+emit the tag, `views_plot` so the plot-appearance control appears only where there is a plot
+(F26), plus `ea_chk()` for booleans and `show_if` for a setting that only applies sometimes.
+
+**b) It found that the XGBoost screen was already BROKEN and nobody knew.** Not a regression
+from this work — `xgboost` changed its API in 3.x (installed here: 3.2.1.1) and the screen was
+never updated. **Two** independent breakages, either of which kills it on Run:
+
+| what the module called | what 3.x does |
+|---|---|
+| `xgboost(data =, params =, verbose =)` | `params` removed, `data` renamed to `x` — the call errors |
+| `cv$best_iteration` | now `NULL`; the value moved to `cv$early_stop$best_iteration`, so `nrounds = NULL` reached the trainer |
+
+Fixed in the port with `xgb.train()` and a tolerant lookup that checks both locations and
+falls back to the minimum of the test metric, so the next API move degrades instead of
+erroring.
+
+**This is an argument for continuing the migration**, beyond tidiness: a screen nobody had
+run recently was silently dead, and porting it is what surfaced that. Worth assuming the
+other 8 may hold similar rot.
+
+**Parity is the standard for each migration** — the port must reproduce the module, not
+reimplement it. For XGBoost: **identical predictions (max abs difference 0)**, same
+`best_nrounds`, same importance ranking, on both regression and binary classification.
+Verified against the module's own computation, read out of its `observeEvent` rather than
+rewritten.
+
+**Retirement pattern** (following D18's retired spatial bundles): the module file stays
+sourced so nothing referencing its UI functions breaks, but the hardcoded `MODUI` line and
+the `server.R` binding are removed — otherwise the screen appears in the menu **twice**, from
+two different implementations. Verified: XGBoost appears exactly once, as `stat_xgboost`.
+
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:
 

@@ -8,6 +8,33 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.1 — 2026-08-04
+
+### Fixed
+- **XGBoost was broken and would error the moment you pressed Train.** Not a regression —
+  the `xgboost` package changed its API in version 3.x and the screen was never updated. Two
+  separate breakages: `xgboost(data =, params =, verbose =)` no longer exists (`params` was
+  removed and `data` renamed to `x`), and `xgb.cv()`'s `best_iteration` moved out of the top
+  level into `early_stop`, so the screen read `NULL` and passed it straight to the trainer.
+  Both fixed while porting the screen, and the best-iteration lookup now checks both
+  locations and falls back to the minimum of the test metric, so the next API move degrades
+  instead of erroring.
+- XGBoost also refuses a binary task on a response that does not have exactly 2 classes,
+  instead of silently encoding a continuous column into hundreds of "classes".
+
+### Changed
+- **XGBoost is now a registry entry** rather than its own module — the first of the existing
+  screens migrated onto `statistics.R`. Same method, same hyperparameters, same views;
+  verified to produce **identical predictions** to the module's own computation. The old
+  `mod_xgboost.R` is retired: still present, no longer registered or bound, so the screen
+  appears once rather than twice.
+
+### Added
+- The registry can render **plots**, which it could not before. A spec declares drawing
+  functions in `plots` and the runner binds one `renderPlot` per entry — a plot needs a
+  device, so unlike a table it cannot simply be returned as UI. Also added boolean options
+  and conditional options (a setting that only appears when it applies).
+
 ## v0.9.0 — 2026-08-04
 
 ### Added
