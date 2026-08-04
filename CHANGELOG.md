@@ -8,6 +8,23 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.4 — 2026-08-04
+
+### Fixed
+- **The Neural Network screen's validation ignored your Max iterations setting.** Both of its
+  cross-validation loops trained each fold for a hardcoded 200 iterations, so a network you
+  trained for 1000 was being scored against one trained for 200. Third screen in a row with
+  a validation that measured a different model than the one on display. The folds now use the
+  iteration count you set.
+
+### Changed
+- **Neural Network is now a registry entry** (migration 4 of 9), verified to produce
+  **identical predictions and an identical final objective value** to the module it replaces,
+  for both regression and classification, including a non-default architecture (hidden units,
+  decay, iterations, restarts and scaling all changed together).
+- Its validation is computed once when you press Run, and a regression network now refuses a
+  categorical response with a clear message instead of failing inside `nnet`.
+
 ## v0.9.3 — 2026-08-04
 
 ### Fixed

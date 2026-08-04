@@ -989,7 +989,7 @@ server <- function(input, output, session) {
   # nothing that still references its UI functions breaks (same treatment the
   # retired spatial bundles got in D18).
   # dtreeServer is NOT bound: it is a statistics.R entry now (stat_dtree).
-  nnet_ctx  <- nnetMlServer("nnet_ml", dataset_pool, active_dataset)
+  # nnetMlServer is NOT bound: it is a statistics.R entry now (stat_nnet).
   # svmServer is NOT bound: SVM is a statistics.R entry now (stat_svm).
   # Spatial modules
   lidar_ctx      <- lidarServer("lidar", dataset_pool, las_pool, vector_pool)
@@ -1133,7 +1133,7 @@ server <- function(input, output, session) {
     lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
     survival = surv_ctx, sem = sem_ctx, bayesian = bayes_ctx,
     rf = rf_ctx,
-    nnet_ml = nnet_ctx,
+
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
     pca = pca_ctx, timeseries = ts_ctx,
     pointcloud = lidar_ctx, metrics = lidar_ctx,

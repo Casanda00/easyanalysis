@@ -800,6 +800,154 @@ ea_statistics <- function() {
                ea_stat_plot(ns, "resid", "340px"))))
     ),
 
+    # ---- Neural network -- MIGRATION 4 of 9 --------------------------------
+    # Ported from mod_nnet_ml.R: same scaling, same best-of-n_init restart loop
+    # keeping the lowest fit$value, same nnet() arguments.
+    # The fold-refit pattern shows up here too, though milder than dtree's: both
+    # CV loops (mod_nnet_ml.R:197, :255) hardcoded `maxit = 200` instead of the
+    # user's setting, so a network trained for 1000 iterations was validated
+    # against one trained for 200. The port passes the real value.
+    list(
+      id = "nnet", label = "Neural Network", group = "Machine learning",
+      summary = paste("A single hidden layer network. Flexible, but needs scaled",
+                      "inputs and enough rows; weight decay keeps it from",
+                      "memorising the training data."),
+      roles = list(
+        ea_role("y", "Response variable (Y)", "any"),
+        ea_role("x", "Predictor variables (X)", "numeric", multiple = TRUE,
+                hint = "Numeric columns only.")),
+      params = list(
+        ea_sel("nn_type", "Task type",
+               c("Regression (numeric Y)" = "reg",
+                 "Classification (category Y)" = "class"), "reg"),
+        ea_num("size",   "Hidden units", 5, 1, 200, 1),
+        ea_num("decay",  "Weight decay (L2)", 0.01, 0, 10, 0.01,
+               hint = "Higher = smoother, less over-fitting."),
+        ea_num("maxit",  "Max iterations", 300, 50, 5000, 50),
+        ea_num("n_init", "Random restarts", 3, 1, 20, 1,
+               hint = "Best of N fits is kept - a network can land in a poor optimum."),
+        ea_chk("scale_x", "Scale predictors (recommended)", TRUE),
+        ea_sel("cv_method", "Validation",
+               c("K-fold" = "kfold", "LOOCV (leave-one-out)" = "loocv"), "kfold"),
+        ea_num("cv_k", "Number of folds (k)", 5, 2, 20, 1,
+               show_if = "input.p_cv_method == 'kfold'")),
+      views = c(performance = "Performance", predictions = "Predictions",
+                network_info = "Network Info"),
+      views_plot = c("performance"),
+      fit = function(df, r, p) {
+        if (!requireNamespace("nnet", quietly = TRUE))
+          stop("Neural networks need the 'nnet' package.")
+        yv <- r$y; xv <- setdiff(r$x, yv)
+        if (!length(xv)) stop("Choose at least one predictor other than the response.")
+        sub <- df[, c(yv, xv), drop = FALSE]
+        sub <- sub[stats::complete.cases(sub), ]
+        if (nrow(sub) < 10) stop("Need at least 10 complete rows; this has ", nrow(sub), ".")
+        type <- p$nn_type %||% "reg"
+        Xr <- as.matrix(sub[, xv, drop = FALSE])
+        Xs <- if (isTRUE(p$scale_x)) scale(Xr) else Xr
+        y  <- sub[[yv]]
+        if (type == "class") {
+          y <- as.factor(y)
+          if (nlevels(y) < 2)
+            stop("Classification needs at least 2 classes in the response.")
+        } else if (!is.numeric(y)) {
+          stop("A regression network needs a numeric response. Pick Classification, ",
+               "or choose a numeric column.")
+        }
+        tr_df <- as.data.frame(Xs); names(tr_df) <- xv; tr_df[[yv]] <- y
+        fml <- stats::as.formula(paste0("`", yv, "` ~ ",
+                                        paste0("`", xv, "`", collapse = " + ")))
+        size <- as.integer(p$size %||% 5L); decay <- as.numeric(p$decay %||% 0.01)
+        maxit <- as.integer(p$maxit %||% 300L); nini <- as.integer(p$n_init %||% 3L)
+        lin <- type == "reg"
+        best <- NULL; bestv <- Inf
+        for (i in seq_len(nini)) {
+          f <- tryCatch(nnet::nnet(fml, data = tr_df, size = size, decay = decay,
+                                   maxit = maxit, linout = lin, trace = FALSE),
+                        error = function(e) NULL)
+          if (!is.null(f) && !is.null(f$value) && f$value < bestv) {
+            best <- f; bestv <- f$value
+          }
+        }
+        if (is.null(best)) stop("The network did not converge on any restart.")
+        preds <- as.vector(stats::predict(best, tr_df,
+                    type = if (type == "class") "class" else "raw"))
+        if (type == "reg") preds <- as.numeric(preds)
+
+        # Validation, once, with the USER's maxit (the module hardcoded 200).
+        n <- nrow(tr_df)
+        k <- if (identical(p$cv_method, "loocv")) n
+             else max(2L, as.integer(p$cv_k %||% 5L))
+        lbl <- .cv_label(k, n)
+        set.seed(42); folds <- sample(rep_len(seq_len(k), n))
+        ap <- c(); aa <- c()
+        for (f in seq_len(k)) {
+          tr <- tr_df[folds != f, , drop = FALSE]; te <- tr_df[folds == f, , drop = FALSE]
+          m <- tryCatch(nnet::nnet(fml, data = tr, size = size, decay = decay,
+                                   maxit = maxit, linout = lin, trace = FALSE),
+                        error = function(e) NULL)
+          if (is.null(m)) next
+          pv <- tryCatch(stats::predict(m, newdata = te,
+                           type = if (type == "class") "class" else "raw"),
+                         error = function(e) NULL)
+          if (is.null(pv)) next
+          ap <- c(ap, if (type == "class") as.character(pv) else as.numeric(pv))
+          aa <- c(aa, if (type == "class") as.character(te[[yv]]) else as.numeric(te[[yv]]))
+        }
+        list(fit = best, preds = preds, y = y, df = tr_df, yv = yv, xv = xv,
+             type = type, reg = lin, final_val = bestv, size = size, decay = decay,
+             maxit = maxit, n_init = nini, scaled = isTRUE(p$scale_x),
+             cv = if (length(ap)) list(actual = aa, predicted = ap, lbl = lbl) else NULL)
+      },
+      plots = list(
+        pred = function(fit, f) {
+          if (fit$reg) {
+            graphics::plot(as.numeric(fit$y), as.numeric(fit$preds), pch = 16,
+                           col = "#2e7d3266", xlab = "Observed", ylab = "Predicted",
+                           main = "Observed vs predicted")
+            graphics::abline(0, 1, col = "#c62828", lwd = 2)
+            graphics::grid(col = "grey92")
+          } else {
+            print(.plot_conf_matrix(table(Predicted = fit$preds, Actual = fit$y),
+                                    title = "Confusion matrix (training)"))
+          }
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        performance = layout_columns(col_widths = c(6, 6),
+          card(card_header("Metrics"), tags$pre(paste(c(
+            sprintf("Network      : %d inputs -> %d hidden -> %s",
+                    length(fit$xv), fit$size, fit$yv),
+            sprintf("Decay / iter : %.4g / %d", fit$decay, fit$maxit),
+            sprintf("Restarts     : %d (best kept)", fit$n_init),
+            sprintf("Predictors   : %s", if (fit$scaled) "scaled" else "raw"),
+            sprintf("Final value  : %.6g", fit$final_val),
+            "",
+            if (fit$reg) paste(utils::capture.output(print(signif(unlist(
+                 uef_evaluation(as.numeric(fit$preds), as.numeric(fit$y))), 4))),
+                 collapse = "\n")
+            else sprintf("Training accuracy : %.2f%%",
+                         100 * mean(as.character(fit$preds) == as.character(fit$y))),
+            if (!is.null(fit$cv))
+              sprintf("%-18s: %s", fit$cv$lbl,
+                      if (fit$reg)
+                        sprintf("RMSE %.4g",
+                                sqrt(mean((fit$cv$actual - fit$cv$predicted)^2)))
+                      else sprintf("%.2f%% accuracy",
+                                   100 * mean(fit$cv$predicted == fit$cv$actual)))
+            else "Validation        : not available"),
+            collapse = "\n"))),
+          card(card_header(if (fit$reg) "Observed vs predicted" else "Confusion matrix"),
+               ea_stat_plot(ns, "pred", if (solo) "100%" else "360px"))),
+        predictions = {
+          d <- data.frame(Observed = fit$y, Predicted = fit$preds)
+          if (fit$reg) d$Residual <- signif(as.numeric(fit$y) - as.numeric(fit$preds), 5)
+          DT::datatable(d, rownames = FALSE,
+                        options = list(pageLength = 15, scrollX = TRUE))
+        },
+        network_info = card(tags$pre(paste(
+          utils::capture.output(print(fit$fit)), collapse = "\n"))))
+    ),
+
     # ---- GLMM (backlog item 34) --------------------------------------------
     # The existing Mixed effects screen is nlme::lme, which fits GAUSSIAN
     # responses only -- it has no `family` argument at all, so a binary or count

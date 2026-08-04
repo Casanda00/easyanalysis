@@ -1538,7 +1538,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # screen in the menu twice, from two different implementations.
       # dtree RETIRED 2026-08-04: it is a statistics.R entry now (stat_dtree).
       # svm RETIRED 2026-08-04: it is a statistics.R entry now (stat_svm).
-      nnet_ml        = list(nm = "Neural network",      grp = "Machine Learning", tools = nnetMlToolsUI, canvas = nnetMlCanvasUI),
+      # nnet_ml RETIRED 2026-08-04: it is a statistics.R entry now (stat_nnet).
       da             = list(nm = "Discriminant analysis", grp = "Machine Learning", tools = daToolsUI,   canvas = daCanvasUI),
       clustering     = list(nm = "Clustering",          grp = "Machine Learning", tools = clusteringToolsUI, canvas = clusteringCanvasUI),
       classification = list(nm = "Classification",      grp = "Machine Learning", tools = classificationToolsUI, canvas = classificationCanvasUI),

@@ -2408,12 +2408,12 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**3 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · nnet_ml · gam · pca ·
-survival · anova · rf.
+**4 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** · gam ·
+pca · survival · anova · rf.
 
-**Running score: 3 screens migrated, 4 latent bugs found — one in every screen so far.** Every
+**Running score: 4 screens migrated, 5 latent bugs found — one in EVERY screen so far.** Every
 port has been bit-for-bit faithful AND turned up something broken that nobody had noticed.
-That is now the strongest argument for finishing: these screens are not being exercised, and
+That is the strongest argument for finishing: these screens are not being exercised, and
 porting is what exercises them.
 
 | screen | latent bug found |
@@ -2421,11 +2421,19 @@ porting is what exercises them.
 | XGBoost | two `xgboost` 3.x API breaks — the screen errored on Run |
 | SVM | cross-validation never produced a result, ever (silent per-fold failure) |
 | Decision tree | validation scored rpart's DEFAULT tree, not the configured one |
+| Neural network | both CV loops hardcoded `maxit = 200`, ignoring the user's setting |
 
-**A pattern is emerging in the per-fold refits.** SVM's ignored cost, gamma and scaling;
-decision tree's ignored every `rpart.control` setting. Both validated a *different model than
-the one on screen*. **Check this specifically in each remaining port** — `nnet_ml`, `gam` and
-`rf` all have their own CV loops.
+**The per-fold-refit pattern is now confirmed in THREE of four screens** and should be
+treated as the default suspicion, not a surprise. SVM's refits ignored cost, gamma and
+scaling; decision tree's ignored every `rpart.control` setting; neural network's ignored
+`maxit`. In each case the validation measured a *different model than the one on screen* —
+and only SVM's failed visibly. **Check this first in `gam` and `rf`**, which still have their
+own CV loops.
+
+**Why it keeps happening:** every one of these loops re-derives its settings from the FITTED
+object (`res$fit$kernel`, `res$fit$decay`) or hardcodes them, instead of using the parameters
+the user supplied. The registry avoids it structurally — `fit(df, r, p)` has `p` in scope, so
+the fold refits use the same values the displayed model did.
 
 **The first migration paid for itself twice over, in ways worth recording:**
 
@@ -2517,6 +2525,24 @@ checkbox so it is distinguishable from the separate hold-out validation.
 **Parity verified:** identical predictions AND an identical `cptable` against the module's own
 `rpart()` + prune sequence, for both regression and classification, including a non-default
 `maxdepth = 2, cp = 0.001, minsplit = 5, minbucket = 2`; all 4 views render for both types.
+
+##### Migration 4 — Neural network (2026-08-04)
+
+**Fifth latent bug — the fold pattern again, third screen running.** Both CV loops in
+`mod_nnet_ml.R` (`:197`, `:255`) hardcoded **`maxit = 200`** regardless of the user's Max
+iterations. A network trained for 1000 iterations was validated against one trained for 200.
+The loops did at least recover `size` and `decay` from the fitted object, so this is milder
+than dtree's — but it is the same failure: the validation described a different model.
+
+**Measured:** on the test data the objective is `12.6269` at `maxit = 200` versus `12.5393`
+at `maxit = 2000` — genuinely different fits, so the numbers were not interchangeable. The
+port passes the user's value, and also applies the correct `linout` per task type.
+
+**Parity verified:** identical predictions AND an identical final objective value against the
+module's own best-of-`n_init` restart loop, for regression and classification, including a
+non-default architecture (`size = 9, decay = 0.2, maxit = 150, n_init = 2, scale_x = FALSE`
+all changed together). A regression network now refuses a categorical response with a clear
+message rather than failing inside `nnet`; all 3 views render for both task types.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:
