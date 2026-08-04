@@ -1337,8 +1337,8 @@ this item was **further along than the entry recorded**:
 | "How to use" page | **BUILT** — `landing/how-to-use.html`, 297 lines |
 | Linked from the landing nav | **YES** — both are `href`s in `index.html` |
 | Tour engine in the app | **BUILT** — `#ea-tour` spotlight + tip + dots, `ui.R:1623-1638`, `start/next/stop` at `ui.R:2873-2893` |
-| Tour content | **2 steps of the 8+ asked for** — only `[data-tour=menu]` and `[data-tour=copilot]` exist, and only those two anchors are placed |
-| Button in the app pointing at the docs | **NOT BUILT** — grepping `ui.R`, `mod_workspace.R`, `mod_projects.R`, `mod_docs.R` for `easyanalysis.dev`, `documentation.html` or `how-to-use` returns **nothing** |
+| Tour content | ~~2 steps~~ → **was 6, now 9** — DONE 2026-08-04. **Correction:** the "2 steps" above was WRONG; that count came from grepping only `[data-tour=…]` anchors and missed four steps targeting CSS classes (`.ea-wsx-left`, `.ea-wsx-tabs`, `.ea-wsx-right`, `.ea-wsx-dock`). It was 6. Added 3 (tool search, Undo/Reset, Docs) → **9**, clearing the ≥8 requirement. |
+| Button in the app pointing at the docs | ~~NOT BUILT~~ → **DONE 2026-08-04.** A "Docs" link added to `.topbar-right` in `ui.R`, pointing at `easyanalysis.dev/documentation.html`, `target="_blank"` so a running project is never navigated away from. It carries no `tb-ws`/`tb-coanalyst` class, so unlike Undo/Reset it shows on the **projects screen and the analysis area** — which is what the item asked for. |
 | Tour 2 (projects page) / Tour 3 (map + data view) | **NOT BUILT** — one tour exists, not three |
 
 **So what actually remains is smaller and much more specific than "write documentation":**
@@ -1494,6 +1494,45 @@ rendered page, per theme.
 
 **Do this after item 25** so the new black & white set is swept in the same pass rather than
 becoming the next thing that needs one.
+
+#### REPRODUCED 2026-08-04 — two screenshots, both modes, on Mixed effects
+
+At last, the concrete symptom the earlier entry could not reproduce. **Both are the same root
+cause — a colour fixed for one mode — but they fail on opposite surfaces**, which is why one
+sweep per mode is necessary and a light-only pass would have missed half.
+
+**Light mode — result text is unreadable.**
+> "I am in light mode, in mixed effects, the texts in the model summary and others are grey
+> and the background is white. I cant read anything. this is true for many of the views for
+> other analyses."
+
+The `verbatimTextOutput` / `<pre>` blocks (Model Summary, Performance Metrics, Cross-Validation)
+render very light grey on white. Card headers and titles are fine, so this is **the `pre`
+block specifically**, not the card. Reported as affecting **many analysis views**, not just
+LME — consistent with a shared rule rather than one screen's CSS.
+
+**Dark mode — sidebar labels and a fixed light panel.**
+> "when I change to dark mode, the quick builder and other hardcoded white texts are bad"
+
+In the tools sidebar: "Quick Builder", "Grouping Variable:", "Random Slope (optional):" are
+dark-on-dark and barely legible, while the **"Convergence Options" panel keeps a light cream
+background** (`#fff8e1`-family) with its heading and checkbox label unreadable on it. That
+panel is a hardcoded light surface that never follows the theme — the same class of bug as
+`.bg-light` (round-1 item 3) and `.modal-footer` (A1/A2), just not yet swept.
+
+**What this pins down for the sweep:**
+
+1. `pre` / `verbatimTextOutput` colour is the **highest-value single fix** — it is where every
+   model's actual numbers live, it is reported across many screens, and one rule should fix
+   all of them.
+2. Fixed **light** panels (`#fff8e1`, `#fce4ec`, and friends) must become theme tokens or a
+   translucent tint. Round-1 item 10 already solved this shape once for the assumption rows —
+   `color-mix(in srgb, var(--warn) 14%, transparent)` takes its lightness from whatever is
+   behind it, so it works in every set. Reuse that, do not invent a second approach.
+3. Sidebar **section labels and helper text** need checking in the dark sets specifically.
+
+Both screenshots are on the **Mixed effects** screen, so start there and use it as the
+reference while sweeping the rest.
 
 ---
 
@@ -1959,7 +1998,7 @@ C11-C13); treat 3 as a launcher button; and hold 4 until the toolchain question 
 
 ---
 
-### 27. Remove the Co-Analyst suggestion chips
+### 27. Remove the Co-Analyst suggestion chips — FIXED 2026-08-04
 > "to remove that suggestions."
 
 **Read as: the clickable suggestion chips in the Co-Analyst panel.**
@@ -1985,7 +2024,7 @@ item 28. Scope is exactly the four chip sites above.
 
 ---
 
-### 28. "dbl" means nothing to users — spell the column types out
+### 28. "dbl" means nothing to users — spell the column types out — FIXED 2026-08-04
 > "in the dataset summary area, users do not understand what dbl is. i think we should go
 > with the regular style. same as the table in the Co-analyst view."
 
@@ -2153,7 +2192,7 @@ on a step, and the two features reinforce each other instead of being built twic
 
 ---
 
-### 32. Multi-step undo — up to 5
+### 32. Multi-step undo — up to 5 — FIXED 2026-08-04
 > "multi step undo. could be undo up to 5 times."
 
 **Currently exactly one step**, and the code says so itself —

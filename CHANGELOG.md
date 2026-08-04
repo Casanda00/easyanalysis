@@ -8,6 +8,37 @@ breaking changes. Newest first.
 
 ---
 
+## v0.8.3 — 2026-08-04
+
+### Changed
+- **Column types are spelled out.** The dataset summary showed tibble/pillar abbreviations
+  (`dbl`, `int`, `fct`, `chr`, `lgl`) that mean nothing to anyone who does not write R — and
+  this app exists so people do not have to. They now read **number, whole number, text,
+  category, true/false, date**, with the R class kept as the cell's tooltip. The coloured
+  badge behind them is gone too: it carried six hardcoded hex values that followed no theme,
+  and the colour never said anything the word did not. (Backlog item 28.)
+- **The Co-Analyst no longer offers suggestion chips.** They were the last place the app
+  volunteered a next step, which contradicted its own system prompt — that already forbids
+  the model from proposing one. The Recommend screen is kept and is where suggestions belong.
+  (Backlog item 27.)
+
+### Added
+- **Undo now goes back 5 steps, not 1.** `snap()` was already the single choke point every
+  data operation passes through, so the change is one bounded stack. Each undo reports how
+  many steps remain, so the last press reads as "no further undo steps" rather than a dead
+  button. Capped deliberately — each entry is a full copy of the data frame. (Backlog item 32.)
+- **A "Docs" button in the app.** The documentation pages have been live on the website for
+  days, but nothing inside the app pointed at them, so users who never visited the site never
+  found them. It sits in the top bar on both the projects screen and the analysis area, and
+  opens in a new tab so a running project is never navigated away from. (Backlog item 17.)
+- **The guided tour covers 9 steps, up from 6** — added the tool search, Undo/Reset, and the
+  new Docs link, clearing the "at least 8" requirement. (Backlog item F24.)
+
+### Fixed
+- **Undo could corrupt a dataset.** The undo snapshot was a single slot shared across every
+  dataset, so switching from A to B and pressing Undo restored **A's data into B**. The stack
+  is now per dataset, and stacks for deleted datasets are pruned.
+
 ## v0.8.2 — 2026-08-04
 
 ### Fixed

@@ -265,10 +265,35 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     ns <- session$ns
     rv <- reactiveValues(working_data = NULL, current_rename_levels = NULL)
-    prev_state <- reactiveVal(NULL)  # one-step undo snapshot
 
-    # Helper: snapshot current state before any mutation
-    snap <- function() prev_state(rv$working_data)
+    # ---- Undo: a bounded stack, PER DATASET (backlog item 32) ---------------
+    # Bounded on purpose. Each entry is a full copy of the data frame, and an
+    # unbounded store of large objects is exactly how this app OOM-ed before
+    # (round-1 item 1 capped the project-load cache at 4 for the same reason).
+    #
+    # Keyed by dataset because the old single `prev_state` slot was shared across
+    # datasets: switching from A to B and pressing Undo restored A's data INTO B,
+    # silently corrupting it. A stack per dataset cannot do that.
+    .UNDO_MAX <- 5L
+    undo_stacks <- reactiveVal(list())   # name -> list of snapshots, newest LAST
+
+    # Snapshot the current state before any mutation. `snap()` is the single
+    # choke point every ~14 mutating handler already calls, so nothing else
+    # needed changing to get 5 steps instead of 1.
+    snap <- function() {
+      ds <- active_dataset()
+      if (!isTruthy(ds) || is.null(rv$working_data)) return(invisible(NULL))
+      s  <- undo_stacks()
+      st <- c(s[[ds]] %||% list(), list(rv$working_data))
+      if (length(st) > .UNDO_MAX) st <- utils::tail(st, .UNDO_MAX)
+      s[[ds]] <- st
+      # Drop stacks for datasets that no longer exist, so a long session cannot
+      # accumulate snapshots of deleted layers.
+      live <- names(dataset_pool)
+      s <- s[names(s) %in% live]
+      undo_stacks(s)
+      invisible(NULL)
+    }
 
     # NOTE: Uploading is handled globally in server.R (left Datasets rail) and
     # writes to raw_pool/dataset_pool. This module only consumes those pools.
@@ -288,15 +313,31 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       showNotification("Dataset reset to original raw data across all tabs.", type = "message")
     })
 
-    # ---- Undo last operation ----
+    # ---- Undo last operation (up to .UNDO_MAX steps) ----
     observeEvent(input$undo_last, {
-      req(active_dataset())
-      prev <- prev_state()
-      if (is.null(prev)) { showNotification("Nothing to undo.", type = "warning"); return() }
+      ds <- active_dataset(); req(ds)
+      s  <- undo_stacks()
+      st <- s[[ds]] %||% list()
+      if (!length(st)) {
+        showNotification("Nothing left to undo.", type = "warning")
+        return()
+      }
+      prev <- st[[length(st)]]
+      st   <- st[-length(st)]          # pop
+      s[[ds]] <- st
+      undo_stacks(s)
       rv$working_data <- prev
-      dataset_pool[[active_dataset()]] <- prev
-      prev_state(NULL)
-      showNotification("Last change undone.", type = "message")
+      dataset_pool[[ds]] <- prev
+      # Say how many are left. The Undo control is static markup fired from JS in
+      # four places (ui.R, mod_workspace.R), so there is no server-rendered label
+      # to update -- reporting it here is what stops the last press reading as a
+      # broken button.
+      showNotification(
+        sprintf("Change undone. %s",
+                if (!length(st)) "No further undo steps."
+                else sprintf("%d undo step%s left.", length(st),
+                             if (length(st) == 1L) "" else "s")),
+        type = "message")
     })
 
     # ---- Reset to original upload (top-bar button) ----
@@ -1116,18 +1157,21 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       req(!is.null(df), nrow(df) > 0)
       n_rows <- nrow(df)
 
+      # PLAIN WORDS, not tibble/pillar abbreviations. `dbl`/`fct`/`chr` are
+      # conventional to R users and meaningless to everyone else -- and this app
+      # exists so people do NOT have to write code, so the audience is exactly
+      # the group that has never seen <dbl>. The R class goes in the cell's
+      # tooltip instead, so nothing is lost for users who do know it.
       .tlbl <- function(x) {
         if (inherits(x, c("Date","POSIXct","POSIXlt"))) "date"
-        else if (is.logical(x)) "lgl"
-        else if (is.integer(x)) "int"
-        else if (is.numeric(x)) "dbl"
-        else if (is.factor(x)) "fct"
-        else if (is.character(x)) "chr"
+        else if (is.logical(x)) "true/false"
+        else if (is.integer(x)) "whole number"
+        else if (is.numeric(x)) "number"
+        else if (is.factor(x)) "category"
+        else if (is.character(x)) "text"
         else class(x)[1]
       }
-      .tcol <- function(lbl) switch(lbl,
-        dbl="#1565c0", int="#1565c0", fct="#2e7d32", chr="#33691e",
-        date="#6a1b9a", lgl="#e65100", "#555")
+      .tclass <- function(x) class(x)[1]   # tooltip: the real R class
 
       rows <- lapply(names(df), function(col) {
         x      <- df[[col]]
@@ -1135,7 +1179,6 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
         pct_na <- 100 * n_na / n_rows
         xc     <- na.omit(x)
         lbl    <- .tlbl(x)
-        clr    <- .tcol(lbl)
 
         detail <- if (is.numeric(x) && length(xc) > 0)
           sprintf("min=%.3g  mean=%.3g  max=%.3g  sd=%.3g",
@@ -1159,11 +1202,12 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
         tags$tr(style=paste0("background:", bg, ";"),
           tags$td(style="padding:4px 10px;font-weight:600;font-size:12px;", col),
-          tags$td(style="padding:4px 10px;",
-            tags$span(class="badge",
-                      style=paste0("background:", clr, "22;color:", clr,
-                                   ";font-size:10px;font-weight:600;border:1px solid ", clr, "44;"),
-                      lbl)),
+          # Plain text, matching the Recommend screen's Data Profile table. The
+          # coloured badge this replaced carried six hardcoded hex values that
+          # followed no theme, and the colour never meant anything the word did
+          # not already say.
+          tags$td(style="padding:4px 10px;font-size:11px;color:var(--bark);",
+                  title = paste0("R type: ", .tclass(x)), lbl),
           na_td,
           tags$td(style="padding:4px 10px;font-size:11px;color:#555;", detail)
         )

@@ -276,9 +276,6 @@ chatUI <- function(id) {
       .bubble p:last-child { margin-bottom: 0; }
       .copilot-actions { font-size: 11px; color: var(--bark); margin: -6px 0 12px 34px; }
       .copilot-actions code { background: var(--tint); color: var(--canopy); padding: 1px 5px; border-radius: 4px; }
-      .copilot-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-      .copilot-chip { border: 1px solid var(--line); background: var(--panel); color: var(--canopy); border-radius: 14px; padding: 5px 11px; font-size: 12px; cursor: pointer; }
-      .copilot-chip:hover { border-color: var(--canopy); }
       /* typing indicator while the agent works */
       .copilot-typing { display: flex; gap: 4px; align-items: center; padding: 12px 14px; }
       .copilot-typing .dot { width: 7px; height: 7px; border-radius: 50%; background: #9bb69c;
@@ -334,7 +331,6 @@ chatUI <- function(id) {
       ),
       tags$div(id = ns("pane_ask"), class = "copilot-pane",
         tags$div(class = "copilot-body", id = ns("body"),
-          uiOutput(ns("suggestions")),
           uiOutput(ns("history")),
           uiOutput(ns("busy_ui"))
         ),
@@ -419,14 +415,10 @@ chatServer <- function(id, dataset_pool, active_dataset, current_view, module_ct
       do.call(tagList, bubbles)
     })
 
-    output$suggestions <- renderUI({
-      if (sum(vapply(chat_state(), function(m) m$role == "user", logical(1))) > 0) return(NULL)
-      chips <- c("Summarise the active dataset", "Which predictors matter most?",
-                 "Fit a suitable model for me", "Interpret what's on this screen")
-      div(class = "copilot-chips",
-        lapply(chips, function(p) tags$span(class = "copilot-chip", p,
-          onclick = sprintf("Shiny.setInputValue('%s', %s, {priority:'event'})", ns("suggest"), jsonlite::toJSON(p, auto_unbox = TRUE)))))
-    })
+    # Suggestion chips REMOVED (backlog item 27). They were the last place the
+    # app volunteered a next step, which contradicted the system prompt above --
+    # it already forbids the model from proposing "best next step" suggestions.
+    # The Recommend screen is kept and is where suggestions belong.
 
     # TRUE while the agent is working — drives the typing indicator and stops
     # double-sends. An agent turn can take 10-30s (tool calls + vision), so the
@@ -477,6 +469,5 @@ chatServer <- function(id, dataset_pool, active_dataset, current_view, module_ct
 
     observeEvent(input$send, { send_message(input$input) })
     observeEvent(input$enter, { send_message(input$enter) })   # Enter key: value passed directly (race-free)
-    observeEvent(input$suggest, { send_message(input$suggest) })
   })
 }

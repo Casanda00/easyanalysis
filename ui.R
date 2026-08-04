@@ -2540,7 +2540,8 @@ page_fillable(
         # Undo
         tags$button(
           class = "topbar-action-btn tb-ws",
-          title = "Undo last data operation  (Ctrl+Z)",
+          title = "Undo the last data operation, up to 5 steps  (Ctrl+Z)",
+          `data-tour` = "undo",
           onclick = "Shiny.setInputValue('data-undo_last', Date.now(), {priority:'event'})",
           icon("rotate-left", style = "font-size:12px;"), "Undo"
         ),
@@ -2562,6 +2563,18 @@ page_fillable(
           icon("wand-magic-sparkles", style = "font-size:12px;"), "Co-Analyst"
         ),
         tags$div(class = "topbar-sep tb-coanalyst"),
+        # Documentation — the landing site's docs are built and linked from the
+        # website, but nothing in the APP pointed at them (backlog item 17), so
+        # a user who never visits the site never finds them. Opens in a new tab
+        # so the running project is never navigated away from.
+        tags$a(
+          class = "topbar-action-btn",
+          href = "https://easyanalysis.dev/documentation.html",
+          target = "_blank", rel = "noopener",
+          title = "Documentation — guides and a reference for every screen",
+          `data-tour` = "docs",
+          icon("book", style = "font-size:12px;"), "Docs"
+        ),
         # Settings gear
         tags$button(
           class = "topbar-action-btn",
@@ -2832,7 +2845,13 @@ page_fillable(
         { target:'.ea-wsx-dock, .ea-wsx-canvas', title:'Results collect in the dock',
           body:'Each run is kept with its numbers and plot, so you can compare runs instead of losing the last one. Click a result to pop it out.' },
         { target:'[data-tour=copilot]', title:'Ask the Co-Analyst',
-          body:'Stuck? It can run an analysis or explain a result for you, in plain language.' }
+          body:'Stuck? It can run an analysis or explain a result for you, in plain language.' },
+        { target:'.ea-toolsearch', title:'Or just search for it',
+          body:'Type what you want to do — regression, raster, DTM — and it finds the tool for you. Faster than remembering which menu a thing lives under.' },
+        { target:'[data-tour=undo]', title:'Changes are reversible',
+          body:'Every data operation can be undone, up to five steps back. Reset returns the active dataset to the state it was uploaded in.' },
+        { target:'[data-tour=docs]', title:'Full documentation',
+          body:'Guides, worked examples and a reference for every screen — opens on the website. Your project stays exactly as you left it.' }
       ];
       var i = 0, ov, spot, tip;
       function el(id){ return document.getElementById(id); }
