@@ -1475,11 +1475,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       p + ggplot2::theme_minimal(base_size = 12)
     })
 
-    output$chart_i <- plotly::renderPlotly({
-      plotly::ggplotly(.gg()) %>%
-        plotly::config(displaylogo = FALSE,
-                       modeBarButtonsToRemove = c("lasso2d", "autoScale2d"))
-    })
+    # Guarded the SAME way the UI above is (`.ea-wsx-dplot`), and that symmetry is
+    # the whole point: `plotly::` here resolves when the module server is BUILT,
+    # not when the output renders, so an unguarded binding calls loadNamespace()
+    # at construction time and takes the entire workspace down on any machine
+    # without plotly -- the UI guard never gets a chance to degrade to plotOutput.
+    # plotly is an OPTIONAL extra (launcher/deps.R), so this must stay guarded.
+    if (requireNamespace("plotly", quietly = TRUE)) {
+      output$chart_i <- plotly::renderPlotly({
+        plotly::ggplotly(.gg()) %>%
+          plotly::config(displaylogo = FALSE,
+                         modeBarButtonsToRemove = c("lasso2d", "autoScale2d"))
+      })
+    }
 
     # Static renderer uses the SAME ggplot spec as the interactive one, so
     # toggling Static/Interactive shows the same plot, not two different ones.

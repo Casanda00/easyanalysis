@@ -144,10 +144,51 @@ page_fillable(
        them here (skeleton loaders, result reveals) is a few CSS keyframes, and
        a JS engine would be weight for no gain. */
 
+    /* RUNNING PILL: the global 'something is happening' signal. Driven purely
+       by the `shiny-busy` class Shiny sets on <html> while a request is in
+       flight -- no server involvement, because a single-threaded R session that
+       is busy computing cannot send anything to animate itself.
+
+       The 400ms transition-delay applies only on the way IN, so a fast
+       round-trip never flashes the pill, while hiding stays instant (the delay
+       lives on the .shiny-busy rule, so it stops applying the moment the class
+       is removed). Net effect: it appears only when something is genuinely
+       taking long enough to look broken. */
+    #ea-busy {
+      position: fixed; left: 14px; bottom: 36px; z-index: 2000;
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 13px 7px 11px; border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--line); color: var(--ink);
+      font: 600 12px var(--ui); letter-spacing: .01em;
+      box-shadow: 0 6px 22px rgba(0,0,0,.28);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      opacity: 0; transform: translateY(4px);
+      pointer-events: none;               /* never intercepts a click */
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    html.shiny-busy #ea-busy {
+      opacity: 1; transform: none;
+      transition: opacity .18s ease .4s, transform .18s ease .4s;
+    }
+    /* Boot overlay owns the screen during startup; two spinners is noise. */
+    #ea-boot:not(.gone) ~ #ea-busy { opacity: 0 !important; }
+    .ea-busy-spin {
+      width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto;
+      border: 2px solid color-mix(in srgb, var(--forest) 35%, transparent);
+      border-top-color: var(--forest);
+      animation: eaBusySpin .7s linear infinite;
+    }
+    @keyframes eaBusySpin { to { transform: rotate(360deg); } }
+
     /* SKELETON: a recomputing output shimmers instead of dimming, so you can
-       see WHERE work is happening now that --shiny-fade-opacity is 1. */
+       see WHERE work is happening now that --shiny-fade-opacity is 1.
+       `.ea-wsx-modcanvas` is where the model screens render, so without it the
+       30 screens that have no withProgress() showed nothing at all. */
     .ea-wsx-canvas .shiny-plot-output.recalculating,
     .ea-wsx-canvas .shiny-html-output.recalculating,
+    .ea-wsx-modcanvas .shiny-plot-output.recalculating,
+    .ea-wsx-modcanvas .shiny-html-output.recalculating,
     .ea-wsx-dplot .recalculating {
       position: relative; border-radius: 8px;
       background-image: linear-gradient(100deg,
@@ -167,8 +208,15 @@ page_fillable(
     @media (prefers-reduced-motion: reduce) {
       .ea-wsx-canvas .shiny-plot-output.recalculating,
       .ea-wsx-canvas .shiny-html-output.recalculating,
+      .ea-wsx-modcanvas .shiny-plot-output.recalculating,
+      .ea-wsx-modcanvas .shiny-html-output.recalculating,
       .ea-wsx-dplot .recalculating { animation: none; }
       .ea-wsx-panel, .ea-wsx-modcanvas, .ea-wsx-pmet, .ea-wsx-resulthead { animation: none; }
+      /* The pill still APPEARS -- it is the whole signal. Only the spin stops,
+         and the fade becomes instant. */
+      .ea-busy-spin { animation: none; }
+      #ea-busy { transition: none; transform: none; }
+      html.shiny-busy #ea-busy { transition: none; }
     }
 
     /* ---- Text legibility across ALL colour sets ----
@@ -1432,6 +1480,15 @@ page_fillable(
     .selectize-dropdown .active, .selectize-dropdown .option.active,
     .selectize-dropdown .option:hover {
       background: var(--sunk) !important; color: var(--ink) !important; }
+    /* NATIVE <select> popups. The rules above are all selectize (which renders
+       divs); a plain selectInput(selectize = FALSE) renders a real <select>,
+       whose option list selectize CSS never touches. `color-scheme` in theme.R
+       is the portable half of this fix -- these two rules are the other half,
+       for engines that do let the page colour an <option> (Chromium on Windows
+       does; Firefox/Safari largely ignore them, which is exactly why
+       color-scheme has to carry the load rather than these). */
+    .form-select option, select.form-control option {
+      background-color: var(--panel); color: var(--ink); }
     .form-control::placeholder { color: var(--bark); }
     /* ===== Glassy popups — a frosted translucent panel over a blurred, dark
        backdrop. Never the white-ish default. ===== */
@@ -2370,6 +2427,26 @@ page_fillable(
     "if(window.jQuery){ $(document).one('shiny:idle', function(){ setTimeout(done, 120); }); }",
     "setTimeout(done, 12000);",
     "})();"))),
+
+  # ---- GLOBAL "Running" pill --------------------------------------------
+  # The one signal that covers all 42 screens. Only 12 of them use
+  # withProgress(), so on the other 30 a slow fit used to look like a frozen
+  # app -- and this app had LESS feedback than stock Shiny, because
+  # `--shiny-fade-opacity: 1` above deliberately turns off Shiny's own dimming.
+  # That trade was made on the promise of a "Running pill" (see the comment at
+  # the top of this file) which was never actually built. This is it.
+  #
+  # It is CLIENT-side on purpose, keyed off the `shiny-busy` class Shiny puts on
+  # <html> while a request is outstanding. Shiny is single-threaded, so during a
+  # blocking fit the server cannot render or animate anything at all -- but the
+  # browser is a separate process and keeps painting, so a CSS animation driven
+  # by a class is the ONLY thing that can move while R is busy. It also needs no
+  # per-module wiring, which is what makes it reach every screen at once.
+  #
+  # Honest by construction: it is shown by Shiny's real request state, never by
+  # a timer, so it cannot claim work that is not happening.
+  tags$div(id = "ea-busy", role = "status", `aria-live` = "polite",
+           tags$i(class = "ea-busy-spin"), tags$span("Running…")),
 
   tags$div(class = "app-shell",
 

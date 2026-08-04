@@ -1101,16 +1101,23 @@ server <- function(input, output, session) {
 
   # UNIFIED workspace: hosts every module's real UI (their servers are bound once
   # above, unchanged). `tool_request` lets a menubar click select a tool in it.
-  # Opening a tool re-arms the module selector population (see active_dataset).
-  observeEvent(workspace_ctx$tool_open(), {
-    ds_refresh(isolate(ds_refresh()) + 1)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
   workspace_ctx  <- workspaceServer("workspace", dataset_pool, raster_pool,
                                     las_pool, vector_pool, active_dataset,
                                     tool_request = reactive(input$current_view),
                                     layer_style = layer_style, src_paths = src_paths,
                                     plot_opts = plot_opts)
+
+  # Opening a tool re-arms the module selector population (see active_dataset).
+  # Registered AFTER the assignment above on purpose. The event expression is
+  # lazy, so the old order (observer first) usually worked -- but only because
+  # the assignment happened to complete before the first flush. When
+  # workspaceServer() threw, `workspace_ctx` was never bound and this observer
+  # then failed on EVERY flush with a "not found" error that pointed here
+  # instead of at the real failure. Ordering it properly keeps the reported
+  # error the actual one.
+  observeEvent(workspace_ctx$tool_open(), {
+    ds_refresh(isolate(ds_refresh()) + 1)
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   module_ctx <- list(
     data = data_ctx,

@@ -166,6 +166,30 @@ it's built) and [DESIGN.md](DESIGN.md) (what it should feel like).
 - **CRS detection:** `sf::st_crs(las)$epsg` is NULL for many valid CRS objects —
   check `is.na(sf::st_crs(las))`. Avoid `lidR::extent(las)@xmin` (fails on
   `terra::SpatExtent`); use `las@data$X` min/max.
+- **An optional package must be guarded at the SERVER binding, not only the UI**
+  (2026-08-04). `output$x <- pkg::renderFoo({...})` resolves `pkg::` when the module
+  server is **built**, so `loadNamespace()` runs then — a UI-side
+  `requireNamespace()` never gets to degrade anything. A missing `plotly` therefore
+  killed the whole workspace on a fresh machine. Two follow-ons: register observers
+  **after** the value they reference (a forward-referenced `workspace_ctx` turned the
+  real error into a misleading "object not found" on every flush), and anything used
+  with `::` must be in `core` in `launcher/deps.R` or guarded as an `extras`.
+  **`plotly` was in neither list** — the installer reported success and the app died at
+  boot. See CLAUDE.md gotcha 27.
+- **Faking an absent package with `requireNamespace()` does not work** (2026-08-04).
+  Shadowing it does not change how `::` resolves, so the control case passes and the
+  test proves nothing. Verify against a library that genuinely lacks the package — a
+  shadow lib of directory junctions omitting just that one leaves the real library
+  untouched.
+- **`color-scheme` is the only portable lever for browser-drawn UI** (2026-08-04):
+  native `<select>` popups, scrollbars and other OS-drawn controls ignore page CSS.
+  Each set in `ea_palettes` declares `scheme = "light"|"dark"`; it must be emitted as a
+  real declaration, not swept into the `--name: value` loop. See CLAUDE.md gotcha 28.
+- **Running feedback has to be client-side** (2026-08-04): Shiny is single-threaded, so
+  during a fit the server cannot animate anything. `#ea-busy` is CSS keyed off Shiny's
+  own `shiny-busy` class on `<html>` — no per-module wiring, so it covers every screen.
+  Only 12 of 42 modules use `withProgress`, which is why the app looked frozen.
+  See CLAUDE.md gotcha 29.
 
 ---
 

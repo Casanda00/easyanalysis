@@ -8,6 +8,50 @@ breaking changes. Newest first.
 
 ---
 
+## v0.8.2 — 2026-08-04
+
+### Fixed
+- **The app would not start on a machine without `plotly`** — the failure every fresh
+  install hits. `plotly` was in **neither** the `core` nor the `extras` list in
+  `launcher/deps.R`, so the installer reported `deps: OK` and the app then died at boot with
+  `there is no package called 'plotly'`. Three causes, all fixed: `plotly` added to `extras`;
+  the workspace's `output$chart_i <- plotly::renderPlotly(...)` binding guarded the way its
+  UI already was (a `pkg::` in a binding resolves when the module server is **built**, so it
+  threw before the UI's `requireNamespace()` guard could degrade to the static plot); and the
+  `observeEvent(workspace_ctx$tool_open())` in `server.R` moved **after** the assignment it
+  references, so a failure there no longer surfaces as a misleading "object not found" on
+  every flush. Audited every other eager `output$x <- pkg::render*` binding — all use core
+  packages, so `plotly` was the only one exposed. (CLAUDE.md gotcha 27.)
+- **Nothing showed that the app was working.** Only 12 of 42 modules use `withProgress`, so
+  on the other 30 — including most model screens — a slow fit looked like a frozen app. Worse,
+  `ui.R` deliberately disables Shiny's own dimming (`--shiny-fade-opacity: 1`) on the promise
+  of a "Running pill" that had never been built, leaving less feedback than stock Shiny. Added
+  the global `#ea-busy` pill: pure CSS keyed off Shiny's `shiny-busy` class, so it needs no
+  per-module wiring and works even while R is blocked (a server-rendered spinner cannot).
+  Shown only by real request state, never a timer, and only after 400 ms so quick actions do
+  not flash it. Also extended the existing skeleton shimmer to the model canvas.
+  (CLAUDE.md gotcha 29.)
+- **Native `<select>` popups and scrollbars ignored the theme.** Page CSS colours the closed
+  control but not the browser-drawn popup list. Every colour set now declares
+  `scheme = "light"|"dark"` in `theme.R` and `ea_theme_css()` emits a real `color-scheme`
+  declaration; `:root` declares it too, since a first-time visitor has no `data-ea-theme`
+  attribute yet while the default palette is dark. Added `option` colour rules as the
+  Chromium-specific complement. (CLAUDE.md gotcha 28.)
+
+### Docs
+- `BACKLOG.md`: Round 4 (items 18-25) and a Round 5 reconciliation table mapping a re-sent
+  batch of 24 reports onto existing entries — all 24 were already recorded.
+- Recorded the **verified** state of the docs/tour surface: the landing documentation and
+  how-to-use pages are built and linked, but the in-app tour has **2 of the 8+** steps asked
+  for and **nothing in the app links to the docs**.
+- `DOCS.md` now indexes the published `landing/` pages, which were missing from it entirely.
+
+> **Changelog gap, stated rather than papered over:** work landed between v0.8.1 and this
+> entry (2026-07-30 → 08-01: B6, B8, C9, C14, D17, round-3 items 7/9/10/14/16, the custom
+> domain and the landing-site rewrite) that was never given a version or an entry here.
+> `BACKLOG.md` records it in full. This is exactly the drift BACKLOG item 24 is about — a
+> release-notes page publishes from this file, so an entry has to be part of finishing work.
+
 ## v0.8.1 — 2026-07-29
 
 ### Fixed

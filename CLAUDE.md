@@ -147,6 +147,39 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+27. **Guard an OPTIONAL package at the SERVER binding, not just in the UI.**
+    `output$x <- pkg::renderFoo({...})` resolves `pkg::` when the module server is
+    **constructed**, not when the output renders — so `::` calls `loadNamespace()` at
+    construction time and an absent package throws before any render guard can run. A
+    `requireNamespace()` check around the *UI* half is therefore useless on its own: it
+    never gets the chance to degrade. This took the whole workspace down on a fresh
+    machine (`there is no package called 'plotly'`), and the cascade made it worse —
+    `workspaceServer()` threw, so `workspace_ctx` was never bound and a *forward-referenced*
+    `observeEvent(workspace_ctx$...)` then failed on every flush with a "not found" error
+    pointing at the wrong line. Rules: guard **both** halves; register observers **after**
+    the value they reference; and anything used with `::` must be in `core` in
+    `launcher/deps.R` or guarded as an `extras`.
+    **Testing note:** shadowing `requireNamespace()` does **NOT** simulate an absent
+    package — it does not affect how `::` resolves, so the control passes and proves
+    nothing. Test against a library that genuinely lacks the package (a shadow lib of
+    directory junctions omitting it works and leaves the real library untouched).
+28. **`color-scheme` is the only lever for browser-drawn UI.** Styling `.form-select`
+    colours the closed control; the **popup list of a native `<select>`**, scrollbars and
+    other OS-drawn controls are painted by the browser and ignore page CSS. An
+    `option { color: … }` rule is not portable (Chromium on Windows honours it,
+    Firefox/Safari largely do not). Each set in `ea_palettes` therefore declares
+    `scheme = "light"|"dark"`, and `ea_theme_css()` emits it as a real `color-scheme`
+    declaration — it must be pulled OUT of the `--name: value` loop or it becomes a
+    `--scheme` custom property that nothing reads. `:root` declares it too, because
+    `ui.R` only sets `data-ea-theme` when localStorage already holds one, so a first-time
+    visitor has no theme attribute while the default palette is dark.
+29. **Shiny is single-threaded, so "it is working" feedback must be CLIENT-side.** During
+    an in-process fit the server cannot render, send or animate anything — a server-driven
+    spinner is precisely what cannot work. The global `#ea-busy` pill is pure CSS keyed off
+    the `shiny-busy` class Shiny puts on `<html>`, which needs no per-module wiring and so
+    reaches all 42 screens at once. Note `ui.R` deliberately sets `--shiny-fade-opacity: 1`
+    to stop ~40 modules dimming the page at startup — that removes Shiny's own busy signal,
+    so the pill is what replaces it. Do not re-enable dimming instead.
 18. **Module panels render LAZILY in the workspace, so `updateSelectInput` is dropped.**
     A module's tools panel only exists once its tool is opened, but its population observer
     runs off `active_dataset()` long before that — the update targets a non-existent element

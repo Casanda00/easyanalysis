@@ -864,11 +864,21 @@ and a table-output algorithm lands in the data pool rather than the raster pool.
 > different. same for decision tree, and others under machine learning."
 
 ### E20. Reuse the existing predictor picker
-> "we had a easier way ... selecting multiple predictors was a drop down with selection
-> shown with checkmark."
+> "we had a easier way. one way is to wite the code. the second way is to use the quick
+> editor. why not resude these components here. selecting multiple predictors was a drop
+> down with selection shown with checkmark."
+
+**Full quote restored 2026-08-04** — the entry previously abbreviated it with an ellipsis and
+lost the actual instruction. The ask is **not** "build a picker that looks like that one": it
+is **reuse the components that already exist**, naming two of them (writing the code, and the
+quick editor). That is a different and cheaper job, and it matters for how E19 is approached.
 
 E19 and E20 are the same job: one shared variable-selection component, reused everywhere,
 matching the multi-select-with-checkmarks that already exists.
+
+**Note the app-wide rule this already has behind it:** UX rule 11 in CLAUDE.md — predictor
+selectors use `selectizeInput(multiple = TRUE)`, never `checkboxGroupInput`. So the target
+component is already specified; E19/E20 are about making every screen actually use it.
 
 ### E21. Move "Select Diagnostics to View:"
 > "change the position of this: Select Diagnostics to View:"
@@ -914,6 +924,15 @@ Source order cannot win. Measured before and after to confirm each override actu
 
 Remove the developer-speak placeholder, put the tour button there instead, hide it once a
 tool loads, and **extend the tour to at least 8 steps**.
+
+**State checked 2026-08-04:** the tour **engine is already built** (`#ea-tour` spotlight, tip
+and dots in `ui.R:1623-1638`; `start`/`next`/`stop` at `ui.R:2873-2893`) but carries **only
+2 steps** — `[data-tour=menu]` and `[data-tour=copilot]` — and only those two anchors are
+placed in the markup. So "extend to 8" is content plus one `data-tour` attribute per target,
+not a build.
+
+**Same work as round-3 item 17** (its tour requirement is identical). Do them together and
+tick both off; see item 17 for the full verified state of the docs/tour surface.
 
 ### F25. Export report as PDF
 > "can export report support pdf too?"
@@ -1305,3 +1324,1145 @@ Reported by user for immediate implementation and testing ("we build one and I w
     - **Tour 1:** On the first page/landing page.
     - **Tour 2:** On the project page.
     - **Tour 3:** On the analysis area page, covering both the **map view** and the **data view**.
+
+#### Verified state 2026-08-04 — PARTLY BUILT (more done than this entry said)
+
+Checked against the repo after reviewing the last 5 pushes. Commit `19bbbd3` (2026-08-01)
+rewrote the landing site substantially — `index.html` +1079 lines, plus two new pages — so
+this item was **further along than the entry recorded**:
+
+| piece | state |
+|---|---|
+| Landing documentation page | **BUILT** — `landing/documentation.html`, 403 lines |
+| "How to use" page | **BUILT** — `landing/how-to-use.html`, 297 lines |
+| Linked from the landing nav | **YES** — both are `href`s in `index.html` |
+| Tour engine in the app | **BUILT** — `#ea-tour` spotlight + tip + dots, `ui.R:1623-1638`, `start/next/stop` at `ui.R:2873-2893` |
+| Tour content | **2 steps of the 8+ asked for** — only `[data-tour=menu]` and `[data-tour=copilot]` exist, and only those two anchors are placed |
+| Button in the app pointing at the docs | **NOT BUILT** — grepping `ui.R`, `mod_workspace.R`, `mod_projects.R`, `mod_docs.R` for `easyanalysis.dev`, `documentation.html` or `how-to-use` returns **nothing** |
+| Tour 2 (projects page) / Tour 3 (map + data view) | **NOT BUILT** — one tour exists, not three |
+
+**So what actually remains is smaller and much more specific than "write documentation":**
+
+1. **Add the 6+ missing tour steps and their `data-tour` anchors.** The engine already
+   works; this is content plus one attribute per target. Same job as **F24**, which asks for
+   ≥8 steps — the two entries are the same work and should be done once.
+2. **Link the app to the docs.** This is the explicit ask ("a button which points to it on
+   the first page the app loads and this button goes on the projects and analysis area pages
+   too") and it is the one piece with nothing in place at all.
+3. **Split into Tour 2 / Tour 3** for the projects screen and the analysis area (map view and
+   data view), or decide one context-aware tour is enough.
+
+---
+
+## Round 4 — reported 2026-08-04
+
+Recorded before any work started. Reporter's wording first, then what I found in the code,
+then what still has to be decided. **Nothing here is done yet.** Numbering continues from
+Round 3, so item references stay unique across the file.
+
+Items 20 and 21 are **diagnosed to a specific line** — the cause is confirmed in the code,
+not inferred from the symptom. The rest still need a decision before they can be built.
+
+---
+
+### 18. Dropdown options are white-on-white in light mode — and a wider colour sweep
+> "The options in the drop downs are white in light mode feels inconsistent (more screen
+> background, results, options color sweep."
+
+**This is NOT a repeat of Round 3 items 2 and 9, and it is important not to close it as one.**
+Those two fixed **selectize** dropdowns — [ui.R:1428-1434](ui.R#L1428-L1434) forces
+`.selectize-dropdown .option`, `.selectize-dropdown-content` and `.selectize-input .item` to
+`var(--ink)`. That work is real and still in place.
+
+**What is still broken is the NATIVE `<select>`, which selectize never touches.** The app
+styles the closed control only:
+
+| selector | where | what it sets |
+|---|---|---|
+| `.form-control, .form-select, textarea` | [ui.R:393-396](ui.R#L393-L396) | background + colour |
+| `.form-control, .form-select, .selectize-input, textarea` | [ui.R:1425-1427](ui.R#L1425-L1427) | same, with `!important` |
+
+There is **no rule anywhere for `option`** — confirmed by searching `ui.R` for `option`:
+the only hits are the selectize ones above. So the `<option>` elements inherit
+`color: var(--ink)` from the `<select>`, while the popup list itself is painted by the
+browser/OS, not by the page. In light mode that lands light text on a light popup.
+
+**`color-scheme` is never declared** — confirmed absent from `ui.R`, `theme.R` and
+`mod_workspace.R`. That is the actual lever for native control popups: the browser paints
+them from the declared scheme, so `html[data-ea-theme=light] { color-scheme: light }` (and
+`dark` for the dark sets) is likely to fix this properly where an `option { color: … }` rule
+can only half-work, since Windows Chrome honours `option` colours but Firefox and Safari
+largely do not.
+
+**The wider ask is a third colour sweep** ("screen background, results, options"), the same
+family as round-1 items 3/8/10 and round-2 A1-A4. **Decide before starting:** this one is
+partly a *taste* call, unlike its predecessors which were all measurable defects (a literal
+dark rgb() from the compiled bootstrap). Round-2 A3 already flagged "body text colour
+app-wide, and card surfaces outside these tiles" as **still open and deliberately untouched
+because they are taste calls**. So this item should be split:
+
+- **defect half** — native `<select>` popups, plus anything else measurably unreadable.
+  Verify by measuring contrast, per gotcha 24 (a non-compositing pane lies).
+- **taste half** — screen background and results-surface colours. Needs the reporter to say
+  what "inconsistent" means concretely, or it will be repainted to a guess.
+
+#### Defect half addressed 2026-08-04 — `color-scheme`, plus `option` colours
+
+**`color-scheme` is now declared per theme**, in `theme.R` beside the colours rather than as
+a loose CSS rule, so a new colour set cannot be added without saying which kind it is. Each
+palette gains a `scheme` key (`light` for **light** and **paperwhite**, `dark` for
+**forest**, **midnight**, **ocean**, **plum**), and `ea_theme_css()` emits it as a real
+`color-scheme` declaration — pulled out of the `--name: value` loop, or it would have become
+a `--scheme` custom property that nothing reads.
+
+`:root` declares `color-scheme: dark` too, which is **not** redundant: `ui.R` only sets
+`data-ea-theme` when localStorage already holds one, so a **first-time visitor has no theme
+attribute at all** while the default palette is dark. Without it the browser assumes light
+and draws native popups and scrollbars light over the dark default — the same defect, on
+first run.
+
+**Complementary `option` rules** added in `ui.R` for `.form-select option` and
+`select.form-control option`. These are deliberately *secondary*: Chromium on Windows honours
+them, Firefox and Safari largely do not, which is exactly why `color-scheme` has to carry the
+fix rather than these.
+
+**Verified:** all 6 sets plus `:root` emit a correct `color-scheme`, colours survive the
+change, braces balance, no `--scheme` variable leaks, and every palette declares a scheme
+(so adding one without it fails the check). Confirmed in the **served page**: 7
+`color-scheme:` declarations, both `light` and `dark` present, `.form-select option` present,
+no stray variable.
+
+**NOT verified — and this matters before it is called done.** I could not reproduce the
+reporter's exact symptom. Working through it in the code, the *native `<select>`* path in
+light mode should already have produced dark text on a light popup
+(`.form-select` sets `color: var(--ink)`, which is near-black in the light set), so
+**"the options are white in light mode" is not fully explained by the diagnosis above.**
+`color-scheme` is a genuine, low-risk correctness fix regardless — it is the right way to
+handle native popups and scrollbars — but it may not be the thing the reporter saw.
+
+**To close this properly, needed from the reporter:** *which* dropdown (a screenshot, or the
+screen and control name). Candidates not yet excluded: the app's own `.dropdown-menu` items,
+a selectize instance the round-3 fix does not reach, or a native select whose theme variables
+are not resolving. Guessing further without that risks repainting the wrong surface.
+
+**Side effect to watch:** `color-scheme` also changes native **scrollbars** and other
+OS-drawn controls. On the dark sets that is the intended correction, but it is a visible
+app-wide change and should be eyeballed once.
+
+#### Scope agreed 2026-08-04 — sweep EVERY mode, and sweep for hardcoded colour
+
+> "i think we need to do a sweep in each mode. dark mode, sweep for the inconsistency. a good
+> thing will be to sweep for hardcoded colors."
+
+This settles the "taste half" question above: the sweep is **per mode**, not light-only, and
+it is driven by **finding hardcoded colour** rather than by opinion. That makes it a
+measurable job again, which is what the earlier entry said it needed.
+
+**Two passes, and they find different things:**
+
+1. **Static pass — hunt raw colour in the source.** `theme.R` states the rule outright:
+   *"Nothing else in the app should contain a raw hex value. If you find one, it belongs in
+   this palette."* So any `#rrggbb`, `rgb(`, or bare colour keyword outside `theme.R` is a
+   candidate by definition, and this can be scripted and re-run — the same shape as
+   `check_plot_views.R`, which already re-derives a fact from the parse tree and fails on
+   drift. A hardcoded colour is invisible in whichever mode it happens to suit, which is
+   exactly why rounds 1 and 2 kept rediscovering it (items 3, 8, 10, A1-A4).
+
+   **Known legitimate exceptions that must NOT be "fixed"** — record them in the checker or
+   it will keep flagging them:
+   - `abline(col = "#2e7d32")` and other **base-graphics** colours (round-1 item 8): base
+     plots render on their own white device regardless of app theme, so a themed colour there
+     would be wrong.
+   - `mod_rconsole.R` plots (round-1 item 13): in the console **your code is the source of
+     truth**; the app repainting your `geom_point(colour = "red")` would be the app lying.
+   - The Co-Pilot header gradient and similar deliberate brand fills.
+
+2. **Runtime pass — measure each mode.** The static pass cannot catch the *other* cause,
+   which has bitten this project repeatedly: **bslib compiles Bootstrap once from the default
+   (dark) palette and bakes literal `rgb()` values into component rules** (gotcha 22). Those
+   contain no variable to override, so they are invisible to a source grep and only show up
+   by measuring a rendered page. That is how `.bg-light` (51 card headers), `.modal-footer`,
+   `.input-group-text`, `.btn-light` and ~32 datepicker rules were each found.
+
+   Now that there are **6 colour sets** (soon 7 with item 25), measure all of them, not just
+   light — the reporter explicitly asked for dark too.
+
+**Method note, or the measurement will lie:** see gotcha 24 — in a non-compositing browser
+pane `requestAnimationFrame` does not fire, tiles read `opacity: 0`, and computed styles are
+stale after `eaSetTheme()` unless a reflow is forced. Contrast has to be measured on a real
+rendered page, per theme.
+
+**Do this after item 25** so the new black & white set is swept in the same pass rather than
+becoming the next thing that needs one.
+
+---
+
+### 25. A black & white theme
+> "I think we need a black and white theme too."
+
+**Straightforward** — the theme system was built for exactly this. A set is a list of colour
+keys in `ea_palettes` (`theme.R`); `ea_theme_css()` emits it as
+`html[data-ea-theme="<name>"]`, and the switcher picks it up from `label`. Nothing else in
+the app changes. There are 6 sets today: forest (default), light, midnight, ocean, plum,
+paperwhite.
+
+**Decide which of the two this means** — the wording fits both, and they are different:
+
+- **Monochrome / greyscale** — a set where the *brand* hue is neutral too, so the whole UI is
+  black, white and greys with no green. This is the bigger change of the two: `--forest` and
+  `--canopy` are used for emphasis, active states and semantic tints all over the app, so a
+  neutral brand removes the app's main signal colour and buttons/active rows will need to
+  distinguish themselves by weight or border instead of hue.
+- **Maximum-contrast black-on-white** (a light counterpart to **midnight**, which is already
+  true-black) — pure `#FFFFFF` paper with `#000000` ink, for projectors, printing and low
+  vision. Smaller change, and arguably the more useful one since midnight has no light twin.
+
+**Recommend the second**, named to pair with midnight, and it can reuse the light set's
+structure with the contrast pushed to the ends.
+
+**Two things it must get right, both already known:**
+
+1. **`scheme = "light"`** (or `dark`) in the palette — added 2026-08-04 for item 18. Miss it
+   and the native `<select>` popups and scrollbars go wrong for that set specifically. The
+   verification script for item 18 already fails on a palette with no `scheme`, so this is
+   caught rather than trusted.
+2. **The semantic keys.** `warn` and `danger` must stay distinguishable. In a strict
+   greyscale set they cannot be — which is a real argument for the high-contrast reading
+   above, or for allowing those two keys to keep their hue as the only colour in the set.
+
+**Also check** the `bar` key: the top menubar is dark green in every existing set, so a black
+& white set is the first one where that would look out of place.
+
+---
+
+### 19. Save analyses to a project as Steps, with Checkpoints — FEATURE
+> "To save analyses to Project. Can call it steps (basically remembers the steps that led to
+> the save)."
+>
+> "Checkpoint: a part in the analyses where you can stop and save files, plots and others.
+> Appears as a card in project flow where you can continue from directly. Saves everything
+> including codes, scripts, and everything in that session."
+
+**Two related things, and they should be built in this order — Steps first, Checkpoints on
+top of Steps.** A checkpoint without a step history has nothing to name itself after.
+
+**What exists today (checked, not assumed).** A project is `project.json` + `datasets.rds`
+([project_store.R:10-11](project_store.R#L10-L11)). The metadata is
+`{id, name, created, last_view, active_dataset, spatial[]}`
+([project_store.R:149-156](project_store.R#L149-L156)) — it stores the *current state* and
+nothing about how that state was reached. Searching `server.R`, `project_store.R` and
+`mod_project.R` for a history/log/steps concept returns **nothing**. So this is greenfield,
+not an extension.
+
+**Steps — what has to be decided first.** A "step" is only useful if it is *replayable*, and
+the app has two very different kinds of action:
+
+- **Algorithm runs** are already data — `algorithms.R` specs are `id + inputs + params`, so a
+  step is a small record and `mod_algo.R` is the single choke point that could write it. This
+  part is genuinely cheap, and it is cheap *because* the operations were made data (the same
+  payoff G29 got for cancellation).
+- **Everything else is not.** Model fits, ETL commands in `mod_data.R`, and console scripts
+  each have their own input sets with no shared shape.
+
+**So: does a step record the whole app, or only what is replayable?** Recommend scoping v1 to
+algorithm runs + ETL commands, both of which have a declared parameter list, and leaving model
+fits for later — rather than a vague "remembers everything" that cannot actually replay.
+
+**Checkpoints — the hard part is "saves everything".** Taken literally that includes rasters
+and point clouds, and the project format deliberately stores spatial layers as **path
+references, never copies**, precisely so a multi-GB `.laz` is not duplicated
+(CLAUDE.md, Projects section). A checkpoint that copies everything would reintroduce exactly
+what that rule avoids. **Decide:** does a checkpoint copy spatial layers, or reference them
+like the project does and accept that an edited source invalidates it? Same question the
+Round-1 item-1 cache had to answer, and it answered it with path + mtime + size.
+
+Plots and scripts are cheap and can genuinely be saved in full. `mod_rconsole.R` already
+tracks what a script produces (`.script_outputs`, [mod_rconsole.R:222](mod_rconsole.R#L222)),
+so console history is the most tractable piece.
+
+**UI:** "appears as a card in project flow where you can continue from directly" — the
+Projects screen already renders project cards (`mod_projects.R`), so checkpoint cards should
+reuse that idiom rather than invent a second one.
+
+---
+
+### 20. App fails to start on a fresh machine — `plotly` is not installed by the installer — FIXED 2026-08-04
+> "Error running easyanalysis on a uni computer. It loaded but failed: … there is no package
+> called 'plotly' … The fix to use it was to manually install plotly using
+> install.packages("plotly") in Rstudio."
+
+**Diagnosed to the line. Two separate bugs, and the second one is why a missing optional
+package took the whole app down.**
+
+**Bug 1 — `plotly` is in no dependency list.** `launcher/deps.R` declares `core`
+([deps.R:25-32](launcher/deps.R#L25-L32)) and `extras`
+([deps.R:36-40](launcher/deps.R#L36-L40)); **`plotly` appears in neither**. But
+`mod_workspace.R` uses it. So the installer completes successfully, reports `deps: OK`, and
+the app then dies at boot on any machine that does not happen to have plotly already. Every
+fresh install is affected — the reporter's own machine only worked because plotly was already
+in its library.
+
+**Bug 2 — the guard is on the UI but not on the server.** The plotly output is guarded where
+it is *displayed*:
+
+```r
+# mod_workspace.R:771-773
+if (identical(input$cmode %||% "static", "interactive") &&
+    requireNamespace("plotly", quietly = TRUE))
+  plotly::plotlyOutput(ns("chart_i"), height = "100%")
+else plotOutput(ns("chart"), height = "100%")
+```
+
+…and then unguarded where it is *bound*:
+
+```r
+# mod_workspace.R:1478
+output$chart_i <- plotly::renderPlotly({ ... })
+```
+
+That line runs unconditionally as soon as `workspaceServer` is created, so `::` triggers
+`loadNamespace("plotly")` and throws — which matches the reported trace exactly
+(`workspaceServer` → `moduleServer` → `callModule` → `loadNamespace` → stop). The graceful
+degradation the `requireNamespace()` guard was written to provide **never gets a chance to
+happen**, because the failure is at server-construction time, not at render time.
+
+**Bug 3 — the cascade, which is also why the error message was confusing.** The second
+reported error, `object 'workspace_ctx' not found` at
+`observeEvent(workspace_ctx$tool_open())`, is **not independent**. In `server.R` that
+observer is registered at **line 1105** while `workspace_ctx` is assigned at **line 1109** —
+a forward reference that normally resolves fine, because the event expression is not
+evaluated until the first flush, by which time the assignment has run. When
+`workspaceServer()` throws, the assignment never completes, so the name is never bound and
+the observer fails on every flush forever. Fixing bug 1 or 2 makes this go away, **but the
+ordering is fragile on its own** and worth swapping regardless.
+
+**Fix, all three parts:**
+1. Add `plotly` to `extras` in `launcher/deps.R` (extras, not core — the static `plotOutput`
+   fallback already exists and is the default mode, so the screen degrades correctly once
+   bug 2 is fixed).
+2. Guard the server binding the same way the UI is guarded, so a missing optional package
+   downgrades the chart instead of killing the workspace.
+3. Move the `observeEvent` in `server.R` to after the `workspace_ctx` assignment.
+
+**This is a strong argument for Round 3 item 8** (session resiliency): one absent optional
+package should never be able to take down the entire analysis workspace.
+
+**Worth auditing while in there:** whether any other `pkg::fn` call sits outside a
+`requireNamespace()` guard for a package that is in `extras` rather than `core`. The same
+shape would fail the same way.
+
+#### Fixed 2026-08-04 — all three parts, plus the audit
+
+1. `plotly` added to `extras` in [launcher/deps.R:39](launcher/deps.R#L39). Extras, not core:
+   the static `plotOutput` fallback is the default mode, so the screen degrades correctly.
+2. [mod_workspace.R:1478](mod_workspace.R#L1478) wrapped in `requireNamespace("plotly")`,
+   matching the guard the UI already had.
+3. The observer in `server.R` moved **after** the `workspace_ctx` assignment.
+
+**The audit found nothing else.** Searching every `output$… <- pkg::render*` binding in the
+repo returns 14 in the live app, and all the rest use `DT`, `leaflet`, `rhandsontable` or
+`shiny` — **all four are `core`**, so they cannot produce this failure. `plotly` was the only
+extras package sitting in an eager binding.
+
+**Verified against a genuinely plotly-free library.** Shadowing `requireNamespace()` was
+tried first and **rejected as unfaithful** — it does not affect how `::` resolves, so the
+control case reported "no error" and proved nothing. The real test builds a shadow library of
+346 directory junctions omitting only `plotly` (the real library is never modified) and runs
+against that:
+
+| check | result |
+|---|---|
+| `requireNamespace("plotly")` | `FALSE` — genuinely absent |
+| CONTROL: old unguarded `plotly::renderPlotly` | **`there is no package called 'plotly'`** — the reported error, reproduced |
+| `workspaceServer` constructs (`cmode = "interactive"`, i.e. plotly explicitly requested) | **TRUE** |
+| `ui.R` + `server.R` source | **TRUE** |
+
+So the control still crashes on the old shape while the guarded app boots — which is the
+only thing that proves the fix rather than the environment.
+
+---
+
+### 21. Semi-supervised LFDA / LLDA, and Capped Norm Threshold — DA methods
+> "Semi-supervised LFDA/LLDA"
+>
+> "**Capped Norm Threshold**"
+
+**Current state, confirmed.** `mod_da.R` offers **7 methods, all fully supervised**
+([mod_da.R:58-60](mod_da.R#L58-L60)): LDA, WLDA, QDA, RLDA, KDA, LLDA (`klaR::loclda`), MMC.
+There is **no LFDA at all** — searching the repo for `lfda` returns only this backlog entry.
+So two of the three asks are new methods, not modifications:
+
+- **LFDA (Local Fisher Discriminant Analysis)** — not present. Distinct from the existing
+  LLDA: LFDA is Sugiyama's local-Fisher criterion, whereas `loclda` is locally-weighted LDA.
+  Naming them clearly matters or the two will be confused in the picker.
+- **Semi-supervised variants** (SELF / SELF-LFDA) — use unlabelled rows alongside labelled
+  ones. **This does not fit the current data contract:** every DA path assumes a complete
+  labelled target column. Semi-supervised means rows with `NA` in the target are *training
+  input*, not rows to drop. **Decide:** does the app treat target-`NA` rows as the unlabelled
+  set, or does the user nominate them explicitly?
+- **Capped Norm Threshold** — the reporter gave no context beyond the name. My reading is the
+  capped-ℓ₂,₁-norm robust variant, where a threshold caps each sample's residual so outliers
+  stop dominating the projection. **Needs confirmation before building** — it is a parameter
+  on a specific formulation, and guessing which one wastes the work.
+
+**Package check needed before any of this:** the `lfda` CRAN package covers LFDA/SELF, but
+`deps.R` would need it added to `extras` and the screen path `requireNamespace()`-guarded —
+**and item 20 above shows the guard has to be on the server binding, not just the UI.**
+
+**Related, already recorded:** the Phase-4 note in CLAUDE.md flags the hidden rare-class
+`min_n` guard in `mod_da.R` as undesirable hidden preprocessing that should be removed so
+users manage class filtering themselves. Worth doing in the same pass, since semi-supervised
+input makes an automatic row-dropping guard even more surprising.
+
+---
+
+### 22. Editing existing data
+> "editing existing data."
+
+**Recorded as reported, but this overlaps work already done and needs one clarification
+before it can be built.** Three plausible readings, and they are very different jobs:
+
+1. **Tabular cell editing** — already fixed in Round 2 B8 (the editable viewer was
+   unreachable from the menu; the entry now opens it, edits persist, and reopening re-reads).
+   If the reporter is still hitting a problem here it is a **new defect on top of that fix**
+   and needs its own reproduction.
+2. **Structural edits** — add/remove rows and columns. This is **Round 3 item 1**, still open.
+3. **Editing spatial layer attributes or geometry** — QGIS-style edit mode on a vector layer.
+   This is genuinely new; nothing in `mod_raster.R` or the vector path supports it.
+
+**Recommend asking which one before starting**, rather than building the intersection.
+Reading 3 is by far the largest and would not be discharged by finishing Round 3 item 1.
+
+---
+
+### 23. Show that something is running, everywhere — GLOBAL SIGNAL BUILT 2026-08-04
+> "some way to show that something is running so that the user does not think the system does
+> not work."
+
+**Confirmed as a real gap, and measured.** Only **12 of the 42** `mod_*.R` files use
+`withProgress` or `Progress$new`: `mod_algo`, `mod_chat`, `mod_classification`,
+`mod_climate_trend`, `mod_gam`, `mod_lidar`, `mod_lme`, `mod_ntl`, `mod_rf`, `mod_rs_search`,
+`mod_surface`, `mod_workspace`.
+
+**Every remaining model screen shows nothing at all while it computes** — including
+`mod_da`, `mod_svm`, `mod_dtree`, `mod_xgboost`, `mod_clustering`, `mod_linear_regression`,
+`mod_anova`, `mod_logistic`, `mod_pca`, `mod_sem`, `mod_bayesian`, `mod_survival`,
+`mod_timeseries` and `mod_tests`. On a slow fit the app looks frozen, which is exactly the
+report.
+
+**This is the same underlying problem as G28**, where curvature "running in a loop" turned out
+most likely to be a large DEM with no visible progress — and the conclusion there was
+explicit: *"the user needs to see progress and be able to stop, not to have curvature made
+10% faster."*
+
+**Do not solve this per module.** Two constraints make a global approach the right one:
+
+- **Shiny is single-threaded** (established in G29), so an in-process fit blocks the session
+  and a server-rendered spinner cannot animate during it. A **client-side** indicator driven
+  by Shiny's own busy state is the only thing that works during a blocking computation.
+- Shiny already emits `shiny-busy` on `<html>` and `recalculating` on each output. A global
+  CSS/JS overlay keyed off those needs **zero per-module wiring** and covers all 42 screens at
+  once — the same "fix it once in CSS rather than 51 times in R" reasoning that settled
+  round-1 item 3, and the same pattern as the existing global plot-download hover overlay.
+
+**Then, on top of that**, add real `withProgress` to the heavy screens where the work has
+nameable stages — but "real info and not assumed info", the constraint the reporter set in
+round-1 item 1: the step must advance on work actually finished, never on a timer.
+
+**Relationship to G29:** heavy algorithm runs already have both a status line and a working
+Stop button via `compute_worker.R`. This item is about everything that never got routed
+through the worker — in-process fits, which is most of the app.
+
+#### Built 2026-08-04 — the global "Running…" pill
+
+**A promise the code had already made and not kept.** `ui.R` sets
+`--shiny-fade-opacity: 1` and `.recalculating { opacity: 1 !important }`, deliberately
+turning OFF Shiny's own dimming — because at startup ~40 modules recalculate at once and the
+whole page greyed out. The comment justifying that trade says feedback comes instead from
+"the boot overlay + Running pill". **The Running pill did not exist** — searching the repo
+for it returns only that comment. So the app had *less* running-feedback than stock Shiny on
+the 30 screens with no `withProgress()`, which is precisely the reported symptom.
+
+**Built as `#ea-busy`** ([ui.R](ui.R)): a small pill, bottom-left, driven entirely by the
+`shiny-busy` class. Bottom-**left** because the Co-Pilot panel occupies the right
+(`position: fixed; right: 0; width: 460px`).
+
+**Why client-side CSS and not a Shiny output.** Shiny is single-threaded (established in
+G29), so while an in-process fit runs, the server cannot render, send, or animate anything —
+a server-driven spinner is exactly the thing that cannot work here. The browser is a separate
+process and keeps painting, so a CSS animation toggled by a class is the only mechanism that
+moves while R is blocked. It also needs no per-module wiring, which is what makes one change
+reach all 42 screens.
+
+**Verified the mechanism rather than assuming it:** `shiny.min.js` contains
+`$(document.documentElement).addClass("shiny-busy")` — so the class really does land on
+`<html>`, which is what the selector keys off.
+
+**Honest by construction:** it is shown by Shiny's real request state, never a timer, so it
+cannot report work that is not happening — the "real info and not assumed info" constraint
+from round-1 item 1. The 400ms delay applies only on the way in (it sits on the
+`.shiny-busy` rule, so it stops applying the instant the class is removed), meaning fast
+round-trips never flash it and hiding is immediate.
+
+**Also extended the existing skeleton shimmer to `.ea-wsx-modcanvas`**, which is where the
+model screens render — without it, the screens this item is about showed nothing at all.
+
+Reduced-motion is handled without losing the signal: the pill still appears, only the spin
+and the fade stop.
+
+**Verified in the actually-served page** (app running, `curl` of the real response, 207 KB):
+`id="ea-busy"`, the `html.shiny-busy #ea-busy` rule, and the new modcanvas shimmer selector
+are all present, and the pill sits after `#ea-boot` in the DOM so the boot-overlay
+suppression selector resolves.
+
+**NOT verified, and worth stating plainly:** no browser automation is available in this
+environment, so I have **not watched the pill appear during a real slow fit**. The class
+mechanism, the markup, the CSS and the DOM order are all confirmed; the visual result is not.
+Note also gotcha 24 — measuring this in a non-compositing pane would lie, so a real browser
+is the only honest check.
+
+**Still open (the second half of this item):** real `withProgress()` on the heavy screens
+that have nameable stages. The pill says *something* is running; it cannot say *what*, and on
+a genuinely long fit that is not enough.
+
+---
+
+### 24. Release notes on the site, updating automatically
+> "to add a release notes on out site that updates automatically"
+
+**The content already exists and is good.** `CHANGELOG.md` holds **29 versioned entries**
+with a consistent structure (`## vMAJOR.MINOR.PATCH — date`, then `### Fixed` / `### Added`
+sections), and the version is single-sourced in
+[global.R:12](global.R#L12) (`APP_VERSION <- "0.8.1"`), shown in the app's status bar and
+About panel. So this is a **publishing** problem, not a writing one.
+
+**What is missing, checked:**
+
+- `landing/index.html` contains **no** reference to a release, a changelog, or a version —
+  the site never tells a visitor what changed or even which version is current.
+- There is **no `.github/workflows` directory at all** — the repo has no CI, so there is
+  currently nothing that could run on push.
+- `landing/vercel.json` is a pure static deploy: `"buildCommand": null`,
+  `"outputDirectory": "."`. Nothing transforms anything at deploy time today.
+- `CHANGELOG.md` lives in the **repo root**, not in `landing/`, so Vercel does not deploy it.
+
+**The uncomfortable finding this surfaced, which matters more than the plumbing.** The newest
+changelog entry is **v0.8.1 — 2026-07-29**, but Round 3 and Round 4 landed fixes dated
+**07-30, 07-31 and 08-04** (items B6, B8, C9, C14, D17, round-3 7/9/10/14, round-4 20/23 and
+the 18 defect half). **None of them are in the changelog, and `APP_VERSION` is still 0.8.1.**
+So "updates automatically" would currently publish a page that is already several days and
+roughly a dozen fixes behind.
+
+**Decide this first, because it determines whether the feature is worth building:** is
+`CHANGELOG.md` going to be kept current as part of finishing work? Automating publication of
+a stale source just makes the staleness public and puts it on the front page. The
+release-notes page and the "bump `APP_VERSION` + add a changelog entry" habit have to ship
+together, or this is worse than no page at all.
+
+**Three ways to do the publishing, with the real trade-off stated:**
+
+| approach | needs | cost |
+|---|---|---|
+| **A. Build step** — convert `CHANGELOG.md` → `landing/release-notes.html` at deploy | a `buildCommand` in `landing/vercel.json` | gives up the zero-toolchain static deploy; fully static output, fastest page |
+| **B. Client-side fetch** — page fetches raw `CHANGELOG.md` from GitHub and renders it | nothing in the repo | no build step at all, but the page breaks if GitHub is unreachable, and needs a Markdown renderer inlined (the site has no bundler) |
+| **C. GitHub Action** — regenerate the HTML on push to `main` and commit it | a first `.github/workflows` | keeps the deploy static AND the page always current; adds CI to a repo that has none |
+
+**Recommend C**, with A as the fallback. C keeps `landing/` a plain static directory (which
+is what makes the installer one-liners work today, see item 16) while guaranteeing the page
+matches `main`. B is tempting because it needs nothing, but a release-notes page that fails
+when GitHub hiccups is exactly the kind of thing nobody notices is broken.
+
+**DECIDED 2026-08-04 — approach C, but DEFERRED to a later session.**
+
+> "did you add the change log and github actions so that the page is automatically updated?"
+> … "we can keep that for another session."
+
+So the blocking question above is answered — **`CHANGELOG.md` will be kept current**, and the
+page is to be generated and published automatically via a **GitHub Action**. The work itself
+is deliberately held for a separate session.
+
+**State when picking this up:** the `CHANGELOG.md` entry side has started (v0.8.2 added
+2026-08-04, and it names the v0.8.1→v0.8.2 gap rather than hiding it). **Not built:**
+`landing/release-notes.html`, the generator, the workflow, and the nav link. Note the repo
+still has **no `.github/workflows` directory at all**, so this would be its first — and
+`landing/vercel.json` is a pure static deploy (`buildCommand: null`), which approach C
+deliberately preserves.
+
+**Also worth doing once the page exists:**
+
+- Link it from the app — a "What's new" entry near the version already shown in the status
+  bar / About panel, so users who never visit the site still see it.
+- An anchor per version (`#v0-8-1`) so a support answer can point at one release.
+- Pairs with **item 17** (documentation + tours), which is the other "users do not know what
+  this app does" gap and wants the same nav slot on the landing page.
+
+---
+
+### 26. A "Code editors" menu — mini R terminal, full RStudio, Python, Jupyter
+> "improving the rconsole. if we can, we should rename the current r terminal as mini R
+> terminal. and if possible, we can have the full R studio view (no need to redesign, we just
+> get it. so we can have a top menu option for only code editors, Python, Jupyter Notebook,
+> R Code"
+
+**Four asks of very different size.** They are listed here smallest first, because the first
+one is worth doing on its own and the last two may not be doable at all under this app's
+install promise.
+
+**Grounding facts, checked:**
+
+- `mod_rconsole.R` is 469 lines and its editor is a plain **`textAreaInput`** — not Ace, not
+  CodeMirror, not Monaco. There is no code editor in this app today.
+- The label "R Console" appears in **`ui.R` (5 places)** and **`mod_workspace.R` (2)**.
+- **No Python integration exists.** The only `reticulate`/Python references are in
+  `mod_gee.R`, which is **deliberately un-wired** precisely because "rgee needs Python + a
+  GEE account" (CLAUDE.md).
+
+**1. Rename to "mini R terminal" — trivial, and do it.** ~7 label sites. It also sets the
+right expectation, which is the real value: the current screen is a small scratchpad, and
+calling it that stops it being judged as a failed IDE.
+
+**2. Make it a real editor — the actual prerequisite.** Three already-open console items
+(**C11** run line-by-line, **C12** script tabs, **C13** environment pane) are all blocked on
+the same thing: a `textAreaInput` has no notion of a current line, a selection, or a gutter.
+`shinyAce` or a Monaco/CodeMirror binding would unblock C11-C13 **and** be the "R Code"
+editor this item asks for. **This is the highest-value piece in the whole item** and should
+be settled before anything below it.
+
+**3. "Full RStudio view … we just get it" — the honest constraint.** This cannot be embedded:
+
+- **RStudio Desktop** is a native app. It cannot be put in an iframe. The most that is
+  possible is *launching* it as a separate process pointed at the project folder — which is
+  not a view inside the app, though it may be exactly what is wanted.
+- **RStudio Server** *can* be iframed, but there is **no Windows build** — it is Linux-only,
+  so on the primary target platform it would mean WSL or Docker. That breaks the install
+  promise this app is built on ("no toolchain, no admin"; `deps.R` goes out of its way to use
+  CRAN binaries so no compiler is ever needed). Shipping Docker to get an editor would be the
+  single biggest regression to the product's main advantage.
+- **Positron / VS Code Server** are the realistic middle ground if a full IDE in the browser
+  is genuinely wanted, but that is adopting a second large dependency, not "just getting it".
+
+**Recommend:** a **"Open in RStudio"** button that launches the user's own installed RStudio
+on the project folder, plus doing (2) properly so the in-app editor is good enough for most
+work. State plainly that an embedded RStudio is not on the table.
+
+**4. Python and Jupyter — decide the product question first, not the technical one.** Both
+require a **Python toolchain on the user's machine**, which the app currently guarantees is
+not needed. Jupyter additionally needs a local server running and its framing headers relaxed
+before it could be shown in a panel. This is the same wall `mod_gee.R` hit and was shelved
+for. It is *possible* (item 12 already sketches a `reticulate` sidecar), but it changes what
+EasyAnalysis promises at install time — from "one installer, no toolchain" to "install Python
+too". **That is a positioning decision, and it should be made deliberately rather than
+arrived at by adding a menu.**
+
+**Suggested split:** ship 1 + 2 as one piece of work (rename + real editor, which also closes
+C11-C13); treat 3 as a launcher button; and hold 4 until the toolchain question is answered.
+
+---
+
+### 27. Remove the Co-Analyst suggestion chips
+> "to remove that suggestions."
+
+**Read as: the clickable suggestion chips in the Co-Analyst panel.**
+`mod_chat.R` renders `uiOutput(ns("suggestions"))` ([mod_chat.R:337](mod_chat.R#L337)),
+builds the chips in `output$suggestions` ([:422-428](mod_chat.R#L422-L428)) and sends the
+chosen prompt via `observeEvent(input$suggest, ...)` ([:480](mod_chat.R#L480)). Removing them
+is those four sites plus the `.chip` CSS ([:279-280](mod_chat.R#L279-L280)).
+
+**This is consistent with a rule the system prompt already enforces**, which is why the
+reading is probably right: the prompt at [mod_chat.R:175](mod_chat.R#L175) already says
+*"Do NOT volunteer 'best next step' suggestions, recommend switching variables, or propose
+alternative…"*. The chips are the last place the app still volunteers a next step, so
+removing them makes the UI agree with the instructions the model is given.
+
+**RESOLVED 2026-08-04 — it is the chips, and Recommend STAYS.** Asked which of the two was
+meant; the answer was explicit:
+
+> "keep the recommend feature. for now, only how the table is styled in the recommend should
+> be used. keep it for now."
+
+So `mod_recommend.R` is **not** touched by this item, and is in fact now a *reference* for
+item 28. Scope is exactly the four chip sites above.
+
+---
+
+### 28. "dbl" means nothing to users — spell the column types out
+> "in the dataset summary area, users do not understand what dbl is. i think we should go
+> with the regular style. same as the table in the Co-analyst view."
+
+**Located.** `.tlbl()` in [mod_data.R:1119-1127](mod_data.R#L1119-L1127) is the only place
+these come from, and it is a small closed set — so this is a one-function change:
+
+| current | proposed |
+|---|---|
+| `dbl` | number / numeric |
+| `int` | whole number / integer |
+| `fct` | category / factor |
+| `chr` | text |
+| `lgl` | true/false / logical |
+| `date` | date (already fine) |
+
+These are **tibble/pillar abbreviations**. They are conventional to R users and opaque to
+everyone else — and this app's whole point is that the user does not have to write code, so
+the audience is exactly the group that has never seen `<dbl>`.
+
+**Decide:** plain-English words ("number", "text", "category") or the full R class names
+("numeric", "character", "factor")? The former suits the stated audience; the latter keeps
+the label the same word the rest of the app and the docs use. **Recommend plain English with
+the R name as the tooltip**, so nothing is lost for users who do know R.
+
+**RESOLVED 2026-08-04 — the reference is the Recommend screen's "Data Profile" table.**
+
+> "only how the table is styled in the recommend should be used."
+
+That is [mod_recommend.R:646-667](mod_recommend.R#L646-L667) — a plain
+`tags$table(class = "table table-sm table-hover mb-0")` with a `thead`, four columns
+(**Column · Type · N/A · Profile**), 11-12px type, `3-4px 8px` cell padding and a
+`max-height:260px` scroll box. `mod_recommend.R` is **kept** (see item 27), so it stays
+available as the model.
+
+**SCOPE CORRECTED 2026-08-04 — keep this small.** An earlier draft of this entry proposed
+also rewriting Recommend's own `num`/`cat` labels and extracting a shared labeller for both
+screens. The reporter rejected that:
+
+> "I dont like that you did that … only type needs to be be changed or simplified."
+
+**So the job is exactly two things and nothing else:**
+
+1. **Simplify the Type label** in the dataset summary — `.tlbl()`,
+   [mod_data.R:1119-1127](mod_data.R#L1119-L1127).
+2. **Style that table like Recommend's** — layout and density only.
+
+**Explicitly NOT in scope:** changing `mod_recommend.R`'s own labels, and any shared-labeller
+refactor. Recommend is the *style* reference, not a second thing to fix. Leave it alone.
+
+**Noted for the item 18 sweep, not for this item:** the Recommend table also carries
+hardcoded hex (`#fff8e1`, `#4caf50`, `#e65100`, `#888`, `#555`) and
+`thead(class = "table-light")`, which is overridden nowhere in `ui.R`/`theme.R` and so keeps
+bslib's dark-compiled literal (the `.bg-light` problem from round-1 item 3). Worth knowing if
+its markup is copied, but it is a colour-sweep item and does not belong in this change.
+
+**Sweep note:** `.tcol()` immediately below ([mod_data.R:1128-1130](mod_data.R#L1128-L1130))
+assigns each type a **hardcoded hex** (`#1565c0`, `#2e7d32`, `#33691e`, `#6a1b9a`, `#e65100`,
+`#555`) — a direct hit for the item 18 hardcoded-colour sweep, and one that will not follow
+any theme. Fix both in the same visit.
+
+---
+
+### 29. The Co-Analyst panel must expand, dock, shrink
+> "one key thing is make the co-analystt to expand, dock shrink, and so on."
+
+**Currently a fixed slab.** `.copilot-panel` is
+`position: fixed; top: 46px; right: 0; bottom: 30px; width: 460px`
+([mod_chat.R:244-247](mod_chat.R#L244-L247)) — one size, one place, open or closed. It cannot
+be widened for a long answer or shrunk out of the way, and while open it covers the right
+side of the workspace.
+
+**The app already has both mechanisms this needs — reuse them, do not invent a third:**
+
+- **Drag-to-resize** exists on the workspace side panels (round-1 item 9), and the lesson
+  from that work applies directly: put the width in a **CSS variable**, not an inline width,
+  or the collapse/expand states will throw away whatever size the user chose.
+- **Dock / float / minimize** exists for tool panels — `tool_mode` is already
+  `"dock" | "float" | "min"` with buttons wired at
+  [mod_workspace.R:1615-1617](mod_workspace.R#L1615-L1617). The Co-Analyst should take the
+  same three states and the same control cluster so it behaves like everything else.
+
+**Ties directly to item 30:** if the Co-Analyst becomes a dockable panel, it is one more
+thing competing for the same sidebar — so the two should be designed together rather than the
+Co-Analyst getting a private docking scheme.
+
+---
+
+### 30. The dock holds only one tool — it should hold several
+> "another thing is the side bar for docking only holds one tool then replaces it when we
+> dock another. the goal is for many tools to be docked."
+
+**Root cause found, and it is structural rather than a bug.** The workspace stores exactly
+one tool:
+
+- `current_tool <- reactiveVal(NULL)` — **a single value**
+  ([mod_workspace.R:1513](mod_workspace.R#L1513)), reassigned on every pick
+  ([:1595-1598](mod_workspace.R#L1595-L1598)).
+- `tool_mode <- reactiveVal("dock")` — **one mode shared by that one tool**
+  ([:1607](mod_workspace.R#L1607)).
+
+So docking a second tool cannot add to the dock; it can only overwrite the variable. Nothing
+is going wrong — the state simply has no room for more than one.
+
+**What the change actually is:** `current_tool` becomes an ordered collection of docked
+tools, each carrying its own mode, with one marked active. That is a contained change to the
+state, but it has three consequences worth deciding before touching code:
+
+1. **Several module UIs would be mounted at once.** Module *servers* are bound once at
+   startup and are unaffected, so this is safe in principle — but it must not produce
+   **duplicate output ids** in the DOM. That exact trap already bit this project: the LiDAR
+   screen and the 3D view shared output ids, which is why `lidarPointcloudCanvasUI` was
+   deleted rather than left mountable alongside `lidar3DOnlyUI` (D18 part 2). Any tool that
+   can appear twice, or whose ids overlap another's, breaks.
+2. **The selector re-arm fires per tool open** (`ds_refresh`, gotchas 18 and 26). Opening a
+   second tool bumps it, which re-populates selectors in the tool **already** docked — that
+   could wipe a selection the user has made. This needs testing explicitly; it is the most
+   likely source of a subtle regression.
+3. **Space.** Several docked tools in one column means an accordion, tabs, or a stack with
+   collapse. Given round-1 item 12 established the principle — *clutter you chose is fine,
+   clutter by default is wrong* — docked tools should probably collapse to their titles with
+   one expanded.
+
+**Do this with item 29**, since both change what the right-hand column can hold.
+
+---
+
+### 31. Languages in sync — do step 1 in one language, step 2 in another
+> "languages should kinda be in sync where users can simply use one language to say, step 1,
+> then use another language to do step 2, for example. cus i think the data is saved while we
+> work."
+
+**This is the point of item 26's Python/Jupyter half**, and it is a much better statement of
+it: the value is not "we also have Python", it is **one dataset, several languages, in
+sequence**. Clean in R, model in Python, plot back in R — without exporting and re-importing
+between each step. Read them together; 26 is the surface, this is the requirement.
+
+**"the data is saved while we work" is correct, and it is why this is feasible at all.**
+Datasets live in `dataset_pool` and are persisted to the project (`datasets.rds`), so there
+already **is** a single shared store for tabular data. A second language does not need a
+parallel world — it needs read/write access to that same pool. The R console already works
+exactly this way: it reads the pool, and `df <- ...` writes back to the selected dataset
+(C9).
+
+**Where it is genuinely hard, stated honestly:**
+
+- **Tabular data crosses cleanly.** `reticulate` converts data.frame ↔ pandas, so the
+  R-console contract ("your result goes back to the pool") extends to Python almost directly.
+- **Spatial objects do NOT.** A `terra` SpatRaster is a **C++ pointer** — this is already
+  established in G29, which is why the compute worker passes *paths, not objects*. The same
+  applies here, and the same solution works: hand Python a **file path**, not the object.
+  `sf` and tabular data serialise; LAS is expensive to copy. So the sync boundary is
+  "tabular in memory, spatial by path".
+- **Model objects do not cross at all.** An `lm` fitted in R is not usable in Python and vice
+  versa. So "step 2 in another language" means the **data** carries over, not the fitted
+  state. Say that plainly in the UI or users will expect otherwise.
+
+**The prerequisite is unchanged and is the real decision:** Python has to exist on the
+machine, which today's installer deliberately does not require (item 26 part 4). **Nothing
+here should be built until that positioning question is answered** — the sync design is the
+easy half.
+
+**Sequencing note:** item 19 (Steps/Checkpoints) is the natural home for this. If a step
+already records "what was run, on what data", then "which language ran it" is one more field
+on a step, and the two features reinforce each other instead of being built twice.
+
+---
+
+### 32. Multi-step undo — up to 5
+> "multi step undo. could be undo up to 5 times."
+
+**Currently exactly one step**, and the code says so itself —
+[mod_data.R:268](mod_data.R#L268):
+
+```r
+prev_state <- reactiveVal(NULL)  # one-step undo snapshot
+```
+
+`snap()` ([:271](mod_data.R#L271)) overwrites that single slot, and it is called at the top
+of **~14 mutating handlers**. The undo handler ([:292-299](mod_data.R#L292-L299)) restores it
+and then sets it back to `NULL`, so a second undo reports "Nothing to undo."
+
+**The change is small and well-shaped**, precisely because `snap()` is already the one choke
+point every mutation goes through:
+
+- `prev_state` becomes a **bounded stack** (a list, newest last, capped at 5).
+- `snap()` pushes and trims to the cap; undo pops.
+- The button should say how many steps remain, or it will look broken at the sixth press —
+  which is the same complaint as item 23 (the app must not look dead).
+
+**Cap it, and cap it deliberately.** 5 snapshots of a data frame is 5 full copies in memory.
+This project has been bitten by exactly this before — the project-load cache was **bounded at
+4 entries** specifically because an unbounded cache of large objects is how the app OOM-ed
+previously (round-1 item 1, CLAUDE.md `.read_las_capped`). So 5 is a sensible number, but the
+bound must be enforced rather than assumed, and it should be a named constant next to the
+stack.
+
+**Decide:** does undo cover **only the Data screen**, or the R console too? Today it covers
+Data only, and C9 already flagged the gap — *"Undo in the Data screen still covers edits made
+there, not console edits"* — which matters more now that a console assignment can overwrite a
+dataset in place. A shared undo stack on `dataset_pool` would cover both, but is a bigger
+change than extending `mod_data.R`'s.
+
+**Related:** "Reset to Raw Data" (round-3 item 5, still open) is the unbounded version of the
+same idea and should be scoped to the active dataset. Worth doing in one visit.
+
+---
+
+### 33. More statistical analyses, and more inside each one
+> "more and more functionalities in the statistical analyses."
+> "more and more statistical analyses."
+
+**Two asks — deeper existing screens, and more screens — and the second one has an
+architectural problem worth settling before adding the next twenty.**
+
+**Where the app stands today (checked, not assumed):**
+
+- **Tests** (`mod_tests.R`): chi-square, Friedman, Kruskal-Wallis, McNemar, one-sample t,
+  paired t, runs test.
+- **Regression**: `lm`, plus `glm` with **poisson / quasi / binomial** families already
+  living inside `mod_linear_regression.R` ([:117](mod_linear_regression.R#L117),
+  [:135-136](mod_linear_regression.R#L135-L136), [:540](mod_linear_regression.R#L540)) —
+  which is exactly what **E22** wants separated.
+- **Mixed models**: `nlme::lme` only — Gaussian, no `family` argument (see item 34).
+- **Multivariate / ML**: DA, PCA, clustering, classification, RF, XGBoost, decision tree,
+  SVM, neural net.
+- **Specialised**: survival, SEM (`lavaan`), Bayesian, GAM (`mgcv`), time series, climate
+  trend, wind.
+
+**Visible gaps, as candidates rather than a decision:** ordinal regression (`MASS::polr`),
+robust regression (`MASS::rlm`), quantile regression (`quantreg`), GLMM (item 34), GEE,
+zero-inflated / negative-binomial counts, repeated-measures ANOVA and MANOVA, post-hoc
+beyond Tukey, effect sizes and power analysis, mediation/moderation, meta-analysis. **Ask
+which of these the actual users need** — this list is derived from what is absent, not from
+demand, and building all of it would be worse than building the right five.
+
+**The architectural point, and the reason not to just start adding modules.** This project
+already learned this lesson once, in D18: spatial operations used to be bundled inside
+screens, and were turned into **data** — `algorithms.R` holds one spec per operation
+(`id, label, group, inputs, params, run`) and `mod_algo.R` renders and runs any of them. The
+payoff was explicit: *"Adding an operation is a list in `algorithms.R` and nothing else"*,
+and cancellation (G29) then became one change instead of 33.
+
+**Statistical analyses have had no equivalent move.** Each is a hand-written module —
+~35 of them — so "more and more analyses" means more and more modules, each repeating its own
+selectors, its own view switching, its own result panes, and each one a fresh chance to
+reintroduce gotchas 18/26 (which have already produced empty dropdowns on *four* screens).
+
+**So decide first: is there a `statistics.R` registry?** A spec per method
+(response/predictor roles, family, options, `fit()`, and what to render) would make most new
+analyses a list entry and give every screen the same variable picker for free — which is
+**E19 + E20** solved structurally rather than screen by screen. Methods that genuinely do not
+fit the shape (SEM, survival, time series) stay as modules, exactly as
+`mod_suitability.R` stayed out of `algorithms.R` because its criteria list is
+variable-length.
+
+**DECIDED 2026-08-04 — build it.**
+
+> "none for now but we can create it. and others too."
+
+So: no registry exists today, and one should be created — **and the same treatment is wanted
+for other families of screens, not just statistics.** That makes this the structural item the
+rest of Round 4 leans on:
+
+- **E19 + E20** stop being a per-screen job — one picker, declared once by the spec's roles.
+- **Item 34 (GLMM)** becomes an entry plus a fit function, not a module (as far as its
+  parameters fit the shape — its random-effects builder may not; see item 34).
+- **"More and more analyses"** becomes tractable, which is the whole point of the ask.
+- **Gotchas 18/26 stop recurring.** Every new hand-written module is a fresh chance to
+  reintroduce the empty-dropdown bug; a runner that builds selectors with `renderUI` — the
+  way `mod_algo.R` already deliberately does — cannot hit it at all.
+
+**Build it the way `algorithms.R` was built, because that one worked:** a registry of specs
+plus ONE generic runner, proven on a few real entries before anything is migrated. Do **not**
+convert 35 modules up front. `mod_algo.R` is the working reference for the runner, and
+`ea_algorithms()` for the spec shape.
+
+**"More inside each one" is cheaper and can start immediately** — two concrete items are
+already recorded and unbuilt:
+
+- **`uef_evaluation()` is defined, sourced, and called by nothing** (CLAUDE.md gotcha 9). It
+  returns RMSE / R² / Bias / RelBias / RRMSE and was meant for the LM, LME and RF metric
+  cards.
+- **Plain-English interpretations** — the "Future Work Queue" in CLAUDE.md already specifies
+  this with a worked `.interp_ttest()` template. It is the single highest-value addition for
+  the stated audience, who can run a model but not read one.
+
+---
+
+### 34. A very detailed GLMM
+> "a very detailed GLMM analyses."
+
+**Not an extension of the existing screen — the engine cannot do it.** `mod_lme.R` uses
+**`nlme::lme` only** ([mod_lme.R:4](mod_lme.R#L4),
+[:149-150](mod_lme.R#L149-L150), [:213-214](mod_lme.R#L213-L214)), and there is **no `family`
+argument anywhere in the file**. `nlme::lme` fits Gaussian LMMs; it cannot fit binomial,
+Poisson or negative-binomial responses at all. The Co-Analyst's `lme` tool has the same
+limit ([agent_tools.R:272-273](agent_tools.R#L272-L273)).
+
+**Neither `lme4` nor `glmmTMB` is in `launcher/deps.R`** — confirmed against both the `core`
+and `extras` lists. So this needs a dependency added, and **the guard must go on the server
+binding, not just the UI** (CLAUDE.md gotcha 27 — this is exactly how the `plotly` crash took
+down the whole workspace on a fresh machine).
+
+**Engine choice matters and should be made deliberately:**
+
+| engine | strengths | cost |
+|---|---|---|
+| **`lme4::glmer`** | the standard; binomial/Poisson/Gamma; huge literature; `MuMIn` (already a dependency) computes Nakagawa R² from it | no negative-binomial without `glmer.nb`; no zero-inflation; harder crossed-random-effect diagnostics |
+| **`glmmTMB`** | negative-binomial, zero-inflation, dispersion models, spatial/temporal correlation structures | heavier dependency; smaller user base; different summary object to parse |
+
+**Recommend `lme4::glmer` first** — it covers the common cases, pairs with `MuMIn` which the
+app already installs, and matches what the reference workflows (VMI/NFI) would use. Add
+`glmmTMB` later if counts with excess zeros turn up.
+
+**"Very detailed" — what that has to mean here, given what already exists:**
+
+- **Family + link pickers**, and a random-effects builder that can express random intercepts
+  **and** random slopes, nested and crossed — the current screen only offers what `lme`'s
+  `random =` syntax covers.
+- **Convergence handling is not optional.** CLAUDE.md gotcha 7 already records that
+  `nlme::lme` *"frequently fails to converge"* when predictors are on different scales, and
+  `glmer` is worse in this respect. The screen must surface the singular-fit and
+  convergence warnings in plain language and offer the standard remedies (scale predictors,
+  change optimiser) rather than printing a raw error — otherwise this becomes the next
+  "screen that cannot be run".
+- **Diagnostics that suit GLMMs**: `DHARMa` residuals (quantile residuals — ordinary residual
+  plots are misleading for non-Gaussian GLMMs), overdispersion and zero-inflation checks,
+  random-effect caterpillar plots, ICC, and marginal/conditional R² via `MuMIn`.
+- **`uef_evaluation()`** for the metric card, closing part of gotcha 9 on a new screen rather
+  than retrofitting an old one.
+
+**Scope check before building:** this is the most detailed single analysis in the backlog. It
+is worth confirming whether it should be its own screen or a mode of a combined
+"Mixed models" screen alongside the existing LMM — two screens that differ only by `family`
+would be the same duplication E22 is complaining about on the regression side.
+
+---
+
+### 35. UNRESOLVED FRAGMENT — "the views for the analyses"
+> "the views for the analyses: I dont like that you did that"
+
+Recorded rather than guessed at. The sentence that followed the colon turned out to be a
+**scope objection about item 28's table** (now applied — see item 28), so the words *"the
+views for the analyses"* were left without a statement of their own.
+
+**It may mean nothing, or it may be a real objection to the select-and-split view pattern**
+(round-1 item 12, rolled out across PCA, decision tree, SVM, XGBoost, neural network,
+survival, time series, GAM, wind and Bayesian). That pattern was built to a specific
+principle — *the default is deliberately ONE view; clutter you chose is fine, clutter by
+default is what was wrong* — so if it is now unwanted, that is a significant reversal
+affecting ~10 screens and should not be inferred from a fragment.
+
+**Ask before acting.**
+
+1. **Item 20 (`plotly`)** — first, and not close. It is a **fresh-install blocker**: every
+   new user hits it, the installer reports success, and the failure only appears at boot.
+   Small, fully diagnosed, three concrete edits.
+2. **Item 23 (busy indicator)** — global, cheap via `shiny-busy`, and it makes every other
+   slow thing in the app stop looking broken. Also partly closes G28.
+3. **Item 18 defect half** (native `<select>` popups via `color-scheme`) — measurable, small.
+   Hold the taste half until the reporter says what "inconsistent" means.
+4. **Item 22** — ask which of the three readings is meant; it may already be Round 3 item 1.
+5. **Item 21** — confirm what "Capped Norm Threshold" refers to, and decide how unlabelled
+   rows are nominated, before writing any DA code.
+6. **Item 19 (Steps + Checkpoints)** — largest, greenfield, and needs the copy-vs-reference
+   decision settled first. Steps before Checkpoints.
+7. **Item 24 (release notes)** — small once the approach is chosen, but do **not** start it
+   before deciding whether `CHANGELOG.md` will be kept current. It is already ~12 fixes
+   behind, and publishing that automatically would put the gap on the front page.
+8. **Item 25 (black & white theme)** — small and self-contained once the greyscale-vs-
+   high-contrast question is answered. Do it **before** the item 18 sweep, so the new set is
+   swept in the same pass instead of becoming the next thing that needs one.
+9. **Item 18 full sweep** — the static hardcoded-colour pass (scriptable, like
+   `check_plot_views.R`) and the per-mode runtime measurement, across all 6 sets (7 with
+   item 25). Last, because it should only be done once.
+
+10. **Item 26 parts 1+2** — rename to "mini R terminal" and give it a real code editor. Worth
+    pulling forward: the editor is the thing blocking **C11, C12 and C13**, so one piece of
+    work closes four entries. Parts 3 and 4 (embedded RStudio, Python/Jupyter) are blocked on
+    a positioning decision, not effort.
+
+**Round 4 additions from 2026-08-04 (items 27-30):**
+
+- **Item 28 (spell out `dbl`)** — smallest useful change in the whole backlog: one function,
+  `.tlbl()`. Do it with the item 18 sweep, because `.tcol()` right beneath it is hardcoded
+  hex. Pin down the reference table first.
+- **Item 27 (remove suggestion chips)** — four sites, but **confirm which "suggestions"** is
+  meant before deleting; `mod_recommend.R` is the other candidate and is a far bigger removal.
+- **Items 29 + 30 together (Co-Analyst expand/dock/shrink, multi-tool dock)** — both change
+  what the right-hand column holds, so designing them separately would mean two competing
+  docking schemes. 30 is the deeper one: `current_tool` is a single `reactiveVal`, so the
+  state has no room for a second tool. Watch the duplicate-output-id trap (D18 part 2) and
+  the `ds_refresh` re-arm (gotchas 18/26) wiping selections in an already-docked tool.
+- **Item 32 (5-step undo)** — small and well-shaped: `snap()` is already the single choke
+  point all ~14 mutations pass through, so it is one stack plus a cap. Do it with round-3
+  item 5 (scope "Reset to Raw Data" to the active dataset) — same surface, one visit.
+- **Item 31 (multi-language sync)** — do **not** treat as separate from item 26 part 4. It is
+  the *requirement* that Python half exists to serve, and both are blocked on the same
+  toolchain decision. If it goes ahead, build it on item 19's steps rather than beside them.
+
+**Round 4 additions from 2026-08-04 (items 33-35):**
+
+- **Item 33 (more statistics)** — the "more inside each screen" half can start today:
+  `uef_evaluation()` is written and called by nothing (gotcha 9), and the plain-English
+  interpretation templates are already specified in CLAUDE.md's Future Work Queue. The "more
+  screens" half should **not** start until the registry question is settled, or every new
+  analysis is another hand-written module.
+- **Item 34 (GLMM)** — needs a new engine (`lme4`) and a new dependency before any UI work.
+  Decide first whether it is its own screen or a family mode of the existing Mixed models
+  screen; two screens differing only by `family` is the duplication E22 already objects to.
+- **Item 35** — a fragment, not an item. **Ask what "the views for the analyses" meant**
+  before touching the select-and-split pattern; reversing it would affect ~10 screens.
+
+**Three questions answered 2026-08-04, recorded so they are not re-asked:** the "suggestions"
+to remove are the **Co-Analyst chips**, not `mod_recommend.R` (which is **kept**); the table
+to copy is Recommend's **Data Profile** table, **styling only**; and item 28 is scoped to
+**the Type label alone** — no shared-labeller refactor, and Recommend's own labels stay as
+they are.
+
+**Cheap and high value, from the round-5 check:** the tour engine already exists and carries
+**2 of the 8+** steps asked for, so **F24 + item 17's tour** are content plus one `data-tour`
+attribute per target — not a build. Linking the app to the already-published docs pages is
+the other small piece with nothing in place at all.
+
+**Status after 2026-08-04:** items **20** and **23** (global signal) are done and verified;
+**18**'s defect half is in but its reported symptom is not reproduced. Items **19**, **21**,
+**22** and **24** are all blocked on a decision, not on effort — see each item for the
+specific question.
+
+---
+
+## Round 5 — reconciliation of a re-sent list (2026-08-04)
+
+The reporter re-sent a batch of items with *"i guess some are not documented in backlog…
+it might overlap but we can filter"*. **Filtered: all 24 are already documented, and every
+one of them is a Round 2 entry.** Nothing in that batch is new, so nothing was added from
+it — this table exists so the same list can be checked off next time instead of re-triaged.
+
+**10 fixed · 2 partly fixed · 12 still open.**
+
+| # | Re-sent item (abbreviated) | Entry | Status |
+|---|---|---|---|
+| 1 | black colour on the packages page | A1+A2 | **FIXED** 07-30 |
+| 2 | dataset information not visible in the options | B4 | open |
+| 3 | separate each data & exploration command, keep synced | B6 | **DONE** 07-30 |
+| 4 | card colour and text colour in light mode | A3 | **defect FIXED** 07-30; taste call open |
+| 5 | active dataset does not change when another is clicked | D15 | **FIXED** 07-29 |
+| 6 | `vmi9_transformed <- df %>% mutate(...)` made a new dataset | C9 | **FIXED** 07-30 |
+| 7 | rename how the data is called (`df` for everything) | C10 | open |
+| 8 | result area fills for plots but not other commands | C14 | **FIXED** 07-30 |
+| 9 | run the console line by line, not the whole buffer | C11 | open |
+| 10 | load an R script, terminal-only; editor tabs | C12 | open |
+| 11 | environment view as an adjustable third column | C13 | open |
+| 12 | table scroller / sticky header / smaller type | F23 | **FIXED** 07-30 |
+| 13 | replace "Pick a tool above…" with the tour button, 8+ steps | F24 | open |
+| 14 | export report as PDF | F25 | open |
+| 15 | black colour in Share project / the Project dropdown | A2 | **FIXED** 07-30 |
+| 16 | edit data table does not work | B8 | **FIXED** 07-30 |
+| 17 | complete tab switch; map view should always exist | D16 | **partly** — desync fixed, "map always there" open |
+| 18 | Download spatial data switches away from map view | D17 | **FIXED** 07-30 |
+| 19 | batch apply, positioned on each data-processing tool | B7 | open |
+| 20 | 3D/point cloud opens two views; spatial & LiDAR carry their own | D18 | **DONE** (parts 1-3) 07-29/30 |
+| 21 | variable selection differs per screen (XGBoost, decision tree) | E19 | open |
+| 22 | reuse the existing predictor picker / quick editor | E20 | open |
+| 23 | move "Select Diagnostics to View:" | E21 | open |
+| 24 | separate linear regression from the other regression types | E22 | open |
+
+**Detail recovered from the re-sent wording.** The original E20 entry abbreviated the quote
+with an ellipsis and lost the actual instruction — see E20, now corrected: the ask is to
+**reuse the components that already exist** (the code path and the quick editor), not merely
+to match their appearance.
+
+**The 12 still open cluster into four jobs**, which is the useful way to read the table:
+
+- **Console** (C10, C11, C12, C13) — four separate asks about one screen; worth doing as one
+  piece of work rather than four visits.
+- **Model screens** (E19, E20, E21, E22) — E19+E20 are one shared variable picker; E21 and
+  E22 are small once that exists.
+- **Data** (B4, B7) — dataset info in the options, and batch apply.
+- **Chrome** (F24, F25) — the tour button and PDF export.

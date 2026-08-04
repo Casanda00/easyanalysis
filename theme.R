@@ -57,8 +57,14 @@ ea_theme <- function(p = ea_palette) {
 # The same palette as CSS custom properties, for the hand-written CSS in ui.R.
 # Generated from the list above so the two can never drift apart.
 ea_css_vars <- function(p = ea_palette) {
+  # The default palette is DARK, and a first-time visitor has no
+  # data-ea-theme attribute yet (ui.R only sets it when localStorage holds
+  # one), so :root must declare the scheme itself. Without this the browser
+  # assumes `light` and draws native <select> popups and scrollbars light on
+  # the dark default -- the same unreadable-popup defect, just on first run.
   paste0(
     ":root{\n",
+    "  color-scheme: dark;\n",
     paste0("  --", names(p), ": ", unlist(p), ";", collapse = "\n"),
     "\n}\n"
   )
@@ -70,37 +76,46 @@ ea_css_vars <- function(p = ea_palette) {
 # to the default (forest) values, so a set only states what it changes.
 # Switching is instant and client-side: <html data-ea-theme="light">.
 # ==========================================================================
+# `scheme` is NOT a colour: it becomes the CSS `color-scheme` property, which is
+# the only way to reach UI the PAGE does not paint -- the popup list of a native
+# <select>, scrollbars, and the form controls the OS draws. Styling
+# `.form-select` colours the closed control only; the open popup is drawn by the
+# browser, so on a light theme it stayed light while `option` inherited the
+# page's light `--ink`, i.e. near-invisible text. An `option { color: … }` rule
+# cannot fix this portably (Windows Chrome honours it, Firefox/Safari largely do
+# not); `color-scheme` is the supported lever. Kept here, beside the colours, so
+# a new set cannot be added without declaring which kind it is.
 ea_palettes <- list(
   forest = list(   # default — dark, green-biased neutrals
-    label = "Forest (dark)"
+    label = "Forest (dark)", scheme = "dark"
   ),
   light = list(
-    label  = "Light",
+    label  = "Light", scheme = "light",
     paper  = "#F7F8F4", panel = "#FFFFFF", sunk = "#EEF1EA", bar = "#2E7D32", tint = "#E7F0E7",
     ink    = "#10150F", bark  = "#5C6657", line = "#DCE1D6",
     forest = "#2E7D32", canopy = "#3E9B44", onbrand = "#FFFFFF",
     warn   = "#B37514", danger = "#B23C23"
   ),
   midnight = list( # true black, high contrast
-    label  = "Midnight (black)",
+    label  = "Midnight (black)", scheme = "dark",
     paper  = "#000000", panel = "#0C0F0C", sunk = "#070907", bar = "#0F1A10", tint = "#141A14",
     ink    = "#EDEFEA", bark  = "#8A9487", line = "#242A24",
     forest = "#4CD964", canopy = "#7BE58E", onbrand = "#04140A"
   ),
   ocean = list(    # cool blue-teal dark
-    label  = "Ocean",
+    label  = "Ocean", scheme = "dark",
     paper  = "#0B1013", panel = "#121A1F", sunk = "#0E161A", bar = "#123243", tint = "#16252C",
     ink    = "#E4EDF1", bark  = "#8CA2AC", line = "#243239",
     forest = "#3FB8C4", canopy = "#6FD6DE", onbrand = "#04161A"
   ),
   plum = list(     # deep violet dark
-    label  = "Plum",
+    label  = "Plum", scheme = "dark",
     paper  = "#0F0C13", panel = "#171320", sunk = "#120F18", bar = "#2B1B47", tint = "#221A2E",
     ink    = "#ECE7F2", bark  = "#9D93AC", line = "#2C2438",
     forest = "#A77BE0", canopy = "#C4A4F0", onbrand = "#120A1C"
   ),
   paperwhite = list(  # warm light, low glare
-    label  = "Paper (warm light)",
+    label  = "Paper (warm light)", scheme = "light",
     paper  = "#FAF7F0", panel = "#FFFFFF", sunk = "#F1ECE1", bar = "#3B5D3F", tint = "#EAF0E6",
     ink    = "#1A1712", bark  = "#6B6355", line = "#E0D8C8",
     forest = "#3B7A43", canopy = "#4E9A57", onbrand = "#FFFFFF",
@@ -113,9 +128,15 @@ ea_palettes <- list(
 ea_theme_css <- function(sets = ea_palettes, base = ea_palette) {
   blocks <- vapply(names(sets), function(nm) {
     p <- sets[[nm]]; p$label <- NULL
-    if (!length(p)) return("")                 # default set = :root already
+    # `scheme` is a real CSS property, not a custom property -- pull it out
+    # before the "--name: value" loop below, or it would emit a --scheme var
+    # that nothing reads and the native popups would stay broken.
+    scheme <- p$scheme; p$scheme <- NULL
+    decls <- c(if (!is.null(scheme)) paste0("  color-scheme: ", scheme, ";"),
+               if (length(p)) paste0("  --", names(p), ": ", unlist(p), ";"))
+    if (!length(decls)) return("")             # default set = :root already
     paste0("html[data-ea-theme=\"", nm, "\"]{\n",
-           paste0("  --", names(p), ": ", unlist(p), ";", collapse = "\n"), "\n}\n")
+           paste(decls, collapse = "\n"), "\n}\n")
   }, character(1))
   paste(blocks, collapse = "")
 }
