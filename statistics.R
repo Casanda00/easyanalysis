@@ -51,9 +51,9 @@
 # the runner can build a correct picker without the spec writing any UI.
 #   "numeric" | "categorical" | "ordered" | "count" | "any"
 ea_role <- function(key, label, types = "any", multiple = FALSE,
-                    required = TRUE, hint = NULL)
+                    required = TRUE, hint = NULL, show_if = NULL)
   list(key = key, label = label, types = types, multiple = multiple,
-       required = required, hint = hint)
+       required = required, hint = hint, show_if = show_if)
 
 # A boolean option. algorithms.R has no equivalent because a spatial operation
 # never needed one; a statistical method routinely does (use CV, scale inputs).
@@ -946,6 +946,202 @@ ea_statistics <- function() {
         },
         network_info = card(tags$pre(paste(
           utils::capture.output(print(fit$fit)), collapse = "\n"))))
+    ),
+
+    # ---- PCA / FA / MDS -- MIGRATION 5 of 9 --------------------------------
+    # The first UNSUPERVISED entry: no response role at all, just a set of
+    # variables. That was the shape the registry had not been proven on, which
+    # is why this screen was taken before the remaining supervised ones.
+    #
+    # It also forced one runner change. `pc_x`, `pc_y` and `colour by` are
+    # DISPLAY options -- the module read them inside renderPlot, so changing an
+    # axis redrew instantly. A plot function that declares a third argument now
+    # receives the live parameter values, so flipping PC2 -> PC3 still does not
+    # require a refit. Without that, porting would have been a UX regression on
+    # an exploratory screen.
+    list(
+      id = "pca", label = "PCA / Factor analysis / MDS", group = "Multivariate",
+      summary = paste("Reduce many correlated variables to a few dimensions, and",
+                      "see which variables drive them."),
+      roles = list(
+        ea_role("vars", "Variables", "numeric", multiple = TRUE,
+                hint = "At least 2 numeric columns."),
+        ea_role("colour", "Colour points by", "categorical", required = FALSE,
+                show_if = "input.p_mode == 'pca'",
+                hint = "Optional - groups the score plot.")),
+      params = list(
+        ea_sel("mode", "Method",
+               c("Principal Component Analysis (PCA)" = "pca",
+                 "Factor Analysis (FA)" = "fa",
+                 "Multidimensional Scaling (MDS)" = "mds"), "pca"),
+        ea_chk("scale_vars", "Scale variables (recommended)", TRUE,
+               hint = "Without this, a variable in large units dominates."),
+        ea_num("n_comp", "Components / factors / dimensions", 2, 2, 20, 1),
+        ea_sel("fa_rotation", "Rotation", c("varimax", "promax", "none"), "varimax",
+               show_if = "input.p_mode == 'fa'"),
+        ea_sel("fa_method", "Factor method",
+               c("Maximum likelihood" = "mle", "Principal axis" = "pa"), "mle",
+               show_if = "input.p_mode == 'fa'"),
+        ea_sel("mds_dist", "Distance metric",
+               c("euclidean", "manhattan", "maximum", "canberra"), "euclidean",
+               show_if = "input.p_mode == 'mds'"),
+        ea_num("pc_x", "X-axis component", 1, 1, 20, 1,
+               show_if = "input.p_mode == 'pca'"),
+        ea_num("pc_y", "Y-axis component", 2, 1, 20, 1,
+               show_if = "input.p_mode == 'pca'")),
+      views = c(main = "Main plot", scree = "Scree / variance",
+                loadings = "Loadings", table = "Summary table"),
+      views_plot = c("main", "scree", "loadings"),
+      fit = function(df, r, p) {
+        vars <- r$vars
+        if (length(vars) < 2) stop("Choose at least 2 numeric variables.")
+        nd <- df[, vars, drop = FALSE]
+        nd <- nd[, vapply(nd, is.numeric, logical(1)), drop = FALSE]
+        if (ncol(nd) < 2) stop("At least 2 of the chosen columns must be numeric.")
+        keep <- stats::complete.cases(nd)
+        nd <- nd[keep, , drop = FALSE]
+        if (nrow(nd) < 3) stop("Need at least 3 complete rows; this has ", nrow(nd), ".")
+        sc   <- isTRUE(p$scale_vars)
+        mode <- p$mode %||% "pca"
+        k    <- max(2L, min(as.integer(p$n_comp %||% 2L), ncol(nd) - 1L))
+        # The colour column has to be subset by the SAME complete-case filter as
+        # the data, or it is a different length than the scores.
+        grp <- if (isTruthy(r$colour) && r$colour %in% names(df))
+                 as.factor(df[[r$colour]][keep]) else NULL
+
+        out <- switch(mode,
+          pca = {
+            f <- stats::prcomp(nd, scale. = sc, center = TRUE)
+            list(mode = "pca", fit = f, data = nd, k = k, grp = grp,
+                 var_pct = 100 * f$sdev^2 / sum(f$sdev^2))
+          },
+          fa = {
+            rot <- p$fa_rotation %||% "varimax"
+            if (identical(p$fa_method %||% "mle", "pa")) {
+              f <- stats::prcomp(nd, scale. = sc, center = TRUE)
+              list(mode = "fa_pca_proxy", fit = f, data = nd, k = k, grp = grp,
+                   var_pct = 100 * f$sdev^2 / sum(f$sdev^2), rotation = rot)
+            } else {
+              f <- tryCatch(stats::factanal(nd, factors = k, rotation = rot,
+                                            scores = "regression"),
+                            error = function(e)
+                              stop("Factor analysis failed: ", conditionMessage(e),
+                                   ". Try fewer factors, or Principal axis."))
+              list(mode = "fa", fit = f, data = nd, k = k, grp = grp)
+            }
+          },
+          mds = {
+            dm <- stats::dist(scale(nd), method = p$mds_dist %||% "euclidean")
+            f  <- stats::cmdscale(dm, k = k, eig = TRUE)
+            list(mode = "mds", fit = f, data = nd, k = k, grp = grp)
+          })
+        out$scaled <- sc
+        out
+      },
+      plots = list(
+        # 3 arguments => the runner hands over LIVE parameter values, so the
+        # axis pickers work without a refit.
+        main = function(fit, f, p) {
+          if (fit$mode == "mds") {
+            pts <- fit$fit$points
+            graphics::plot(pts[, 1], pts[, 2], pch = 16,
+                           col = if (is.null(fit$grp)) "#2e7d3288"
+                                 else grDevices::palette.colors(nlevels(fit$grp),
+                                        palette = "Set2")[fit$grp],
+                           xlab = "Dimension 1", ylab = "Dimension 2",
+                           main = "MDS configuration")
+            graphics::abline(h = 0, v = 0, col = "grey70", lty = 2)
+            return(invisible())
+          }
+          if (fit$mode == "fa") {
+            ld <- unclass(stats::loadings(fit$fit))
+            if (ncol(ld) < 2) return(show_placeholder("Need 2+ factors to plot."))
+            graphics::plot(ld[, 1], ld[, 2], type = "n", xlab = "Factor 1",
+                           ylab = "Factor 2", main = "Factor loadings")
+            graphics::abline(h = 0, v = 0, col = "grey70", lty = 2)
+            graphics::text(ld[, 1], ld[, 2], rownames(ld), cex = .85, col = "#2e7d32")
+            return(invisible())
+          }
+          scores <- as.data.frame(fit$fit$x)
+          nc <- ncol(scores)
+          px <- max(1L, min(as.integer(p$pc_x %||% 1L), nc))
+          py <- max(1L, min(as.integer(p$pc_y %||% 2L), nc))
+          cols <- if (is.null(fit$grp)) "#2e7d3288"
+                  else grDevices::palette.colors(nlevels(fit$grp), palette = "Set2")[fit$grp]
+          graphics::plot(scores[, px], scores[, py], pch = 16, col = cols,
+            xlab = sprintf("PC%d (%.1f%%)", px, fit$var_pct[px]),
+            ylab = sprintf("PC%d (%.1f%%)", py, fit$var_pct[py]),
+            main = "PCA score plot")
+          graphics::abline(h = 0, v = 0, col = "grey70", lty = 2)
+          ld <- fit$fit$rotation[, c(px, py), drop = FALSE]
+          rng <- max(abs(scores[, c(px, py)])); s <- rng * .7 / max(abs(ld))
+          graphics::arrows(0, 0, ld[, 1] * s, ld[, 2] * s, length = .08, col = "#c62828")
+          graphics::text(ld[, 1] * s * 1.1, ld[, 2] * s * 1.1, rownames(ld),
+                         cex = .8, col = "#c62828")
+          if (!is.null(fit$grp))
+            graphics::legend("topright", legend = levels(fit$grp), pch = 16, bty = "n",
+              col = grDevices::palette.colors(nlevels(fit$grp), palette = "Set2"))
+        },
+        scree = function(fit, f) {
+          v <- if (!is.null(fit$var_pct)) fit$var_pct
+               else if (fit$mode == "mds") {
+                 e <- fit$fit$eig; e <- e[e > 0]; 100 * e / sum(e)
+               } else NULL
+          if (is.null(v)) return(show_placeholder(
+            "Factor analysis reports uniquenesses rather than a scree curve - see the Summary table."))
+          v <- utils::head(v, 15)
+          graphics::barplot(v, names.arg = seq_along(v), col = "#4caf5099",
+                            border = "#2e7d32", xlab = "Component",
+                            ylab = "% variance", main = "Variance explained")
+          graphics::lines(seq_along(v) * 1.2 - 0.5, cumsum(v), type = "b",
+                          col = "#c62828", lwd = 2, pch = 16)
+          graphics::legend("topright", c("Individual", "Cumulative"),
+                           fill = c("#4caf5099", NA), border = c("#2e7d32", NA),
+                           col = c(NA, "#c62828"), lty = c(NA, 1), lwd = c(NA, 2),
+                           bty = "n")
+        },
+        loadings = function(fit, f) {
+          ld <- switch(fit$mode,
+            fa = unclass(stats::loadings(fit$fit)),
+            mds = NULL,
+            fit$fit$rotation)
+          if (is.null(ld)) return(show_placeholder(
+            "MDS has no loadings - it positions rows, not variables."))
+          m <- t(ld[, seq_len(min(5, ncol(ld))), drop = FALSE])
+          graphics::par(mar = c(8, 4, 3, 2))
+          graphics::barplot(m, beside = TRUE, las = 2, border = NA,
+                            col = grDevices::hcl.colors(nrow(m), "Greens 3"),
+                            main = "Loadings by variable", ylab = "Loading")
+          graphics::abline(h = 0, col = "grey60")
+          graphics::legend("topright", rownames(m), bty = "n",
+                           fill = grDevices::hcl.colors(nrow(m), "Greens 3"))
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        main     = ea_stat_plot(ns, "main",     if (solo) "500px" else "100%"),
+        scree    = ea_stat_plot(ns, "scree",    if (solo) "400px" else "100%"),
+        loadings = ea_stat_plot(ns, "loadings", if (solo) "500px" else "100%"),
+        table    = {
+          d <- switch(fit$mode,
+            fa = {
+              ld <- unclass(stats::loadings(fit$fit))
+              data.frame(Variable = rownames(ld), signif(as.data.frame(ld), 3),
+                         Uniqueness = signif(fit$fit$uniquenesses, 3),
+                         check.names = FALSE)
+            },
+            mds = {
+              e <- fit$fit$eig; e <- e[e > 0]
+              data.frame(Dimension = seq_along(e), Eigenvalue = signif(e, 4),
+                         `% of total` = signif(100 * e / sum(e), 3),
+                         check.names = FALSE)
+            },
+            data.frame(Component = paste0("PC", seq_along(fit$var_pct)),
+                       `SD` = signif(fit$fit$sdev, 4),
+                       `% variance` = signif(fit$var_pct, 3),
+                       `Cumulative %` = signif(cumsum(fit$var_pct), 4),
+                       check.names = FALSE))
+          DT::datatable(d, rownames = FALSE,
+                        options = list(pageLength = 20, scrollX = TRUE))
+        })
     ),
 
     # ---- GLMM (backlog item 34) --------------------------------------------

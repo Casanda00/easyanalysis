@@ -2408,27 +2408,34 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**4 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** · gam ·
-pca · survival · anova · rf.
+**5 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
+**pca ✅** · gam · survival · anova · rf.
 
-**Running score: 4 screens migrated, 5 latent bugs found — one in EVERY screen so far.** Every
-port has been bit-for-bit faithful AND turned up something broken that nobody had noticed.
-That is the strongest argument for finishing: these screens are not being exercised, and
-porting is what exercises them.
+**Running score: 5 screens migrated, 5 latent bugs.** PCA is the first port that found
+**nothing wrong** — worth recording, because it is evidence the bug rate is about *what kind*
+of screen it is, not about the codebase being uniformly rotten. The four buggy ones all had
+hand-rolled cross-validation loops; PCA has none. **That sharpens the prediction for the
+remaining four:** `gam` and `rf` have CV loops and should be treated as suspect; `anova` and
+`survival` do not, and may well be clean.
 
-| screen | latent bug found |
-|---|---|
-| XGBoost | two `xgboost` 3.x API breaks — the screen errored on Run |
-| SVM | cross-validation never produced a result, ever (silent per-fold failure) |
-| Decision tree | validation scored rpart's DEFAULT tree, not the configured one |
-| Neural network | both CV loops hardcoded `maxit = 200`, ignoring the user's setting |
+Every port has been bit-for-bit faithful, and four of the five turned up something broken
+that nobody had noticed. That remains the strongest argument for finishing: these screens are
+not being exercised, and porting is what exercises them.
 
-**The per-fold-refit pattern is now confirmed in THREE of four screens** and should be
-treated as the default suspicion, not a surprise. SVM's refits ignored cost, gamma and
-scaling; decision tree's ignored every `rpart.control` setting; neural network's ignored
-`maxit`. In each case the validation measured a *different model than the one on screen* —
-and only SVM's failed visibly. **Check this first in `gam` and `rf`**, which still have their
-own CV loops.
+| screen | latent bug found | had a hand-rolled CV loop? |
+|---|---|---|
+| XGBoost | two `xgboost` 3.x API breaks — the screen errored on Run | no (a package API moved) |
+| SVM | cross-validation never produced a result, ever (silent per-fold failure) | yes |
+| Decision tree | validation scored rpart's DEFAULT tree, not the configured one | yes |
+| Neural network | both CV loops hardcoded `maxit = 200`, ignoring the user's setting | yes |
+| **PCA** | **none — clean** | **no** |
+
+**The per-fold-refit pattern is confirmed in every screen that has one** — three for three —
+and should be the default suspicion rather than a surprise. SVM's refits ignored cost, gamma
+and scaling; decision tree's ignored every `rpart.control` setting; neural network's ignored
+`maxit`. In each case the validation measured a *different model than the one on screen*, and
+only SVM's failed visibly. **Check this first in `gam` and `rf`**, the two remaining screens
+with their own CV loops. `anova` and `survival` have none and may well be clean, like PCA.
 
 **Why it keeps happening:** every one of these loops re-derives its settings from the FITTED
 object (`res$fit$kernel`, `res$fit$decay`) or hardcodes them, instead of using the parameters
@@ -2543,6 +2550,38 @@ module's own best-of-`n_init` restart loop, for regression and classification, i
 non-default architecture (`size = 9, decay = 0.2, maxit = 150, n_init = 2, scale_x = FALSE`
 all changed together). A regression network now refuses a categorical response with a clear
 message rather than failing inside `nnet`; all 3 views render for both task types.
+
+##### Migration 5 — PCA / FA / MDS (2026-08-04)
+
+**Taken fifth on purpose: the first UNSUPERVISED entry.** No response role at all, just a set
+of variables plus an optional grouping column — the one spec shape the registry had not been
+proven on. Better to find a gap here, with four screens still ahead, than after four more
+same-shaped ports. **No gap was found in the role model**, but the port did force one runner
+change (below).
+
+**No latent bug — the first clean port.** Worth recording as evidence rather than treating the
+earlier four as proof the codebase is uniformly rotten: PCA has **no hand-rolled CV loop**,
+which is the thing all four buggy screens shared.
+
+**The runner change it forced: live display parameters.** `pc_x`, `pc_y` and "colour by" are
+*display* options — the module read them inside `renderPlot`, so changing an axis redrew
+instantly. `render(fit, key, solo, ns)` has no access to inputs, so a naive port would have
+required pressing Run again to look at PC3 instead of PC2 — a real regression on an
+exploratory screen. A plot function that declares a **third argument** now receives the live
+parameter values. Existing two-argument plots are untouched (same tolerant dispatch as `ns`).
+
+**Also added `show_if` to roles**, not just parameters, so "Colour points by" appears only for
+PCA and not for FA or MDS.
+
+**Parity verified against the underlying functions directly** rather than a re-implementation:
+identical `sdev`, `rotation` and scores versus `prcomp`; identical points versus `cmdscale`;
+identical uniquenesses versus `factanal`. The scale flag is honoured (scaled and unscaled
+verified to differ). The NA row in the fixture is dropped, and the colour column is subset by
+the same complete-case filter so it stays aligned with the points.
+
+**One improvement:** factor analysis with more factors than the variables support used to
+surface R's bare `2 factors are too many for 4 variables`. It now names the failure and says
+what to try (fewer factors, or Principal axis) — verified by the guard test.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

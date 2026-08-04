@@ -1542,7 +1542,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       da             = list(nm = "Discriminant analysis", grp = "Machine Learning", tools = daToolsUI,   canvas = daCanvasUI),
       clustering     = list(nm = "Clustering",          grp = "Machine Learning", tools = clusteringToolsUI, canvas = clusteringCanvasUI),
       classification = list(nm = "Classification",      grp = "Machine Learning", tools = classificationToolsUI, canvas = classificationCanvasUI),
-      pca            = list(nm = "Dimension reduction (PCA)", grp = "Machine Learning", tools = pcaToolsUI, canvas = pcaCanvasUI),
+      # pca RETIRED 2026-08-04: it is a statistics.R entry now (stat_pca).
       # --- Spatial & LiDAR ---
       raster         = list(nm = "Raster & vector analysis", grp = "Spatial & LiDAR", tools = rasterToolsUI,  canvas = rasterCanvasUI, map_based = TRUE),
       # NOTE: "Surface models" is gone. It bundled DTM / DSM / CHM / nDSM behind

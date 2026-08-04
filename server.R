@@ -978,7 +978,7 @@ server <- function(input, output, session) {
   # New statistical modules
   desc_ctx  <- descriptiveServer("descriptive", dataset_pool, active_dataset)
   test_ctx  <- testsServer("tests", dataset_pool, active_dataset)
-  pca_ctx   <- pcaServer("pca", dataset_pool, active_dataset)
+  # pcaServer is NOT bound: it is a statistics.R entry now (stat_pca).
   ts_ctx    <- timeseriesServer("timeseries", dataset_pool, active_dataset)
   surv_ctx  <- survivalServer("survival", dataset_pool, active_dataset)
   sem_ctx   <- semServer("sem", dataset_pool, active_dataset)
@@ -1135,7 +1135,7 @@ server <- function(input, output, session) {
     rf = rf_ctx,
 
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
-    pca = pca_ctx, timeseries = ts_ctx,
+    timeseries = ts_ctx,
     pointcloud = lidar_ctx, metrics = lidar_ctx,
     raster = raster_ctx, rs_search = rs_ctx,
     suitability = suit_ctx, land_classify = land_cls_ctx,

@@ -8,6 +8,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.5 — 2026-08-04
+
+### Changed
+- **PCA / Factor analysis / MDS is now a registry entry** (migration 5 of 9), verified against
+  `prcomp`, `cmdscale` and `factanal` directly: identical loadings, scores, standard
+  deviations, MDS coordinates and factor uniquenesses.
+- Factor analysis now explains itself when it cannot run. Asking for more factors than the
+  variables support used to surface R's bare complaint; it now says what failed and what to
+  try instead (fewer factors, or Principal axis).
+- The method-specific options (rotation, distance metric, component axes) appear only for the
+  method they belong to, and "Colour points by" only for PCA.
+
+- The colour-by column is subset by the same complete-case filter as the data, so it stays
+  aligned with the points when a variable has missing values. (Verified rather than changed —
+  the old screen did this correctly too.)
+
 ## v0.9.4 — 2026-08-04
 
 ### Fixed

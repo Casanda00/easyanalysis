@@ -87,7 +87,7 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
         prev <- isolate(input[[paste0("r_", rl$key)]])
         keep <- if (length(prev)) prev[prev %in% ok] else character(0)
         lbl <- if (isTRUE(rl$required)) rl$label else paste0(rl$label)
-        tagList(
+        one <- tagList(
           if (isTRUE(rl$multiple))
             selectizeInput(ns(paste0("r_", rl$key)), lbl, choices = ok,
                            selected = keep, multiple = TRUE,
@@ -99,6 +99,9 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
                         selected = if (length(keep)) keep[1] else ""),
           if (!is.null(rl$hint))
             tags$p(class = "text-muted small mt-n1 mb-2", rl$hint))
+        # A role can be conditional too (PCA's "colour by" applies to one of its
+        # three methods). `ns = ns` or the JS cannot resolve a namespaced input.
+        if (!is.null(rl$show_if)) conditionalPanel(rl$show_if, ns = ns, one) else one
       })
     })
 
@@ -172,12 +175,26 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
     # not from inside view_body: a plot needs a device, so it cannot be returned
     # as UI the way a DT widget or tags$pre can. `local()` captures the name --
     # without it every binding would close over the last one.
+    # Current parameter values, for DISPLAY options that should not need a
+    # refit. PCA's "which PC on each axis" and "colour by" are the case that
+    # forced this: in the module they were read inside renderPlot, so changing
+    # them redrew instantly. A plot function taking a 3rd argument gets them.
+    .cur_params <- function() {
+      p <- list()
+      for (q in spec$params) p[[q$key]] <- input[[paste0("p_", q$key)]]
+      p
+    }
+
     for (.nm in names(spec$plots %||% list())) local({
       nm <- .nm
       output[[paste0("plot_", nm)]] <- renderPlot({
         f <- fit_obj()
         if (is.null(f)) return(show_placeholder("Press Run to see this."))
-        tryCatch(spec$plots[[nm]](f$fit, f),
+        fn <- spec$plots[[nm]]
+        # Pass live params only to a plot that asks for them, so the simple
+        # plots keep a two-argument signature (same approach as `ns` in render).
+        tryCatch(if (length(formals(fn)) >= 3) fn(f$fit, f, .cur_params())
+                 else fn(f$fit, f),
                  error = function(e) show_placeholder(conditionMessage(e)))
       })
     })
