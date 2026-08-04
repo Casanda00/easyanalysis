@@ -988,7 +988,7 @@ server <- function(input, output, session) {
   # the statServer loop below as "stat_xgboost". mod_xgboost.R stays sourced so
   # nothing that still references its UI functions breaks (same treatment the
   # retired spatial bundles got in D18).
-  dtree_ctx <- dtreeServer("dtree", dataset_pool, active_dataset)
+  # dtreeServer is NOT bound: it is a statistics.R entry now (stat_dtree).
   nnet_ctx  <- nnetMlServer("nnet_ml", dataset_pool, active_dataset)
   # svmServer is NOT bound: SVM is a statistics.R entry now (stat_svm).
   # Spatial modules
@@ -1132,7 +1132,7 @@ server <- function(input, output, session) {
     descriptive = desc_ctx, tests = test_ctx,
     lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
     survival = surv_ctx, sem = sem_ctx, bayesian = bayes_ctx,
-    rf = rf_ctx, dtree = dtree_ctx,
+    rf = rf_ctx,
     nnet_ml = nnet_ctx,
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
     pca = pca_ctx, timeseries = ts_ctx,

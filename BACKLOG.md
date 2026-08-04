@@ -2408,13 +2408,24 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**2 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · dtree · nnet_ml · gam · pca ·
+**3 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · nnet_ml · gam · pca ·
 survival · anova · rf.
 
-**Running score: 2 screens migrated, 3 latent bugs found.** Both ports were bit-for-bit
-faithful, and both turned up something broken that nobody had noticed — see each below. That
-is now the strongest argument for finishing the migration: these screens are not being
-exercised, and porting is what exercises them.
+**Running score: 3 screens migrated, 4 latent bugs found — one in every screen so far.** Every
+port has been bit-for-bit faithful AND turned up something broken that nobody had noticed.
+That is now the strongest argument for finishing: these screens are not being exercised, and
+porting is what exercises them.
+
+| screen | latent bug found |
+|---|---|
+| XGBoost | two `xgboost` 3.x API breaks — the screen errored on Run |
+| SVM | cross-validation never produced a result, ever (silent per-fold failure) |
+| Decision tree | validation scored rpart's DEFAULT tree, not the configured one |
+
+**A pattern is emerging in the per-fold refits.** SVM's ignored cost, gamma and scaling;
+decision tree's ignored every `rpart.control` setting. Both validated a *different model than
+the one on screen*. **Check this specifically in each remaining port** — `nnet_ml`, `gam` and
+`rf` all have their own CV loops.
 
 **The first migration paid for itself twice over, in ways worth recording:**
 
@@ -2485,6 +2496,27 @@ module's own `svm()` call, for eps-regression, C-classification, and a non-defau
 honoured; predictor-equals-response is refused; all 3 views render for both task types.
 Conditional visibility (gamma hidden for a linear kernel, degree only for polynomial, epsilon
 only for eps-regression) is preserved via the new `show_if`.
+
+##### Migration 3 — Decision tree (2026-08-04)
+
+**Fourth latent bug, and the same shape as SVM's.** `mod_dtree.R`'s per-fold refits
+(`:242`, `:295`) called `rpart(fml, data = tr, method = …)` with **no `control` argument at
+all**, so every fold was built with rpart's defaults — not the max depth, cp, min-split and
+min-bucket the user had set. The validation numbers therefore described a tree that was not
+the one on screen.
+
+Unlike SVM's, this one did not fail loudly or quietly — it produced *plausible* numbers for
+the wrong model, which is worse. **Measured:** on the test data the default tree has **8
+leaves** where the configured one has **2**. Fixed by passing the same `rpart.control` the
+displayed tree uses.
+
+Also moved the validation into `fit` (computed once instead of per redraw), added a clear
+refusal when a regression tree is asked for a categorical response, and labelled the pruning
+checkbox so it is distinguishable from the separate hold-out validation.
+
+**Parity verified:** identical predictions AND an identical `cptable` against the module's own
+`rpart()` + prune sequence, for both regression and classification, including a non-default
+`maxdepth = 2, cp = 0.001, minsplit = 5, minbucket = 2`; all 4 views render for both types.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

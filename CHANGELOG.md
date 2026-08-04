@@ -8,6 +8,25 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.3 — 2026-08-04
+
+### Fixed
+- **The Decision Tree screen's validation scored the wrong tree.** Its per-fold refits were
+  built with rpart's *default* settings instead of the max depth, cp, min-split and
+  min-bucket you had set — so the validation numbers described a tree you were not looking
+  at. Measured on the test data: the default tree had **8 leaves** where the configured one
+  had **2**. The folds now use the same controls as the tree on screen.
+
+### Changed
+- **Decision Tree is now a registry entry** (migration 3 of 9), verified to produce
+  **identical predictions and an identical CP table** to the module it replaces, for both
+  regression and classification trees, including non-default depth/cp/min-split settings.
+- Its validation is computed once when you press Run, rather than being recomputed every
+  time the results redrew — the same change SVM got.
+- A regression tree now refuses a categorical response with a clear message instead of
+  failing inside rpart, and the pruning control is labelled to distinguish it from the
+  separate hold-out validation.
+
 ## v0.9.2 — 2026-08-04
 
 ### Fixed

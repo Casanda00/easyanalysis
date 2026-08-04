@@ -644,6 +644,162 @@ ea_statistics <- function() {
         })
     ),
 
+    # ---- Decision tree -- MIGRATION 3 of 9 ---------------------------------
+    # Ported from mod_dtree.R. Same rpart.control, same prune-to-best-cp step.
+    # Two things the module got wrong are fixed here, both the same shape as the
+    # SVM port: the hold-out CV ran inside render outputs (recomputed on every
+    # redraw), and its per-fold refits passed NO control at all
+    # (mod_dtree.R:242, :295), so they validated rpart's DEFAULT tree rather
+    # than the one the user configured and is looking at.
+    list(
+      id = "dtree", label = "Decision Tree", group = "Machine learning",
+      summary = paste("A single readable tree of if/then splits. Good when you",
+                      "need to explain the rule, not just the prediction."),
+      roles = list(
+        ea_role("y", "Response variable (Y)", "any"),
+        ea_role("x", "Predictor variables (X)", "any", multiple = TRUE,
+                hint = "Numbers or categories - a tree handles both.")),
+      params = list(
+        ea_sel("tree_type", "Tree type",
+               c("Regression (numeric Y)" = "anova",
+                 "Classification (category Y)" = "class"), "anova"),
+        ea_num("maxdepth",  "Max depth", 5, 1, 30, 1),
+        ea_num("minsplit",  "Min rows to attempt a split", 20, 1, NA, 1),
+        ea_num("minbucket", "Min rows in a leaf", 7, 1, NA, 1),
+        ea_num("cp", "Complexity parameter (cp)", 0.01, 0, 1, 0.001,
+               hint = "Lower grows a bigger tree."),
+        ea_chk("use_cv", "Prune using rpart's internal cross-validation", TRUE),
+        ea_sel("cv_method", "Hold-out validation",
+               c("K-fold" = "kfold", "LOOCV (leave-one-out)" = "loocv"), "kfold",
+               hint = "Separate from pruning: refits the tree per fold."),
+        ea_num("cv_k", "Number of folds (k)", 5, 2, 20, 1,
+               show_if = "input.p_cv_method == 'kfold'")),
+      views = c(tree = "Tree diagram", cp = "CP / pruning",
+                imp = "Variable importance", perf = "Performance"),
+      views_plot = c("tree", "cp", "imp", "perf"),
+      fit = function(df, r, p) {
+        if (!requireNamespace("rpart", quietly = TRUE))
+          stop("Decision trees need the 'rpart' package. Install it from the Packages screen.")
+        yv <- r$y; xv <- setdiff(r$x, yv)
+        if (!length(xv)) stop("Choose at least one predictor other than the response.")
+        sub <- df[, c(yv, xv), drop = FALSE]
+        sub <- sub[stats::complete.cases(sub), ]
+        if (nrow(sub) < 10) stop("Need at least 10 complete rows; this has ", nrow(sub), ".")
+        method <- p$tree_type %||% "anova"
+        if (method == "class") {
+          sub[[yv]] <- as.factor(sub[[yv]])
+          if (nlevels(sub[[yv]]) < 2)
+            stop("Classification needs at least 2 classes in the response.")
+        } else if (!is.numeric(sub[[yv]])) {
+          stop("A regression tree needs a numeric response. Pick Classification, ",
+               "or choose a numeric column.")
+        }
+        ctrl <- rpart::rpart.control(
+          maxdepth = as.integer(p$maxdepth %||% 5L),
+          minsplit = as.integer(p$minsplit %||% 20L),
+          minbucket = as.integer(p$minbucket %||% 7L),
+          cp = as.numeric(p$cp %||% 0.01),
+          xval = if (isTRUE(p$use_cv)) 10L else 0L)
+        fml <- stats::as.formula(paste0("`", yv, "` ~ ",
+                                        paste0("`", xv, "`", collapse = " + ")))
+        fit <- rpart::rpart(fml, data = sub, method = method, control = ctrl)
+        if (isTRUE(p$use_cv) && nrow(fit$cptable) > 1) {
+          best <- fit$cptable[which.min(fit$cptable[, "xerror"]), "CP"]
+          fit <- rpart::prune(fit, cp = best)
+        }
+        preds <- stats::predict(fit, sub,
+                                type = if (method == "class") "class" else "vector")
+
+        # Hold-out validation: once, here -- and with the SAME control as the
+        # displayed tree. The module passed none, so it validated a default tree.
+        n <- nrow(sub)
+        k <- if (identical(p$cv_method, "loocv")) n
+             else max(2L, as.integer(p$cv_k %||% 5L))
+        lbl <- .cv_label(k, n)
+        set.seed(42); folds <- sample(rep_len(seq_len(k), n))
+        ap <- c(); aa <- c()
+        for (f in seq_len(k)) {
+          tr <- sub[folds != f, , drop = FALSE]; te <- sub[folds == f, , drop = FALSE]
+          m <- tryCatch(rpart::rpart(fml, data = tr, method = method, control = ctrl),
+                        error = function(e) NULL)
+          if (is.null(m)) next
+          pv <- tryCatch(stats::predict(m, newdata = te,
+                           type = if (method == "class") "class" else "vector"),
+                         error = function(e) NULL)
+          if (is.null(pv)) next
+          ap <- c(ap, if (method == "class") as.character(pv) else as.numeric(pv))
+          aa <- c(aa, if (method == "class") as.character(te[[yv]])
+                      else as.numeric(te[[yv]]))
+        }
+        list(fit = fit, preds = preds, y = sub[[yv]], df = sub, yv = yv, xv = xv,
+             method = method, reg = method == "anova",
+             cv = if (length(ap)) list(actual = aa, predicted = ap, lbl = lbl) else NULL)
+      },
+      plots = list(
+        tree = function(fit, f) {
+          if (nrow(fit$fit$frame) <= 1)
+            return(show_placeholder("The tree is a single root node - lower cp or raise max depth."))
+          graphics::plot(fit$fit, uniform = TRUE, compress = TRUE, margin = 0.05,
+                         main = paste("Decision tree:", fit$yv))
+          graphics::text(fit$fit, use.n = TRUE, all = FALSE, cex = .75, splits = TRUE)
+        },
+        cp = function(fit, f) {
+          if (nrow(fit$fit$cptable) < 2)
+            return(show_placeholder("Only one CP row - nothing to prune."))
+          rpart::plotcp(fit$fit, col = "#2e7d32", lwd = 2)
+        },
+        imp = function(fit, f) {
+          imp <- fit$fit$variable.importance
+          if (is.null(imp) || !length(imp))
+            return(show_placeholder("No variable importance - the tree made no splits."))
+          graphics::par(mar = c(4, 9, 3, 2))
+          graphics::barplot(sort(imp), horiz = TRUE, col = "#4caf5099",
+                            border = "#2e7d32", las = 1, cex.names = .85,
+                            xlab = "Relative importance", main = "Variable importance")
+          graphics::grid(nx = 5, ny = NA, col = "grey92")
+        },
+        resid = function(fit, f) {
+          if (fit$reg) {
+            e <- as.numeric(fit$y) - as.numeric(fit$preds)
+            graphics::plot(as.numeric(fit$preds), e, pch = 16, col = "#2e7d3266",
+                           xlab = "Fitted", ylab = "Residual", main = "Residuals")
+            graphics::abline(h = 0, col = "#c62828", lwd = 2)
+            graphics::grid(col = "grey92")
+          } else {
+            print(.plot_conf_matrix(table(Predicted = fit$preds, Actual = fit$y),
+                                    title = "Confusion matrix (training)"))
+          }
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        tree = ea_stat_plot(ns, "tree", if (solo) "520px" else "100%"),
+        cp   = ea_stat_plot(ns, "cp",   if (solo) "380px" else "100%"),
+        imp  = ea_stat_plot(ns, "imp",  if (solo) "400px" else "100%"),
+        perf = layout_columns(col_widths = c(6, 6),
+          card(card_header("Summary"), tags$pre(paste(c(
+            sprintf("Tree type   : %s", if (fit$reg) "regression" else "classification"),
+            sprintf("Leaves      : %d", sum(fit$fit$frame$var == "<leaf>")),
+            sprintf("Predictors  : %d of %d used", length(fit$fit$variable.importance),
+                    length(fit$xv)),
+            sprintf("Rows        : %d", nrow(fit$df)),
+            "",
+            if (fit$reg) paste(utils::capture.output(print(signif(unlist(
+                 uef_evaluation(as.numeric(fit$preds), as.numeric(fit$y))), 4))),
+                 collapse = "\n")
+            else sprintf("Training accuracy : %.2f%%",
+                         100 * mean(as.character(fit$preds) == as.character(fit$y))),
+            if (!is.null(fit$cv))
+              sprintf("%-18s: %s", fit$cv$lbl,
+                      if (fit$reg)
+                        sprintf("RMSE %.4g",
+                                sqrt(mean((fit$cv$actual - fit$cv$predicted)^2)))
+                      else sprintf("%.2f%% accuracy",
+                                   100 * mean(fit$cv$predicted == fit$cv$actual)))
+            else "Validation        : not available"),
+            collapse = "\n"))),
+          card(card_header(if (fit$reg) "Residuals" else "Confusion matrix"),
+               ea_stat_plot(ns, "resid", "340px"))))
+    ),
+
     # ---- GLMM (backlog item 34) --------------------------------------------
     # The existing Mixed effects screen is nlme::lme, which fits GAUSSIAN
     # responses only -- it has no `family` argument at all, so a binary or count
