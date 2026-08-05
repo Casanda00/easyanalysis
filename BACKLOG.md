@@ -2889,7 +2889,7 @@ in calls like `df[, cols]` raise "argument is missing" when touched.)
 
 | priority | where | why it matters |
 |---|---|---|
-| **1** | `mod_da.R:646`, `:653` | Fold refits that `next` on failure — **exactly SVM's shape**, which never produced a result. Whether DA's CV returns anything is **unverified**. |
+| ~~1~~ | `mod_da.R:646`, `:653` | **DONE 2026-08-05 — see below.** Its CV was *not* dead, but it validated a different model. |
 | **2** | `mod_logistic.R:197`, `mod_classification.R:272`, `mod_lme.R:214` | Same fold-skip shape; each needs the same two checks — does the CV produce a result, and does it use the user's settings? |
 | **3** | `agent_tools.R:243, :255, :274, :275, :304` | The **Co-Analyst's own** analysis paths. A silent `NULL` here means the agent reports nothing instead of reporting a failure, and the user cannot see the code to know why. |
 | 4 | `mod_timeseries.R:178`, `:219` | `decompose()` swallowed; a series that cannot be decomposed shows an empty panel. |
@@ -2898,6 +2898,40 @@ in calls like `df[, cols]` raise "argument is missing" when touched.)
 that fails may be skipped, but **the run as a whole must say so**. Either the result is
 produced, or the reason is shown. A `NULL` arriving at the UI as "nothing here" is the exact
 failure mode this sweep exists to find.
+
+#### Priority 1 resolved 2026-08-05 — Discriminant Analysis
+
+**My suspicion was wrong in the way that matters, and right in another.** I flagged DA as
+SVM-shaped, i.e. possibly producing no CV at all. **Tested every method path — all seven
+produce predictions.** DA's cross-validation is not dead.
+
+**But it had the other fault, and badly.** The fold refits used **none** of the method
+parameters the tool panel offers. Verified by reading the fold block: `kda_sigma`, `kda_C`,
+`mmc_C`, `llda_k` and `wlda_weight_type` were all absent, while the displayed fit
+(`mod_da.R:213-264`) uses every one of them. So Kernel DA validated at ksvm's default RBF
+width and cost instead of the chosen 0.01 / 0.1, Maximum Margin ignored its cost, and Locally
+Linear DA used a hardcoded `k = 5` whatever the Neighbours slider said.
+
+**Measured:** a default-parameter fold agreed with the configured model on **38% of rows**.
+The accuracy figure was describing a substantially different classifier.
+
+**A second, subtler fault found while fixing it.** When `loclda` hits a singular local
+covariance the fit is relabelled `"Locally Linear DA (PCA-decorrelated)"`. The fold loop tested
+`mn == "Locally Linear DA"` — an equality test that variant fails — so those folds fell through
+to the final `else` branch and **cross-validated plain `MASS::lda`**. The CV was scoring a
+different *method*, not merely different parameters. Now matched with `startsWith()`; if
+`loclda` genuinely cannot fit a fold it fails and is skipped, which the existing
+"no CV available" path reports honestly.
+
+**Also removed a dead branch I had just written.** I added a WLDA weighting branch to the fold
+loop before checking that WLDA never reaches it — `mod_da.R:619` routes both LDA and Weighted
+LDA to `MASS::lda(CV = TRUE)` instead. Deleted rather than left as misleading code.
+
+**Left open, recorded rather than half-fixed:** that LOOCV branch calls
+`MASS::lda(fml, data, CV = TRUE)` with **no weights**, while the displayed Weighted LDA fit
+passes them. So WLDA's LOOCV still describes an unweighted model. Fixing it needs a decision —
+either pass weights through `lda(CV = TRUE)` (untested whether it honours them) or move WLDA
+onto the k-fold path, which would visibly change its label from LOOCV to k-fold.
 
 ---
 

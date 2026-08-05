@@ -8,6 +8,20 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.1 — 2026-08-05
+
+### Fixed
+- **Discriminant Analysis validated a different model than the one you configured.** Its
+  cross-validation refitted each fold with the package defaults instead of the settings you
+  chose — Kernel DA ran at the default RBF width and cost rather than yours, Maximum Margin
+  ignored its cost, and Locally Linear DA always used 5 neighbours whatever the slider said.
+  Measured on test data: a default-parameter fold agreed with the configured model on only
+  **38% of rows**, so the reported accuracy described a substantially different classifier.
+- **Locally Linear DA's validation silently scored a different method entirely.** When that
+  fit falls back to its PCA-decorrelated form (which happens whenever the local covariance is
+  singular), the validation no longer recognised it and quietly cross-validated plain LDA
+  instead. It now validates the method actually used, and says so honestly when it cannot.
+
 ## v0.10.0 — 2026-08-05
 
 ### Changed

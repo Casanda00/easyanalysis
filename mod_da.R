@@ -625,6 +625,16 @@ daServer <- function(id, dataset_pool, active_dataset) {
           n <- nrow(data); k <- .cv_k(input, data); lbl <- .cv_label(k, n)
           set.seed(42); folds <- sample(rep_len(seq_len(k), n))
           all_p <- c(); all_a <- c()
+          # The fold refits MUST use the same method parameters as the displayed
+          # model. They previously used none of them -- ksvm ran with its default
+          # sigma/C instead of the chosen ones, and loclda with a hardcoded k = 5
+          # regardless of the Neighbours slider -- so the validation accuracy
+          # described a different model than the one on screen. Same fault found
+          # in five migrated screens (backlog item 33's migration log).
+          sigma_val <- if (isTruthy(input$kda_sigma)) input$kda_sigma else 0.01
+          kda_C_val <- if (isTruthy(input$kda_C))     input$kda_C     else 0.1
+          mmc_C_val <- if (isTruthy(input$mmc_C))     input$mmc_C     else 1
+          k_val     <- if (isTruthy(input$llda_k))    input$llda_k    else 5
           for (fold in seq_len(k)) {
             tr <- data[folds != fold, , drop = FALSE]
             te <- data[folds == fold, , drop = FALSE]
@@ -633,14 +643,22 @@ daServer <- function(id, dataset_pool, active_dataset) {
                 MASS::qda(fml, data = tr)
               else if (mn == "Regularized LDA" && requireNamespace("klaR", quietly = TRUE))
                 klaR::rda(fml, data = tr, gamma = seq(0,1,0.1), lambda = seq(0,1,0.1))
-              else if (mn %in% c("Kernel DA (SVM-RBF)", "Maximum Margin (Linear SVM)") &&
-                       requireNamespace("kernlab", quietly = TRUE))
-                kernlab::ksvm(fml, data = tr,
-                              kernel = if (mn == "Kernel DA (SVM-RBF)") "rbfdot" else "vanilladot")
-              else if (mn == "Locally Linear DA" && requireNamespace("klaR", quietly = TRUE)) {
+              else if (mn == "Kernel DA (SVM-RBF)" && requireNamespace("kernlab", quietly = TRUE))
+                kernlab::ksvm(fml, data = tr, kernel = "rbfdot",
+                              kpar = list(sigma = sigma_val), C = kda_C_val)
+              else if (mn == "Maximum Margin (Linear SVM)" && requireNamespace("kernlab", quietly = TRUE))
+                kernlab::ksvm(fml, data = tr, kernel = "vanilladot", C = mmc_C_val)
+              # startsWith, not ==: when loclda hits a singular local covariance
+              # the fit is relabelled "Locally Linear DA (PCA-decorrelated)",
+              # which an equality test missed -- so those folds fell through to
+              # plain MASS::lda and the CV silently scored a DIFFERENT METHOD.
+              # If loclda genuinely cannot fit a fold it now fails and is
+              # skipped, which the "no CV available" message reports honestly.
+              else if (startsWith(mn, "Locally Linear DA") &&
+                       requireNamespace("klaR", quietly = TRUE)) {
                 tr_j <- tr
                 for (p in pvars) if (is.numeric(tr_j[[p]])) tr_j[[p]] <- jitter(tr_j[[p]], amount = 0.0001)
-                klaR::loclda(fml, data = tr_j, k = 5)
+                klaR::loclda(fml, data = tr_j, k = k_val)
               }
               else MASS::lda(fml, data = tr)
             }, error = function(e) NULL)
