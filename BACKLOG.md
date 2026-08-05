@@ -2858,6 +2858,49 @@ with excess zeros turn up, per the engine comparison above.
 
 ---
 
+### 36. App-wide sweep for silent `tryCatch` — DONE 2026-08-05 (investigation)
+> "that trycatch sweep seems like a good idea"
+
+The migration established that `tryCatch(..., error = function(e) NULL)` is where broken
+features hide — it explained SVM, GAM and Survival directly. This is that sweep, across every
+`.R` file in the repo root (excluding `*_legacy.R`).
+
+**Method:** for every silent error handler (`function(e) NULL | invisible() | {} | NA`), look
+back 12 lines for a model-fitting call. **Stated limitation:** it can miss a fit more than 12
+lines above its handler, and can flag one that is merely nearby — so every hit was read by
+hand rather than trusted. (A parse-tree walker was tried first and abandoned: empty arguments
+in calls like `df[, cols]` raise "argument is missing" when touched.)
+
+**Result: 77 sites across 17 files; 28 in files not examined during the migration.**
+
+**Two reassuring findings, both checked rather than assumed:**
+
+1. **The SHARED cross-validation helper is correct.** `.kfold_cv()` (`helpers.R:29-56`) takes
+   the **formula and family as arguments**, so it necessarily inherits the caller's model
+   specification and cannot have the "validates a different model" bug at all. **All five
+   validation bugs were in per-module hand-rolled loops, never in the shared helper** — which
+   is the same argument the registry rests on, arrived at independently.
+2. **The primary-fit sites that looked dangerous are handled properly.** `mod_ntl.R:176`
+   wraps its only `lm()` but checks the result on the very next line and reports it;
+   `mod_linear_regression.R:53` is an optional VIF helper whose `NULL` means "no VIF", not
+   "no model".
+
+**What remains — NOT fixed, recorded in priority order:**
+
+| priority | where | why it matters |
+|---|---|---|
+| **1** | `mod_da.R:646`, `:653` | Fold refits that `next` on failure — **exactly SVM's shape**, which never produced a result. Whether DA's CV returns anything is **unverified**. |
+| **2** | `mod_logistic.R:197`, `mod_classification.R:272`, `mod_lme.R:214` | Same fold-skip shape; each needs the same two checks — does the CV produce a result, and does it use the user's settings? |
+| **3** | `agent_tools.R:243, :255, :274, :275, :304` | The **Co-Analyst's own** analysis paths. A silent `NULL` here means the agent reports nothing instead of reporting a failure, and the user cannot see the code to know why. |
+| 4 | `mod_timeseries.R:178`, `:219` | `decompose()` swallowed; a series that cannot be decomposed shows an empty panel. |
+
+**The rule to apply when fixing any of these** — it is what the ported screens now do: a fold
+that fails may be skipped, but **the run as a whole must say so**. Either the result is
+produced, or the reason is shown. A `NULL` arriving at the UI as "nothing here" is the exact
+failure mode this sweep exists to find.
+
+---
+
 ### 35. UNRESOLVED FRAGMENT — "the views for the analyses"
 > "the views for the analyses: I dont like that you did that"
 
