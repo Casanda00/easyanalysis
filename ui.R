@@ -2331,7 +2331,12 @@ page_fillable(
          stopApp() runs the websocket drops, and anything we try to render after
          that never arrives. The veil is therefore purely client-side. */
       function eaQuitApp(){
-        if(!confirm('Close EasyAnalysis?\n\nThe R session will stop. Your project is saved automatically.')) return;
+        /* \\n, NOT \n: this lives in an R double-quoted HTML() string, so R
+           consumes the escape first. A bare \n became a REAL newline inside a
+           JS string literal -- a syntax error that killed this whole <script>
+           block, taking openSettings() and every other handler with it. The
+           app rendered fine and nothing was clickable. (Gotcha 1, new form.) */
+        if(!confirm('Close EasyAnalysis?\\n\\nThe R session will stop. Your project is saved automatically.')) return;
         var v = document.getElementById('ea-quit-veil');
         if(v) v.classList.add('on');
         Shiny.setInputValue('app_quit', Date.now(), {priority:'event'});

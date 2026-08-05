@@ -303,6 +303,20 @@ browser (or the whole app) and coming back resumes where the user stopped.
    `HTML("...")` string. A literal `"` inside (e.g. `a[data-bs-toggle="tab"]`) **silently
    breaks R parsing of the whole file**. Use single quotes or no quotes in CSS/attr
    selectors (`a[data-bs-toggle=tab]`), or escape as `\"`.
+   **1b. `\n` is the SAME TRAP but it does NOT break the R parse — it breaks the browser.**
+   R consumes the escape first, so `confirm('Done?\n\nSure?')` inside `HTML("...")` emits a
+   **real newline inside a JS string literal**, which is a JavaScript syntax error. One bad
+   character kills **the entire `<script>` block**, so every function defined in it becomes
+   undefined. This shipped in v0.10.7: the app rendered perfectly and **nothing in the top bar
+   was clickable** — Settings would not open, projects would not open — because `openSettings()`
+   and its neighbours no longer existed. Write `\\n`, `\\t`, `\\"` whenever the *browser* is
+   meant to receive the escape.
+   **The build check cannot catch this** (the R parses fine), and neither does asserting the
+   text is present — the v0.10.7 tests checked the confirm message *was in the HTML*, which it
+   was. **`check_ui_js.R` closes this gap**: it renders the UI, extracts every inline
+   JavaScript `<script>` (skipping `application/json` and `ld+json`, which are data) and runs
+   `node --check` on each. Run it after touching any `tags$script`. It was control-tested by
+   reintroducing this exact bug and confirming it fails.
 2. **Do NOT hand-roll tab switching.** bslib + Bootstrap 5 switch `nav_panel`/`nav_menu`
    tabs natively via the `data-bs-toggle` attrs it emits, and sync `input$main_tabs`
    automatically (navbar `id`). A custom jQuery handler that `.hide()`s panes leaves an

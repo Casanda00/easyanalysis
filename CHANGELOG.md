@@ -18,6 +18,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.9 — 2026-08-05
+
+### Fixed — nothing was clickable in v0.10.7 and v0.10.8
+
+The Quit button added in v0.10.7 carried a hidden line-break character in its confirmation
+message. That one character was invalid where it landed, which stopped **the whole block of the
+app's interface code from loading** — so every button in the top bar went dead at once. Projects
+would not open, Settings would not open, and the app otherwise looked completely normal, which
+made it hard to tell anything was wrong.
+
+Fixed, and a check now runs over the app's interface code to make sure it is valid before a
+release. That check was written against this exact bug and confirmed to catch it — the previous
+tests only checked the message *text was present*, never that the code around it worked.
+
+**If you are on v0.10.7 or v0.10.8, update.** Those versions are unusable.
+
 ## v0.10.8 — 2026-08-05
 
 ### Added — the site can now be found

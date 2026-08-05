@@ -22,7 +22,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.8.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.9.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -122,14 +122,25 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.8</b> · 50 releases ·
+      <p class="meta">Latest: <b>v0.10.9</b> · 51 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-8"><h2><a class="anchor" href="#v0-10-8">v0.10.8</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-9"><h2><a class="anchor" href="#v0-10-9">v0.10.9</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed — nothing was clickable in v0.10.7 and v0.10.8</h3>
+<p>The Quit button added in v0.10.7 carried a hidden line-break character in its confirmation
+message. That one character was invalid where it landed, which stopped <strong>the whole block of the
+app&#39;s interface code from loading</strong> — so every button in the top bar went dead at once. Projects
+would not open, Settings would not open, and the app otherwise looked completely normal, which
+made it hard to tell anything was wrong.</p>
+<p>Fixed, and a check now runs over the app&#39;s interface code to make sure it is valid before a
+release. That check was written against this exact bug and confirmed to catch it — the previous
+tests only checked the message <em>text was present</em>, never that the code around it worked.</p>
+<p><strong>If you are on v0.10.7 or v0.10.8, update.</strong> Those versions are unusable.</p>
+</section><section class="rel" id="v0-10-8"><h2><a class="anchor" href="#v0-10-8">v0.10.8</a><span class="when">2026-08-05</span></h2>
 <h3>Added — the site can now be found</h3>
 <p>The website had no sitemap and no <code>robots.txt</code>, so nothing told a search engine or an AI
 assistant which pages existed. Both now exist, and AI crawlers are welcomed explicitly rather
