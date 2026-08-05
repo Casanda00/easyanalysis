@@ -8,6 +8,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.3 — 2026-08-05
+
+### Fixed
+- **More fixed-light surfaces found by an app-wide scan**, the same fault as the References
+  page rather than new ones: the confusion-matrix cells on Classification, the F1 bar, the
+  macro-average row in every precision/recall table, and GAM's Yes/No non-linearity column
+  were all fixed pastels that stayed pale on a dark theme. They are translucent tints of the
+  theme's own colours now, so they keep their meaning and follow the theme.
+- The Recommender's priority colours, a Download-spatial-data caption, the active dataset
+  row's text, and the Co-Analyst's typing dot and disabled send button were likewise pinned
+  to fixed colours.
+
+### Changed
+- The Recommender's "Ask AI" button — a robot emoji plus a **fourth** name for the same panel
+  — is now an icon and "Ask Co-Analyst". (The visual language rules emojis out.)
+
 ## v0.10.2 — 2026-08-05
 
 ### Fixed

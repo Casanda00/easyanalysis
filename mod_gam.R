@@ -262,7 +262,7 @@ gamServer <- function(id, dataset_pool, active_dataset) {
         options=list(dom="t", pageLength=20),
         selection="none") %>%
         DT::formatStyle("Nonlinear",
-          backgroundColor = DT::styleEqual(c("Yes","No"),c("#c8e6c9","#fff9c4")))
+          backgroundColor = DT::styleEqual(c("Yes","No"), c("color-mix(in srgb, var(--forest) 22%, transparent)", "color-mix(in srgb, var(--warn) 18%, transparent)")))
     })
 
     output$gain_summary_ui <- renderUI({

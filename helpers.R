@@ -118,7 +118,7 @@
   tbl |>
     DT::formatStyle("Class", target = "row",
       fontWeight      = DT::styleEqual("— Macro avg", "bold"),
-      backgroundColor = DT::styleEqual("— Macro avg", "#eef2f7"))
+      backgroundColor = DT::styleEqual("— Macro avg", "color-mix(in srgb, var(--canopy) 16%, transparent)"))
 }
 
 # Render regression metrics as a compact DT: Metric | stage1 | stage2 …

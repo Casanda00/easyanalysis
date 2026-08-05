@@ -270,7 +270,7 @@ rsSearchServer <- function(id, dataset_pool, active_dataset, raster_pool) {
         tags$strong(nrow(df), " scene(s) found"),
         tags$p(style = "margin:0; font-size:11px; color:#555",
           substr(input$sensor %||% "", 1, 35)),
-        tags$p(style = "margin:0; font-size:11px; color:#2e7d32",
+        tags$p(style = "margin:0; font-size:11px; color:var(--forest)",
           paste0(input$date_from, " – ", input$date_to))
       )
     })

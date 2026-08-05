@@ -212,7 +212,7 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
         caption = sprintf("Threshold: %.2f", isolate(input$threshold) %||% 0.5),
         options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
         class = "compact stripe") |>
-        DT::formatStyle("F1", background = DT::styleColorBar(c(0, 1), "#d1e7dd"),
+        DT::formatStyle("F1", background = DT::styleColorBar(c(0, 1), "color-mix(in srgb, var(--forest) 30%, transparent)"),
                         backgroundSize = "98% 88%", backgroundRepeat = "no-repeat",
                         backgroundPosition = "center")
     })
@@ -230,7 +230,12 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
         )
       }))
       df_long$Metric <- factor(df_long$Metric, levels = c("TP", "FP", "FN", "TN"))
-      fill_map <- c(TP = "#d1e7dd", FP = "#f8d7da", FN = "#fff3cd", TN = "#cfe2ff")
+      # Translucent tints of semantic tokens, not fixed pastels: these sit on a themed
+      # table, so a fixed light fill is unreadable on every dark set (gotcha 31).
+      fill_map <- c(TP = "color-mix(in srgb, var(--forest) 22%, transparent)",
+                    FP = "color-mix(in srgb, var(--danger) 22%, transparent)",
+                    FN = "color-mix(in srgb, var(--warn) 22%, transparent)",
+                    TN = "color-mix(in srgb, var(--canopy) 18%, transparent)")
       print(
         ggplot(df_long, aes(x = Metric, y = Count, fill = Metric)) +
           geom_col(show.legend = FALSE) +

@@ -338,7 +338,7 @@
 
 # ---------- Card renderer ------------------------------------------------- #
 .rec_card_html <- function(rec, ns, idx) {
-  col <- switch(rec$priority, high="#2e7d32", medium="#e65100", consider="#1565c0")
+  col <- switch(rec$priority, high="var(--forest)", medium="var(--warn)", consider="var(--bark)")
   badge_cls <- switch(rec$priority,
     high="bg-success", medium="bg-warning text-dark", consider="bg-info")
   badge_lbl <- switch(rec$priority,
@@ -380,7 +380,9 @@
         style="font-size:12px;",
         onclick=sprintf("Shiny.setInputValue('%s','%s:%d',{priority:'event'});",
                         ns("ask_ai_btn"), rec$id, idx),
-        HTML("&#129302; Ask AI")
+        # Was an emoji + "Ask AI" — a robot glyph (DESIGN.md rules emojis out)
+        # and a FOURTH name for the same panel. Icon + the one agreed name.
+        tagList(icon("wand-magic-sparkles"), " Ask Co-Analyst")
       )
     )
   )

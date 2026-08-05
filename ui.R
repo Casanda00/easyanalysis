@@ -1459,7 +1459,7 @@ page_fillable(
     /* dataset rail items */
     .ds-item { background: var(--panel); border: 1px solid var(--line); color: var(--ink); }
     .ds-item:hover { border-color: var(--canopy); }
-    .ds-item.active { background: var(--forest); border-color: var(--forest); color: #08120A; }
+    .ds-item.active { background: var(--forest); border-color: var(--forest); color: var(--onbrand); }
 
     /* bslib cards + tabs */
     .card, .bslib-card { background: var(--panel); border-color: var(--line); }

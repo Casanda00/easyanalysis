@@ -278,12 +278,12 @@ chatUI <- function(id) {
       .copilot-actions code { background: var(--tint); color: var(--canopy); padding: 1px 5px; border-radius: 4px; }
       /* typing indicator while the agent works */
       .copilot-typing { display: flex; gap: 4px; align-items: center; padding: 12px 14px; }
-      .copilot-typing .dot { width: 7px; height: 7px; border-radius: 50%; background: #9bb69c;
+      .copilot-typing .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bark);
         animation: copilotBlink 1.2s infinite ease-in-out both; }
       .copilot-typing .dot:nth-child(2) { animation-delay: .18s; }
       .copilot-typing .dot:nth-child(3) { animation-delay: .36s; }
       @keyframes copilotBlink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
-      .copilot-send:disabled { background: #a5c9a7; cursor: not-allowed; }
+      .copilot-send:disabled { background: var(--bark); cursor: not-allowed; }
       /* merged Recommend + Ask tabs */
       .copilot-tabs { display: flex; gap: 4px; padding: 8px 10px 0; background: var(--panel);
         border-bottom: 1px solid var(--line); flex: none; }
