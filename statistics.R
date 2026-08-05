@@ -68,11 +68,15 @@ ea_stat_plot <- function(ns, name, height = "400px")
   plotOutput(ns(paste0("plot_", name)), height = height)
 
 # An EXTRA action beyond Run -- a second button that does something with an
-# existing fit rather than producing one. GAM's "predictions to data pool" is
-# the case that needed it; Random forest's partial-dependence button is the
-# other. `run(fit, f, pools)` gets the fitted object, the whole fit record, and
-# the app's pools; return a message string to show, or NULL for silence.
-# Buttons only appear once there IS a fit -- they are meaningless before.
+# existing fit rather than producing one. GAM's "predictions to data pool" and
+# Random forest's partial-dependence plot are the two cases.
+# `run(fit, f, pools)` gets the fitted object, the whole fit record, and the
+# app's pools. It may return:
+#   * a character message to show, or NULL for silence; or
+#   * list(message = , store = ) -- `store` is merged into the fit record's
+#     `extra`, so a plot can render something the action COMPUTED. That is what
+#     lets a slow result stay behind a button instead of recomputing whenever
+#     its view is shown.
 ea_action <- function(id, label, run, icon = "bolt", hint = NULL)
   list(id = id, label = label, run = run, icon = icon, hint = hint)
 
@@ -1316,6 +1320,138 @@ ea_statistics <- function() {
             } else "Validation      : not available"),
             collapse = "\n")))
         })
+    ),
+
+    # ---- Random forest -- MIGRATION 7 of 9 ---------------------------------
+    # Ported from mod_rf.R: same mtry rule (p/3 for regression, sqrt(p) for
+    # classification), same ntree, same OOB reporting, same rfcv option.
+    #
+    # RF is the one screen whose validation is NOT a hand-rolled loop -- it uses
+    # randomForest's own rfcv(). It still lost settings, in a different way:
+    # mod_rf.R:101 called rfcv() without passing `ntree`, so the CV curve came
+    # from 500-tree forests no matter what the slider said, and rfcv's default
+    # mtry is sqrt(p) -- the CLASSIFICATION rule -- even for a regression model
+    # whose displayed fit used p/3. Verified that ntree does reach rfcv through
+    # `...` and does change the result. So the refinement to the pattern is:
+    # the risk is ANY validation path that does not inherit the model's
+    # settings, not just a hand-written loop.
+    list(
+      id = "rf", label = "Random Forest", group = "Machine learning",
+      summary = paste("Many decision trees averaged together. Strong default",
+                      "choice for tabular data, and it reports which predictors",
+                      "carried the signal."),
+      roles = list(
+        ea_role("y", "Target variable", "any"),
+        ea_role("x", "Predictors", "any", multiple = TRUE),
+        ea_role("pdp_var", "Partial-dependence variable", "any", required = FALSE,
+                hint = "Pick one, then press the button below the Run button.")),
+      params = list(
+        ea_num("ntree", "Number of trees", 500, 100, 2000, 100),
+        ea_chk("run_cv", "Also run 10-fold CV (slow)", FALSE,
+               hint = "Error against the number of variables used.")),
+      views = c(summary = "Model summary", importance = "Variable importance",
+                performance = "Performance", pdp = "Partial dependence"),
+      views_plot = c("importance", "performance", "pdp"),
+      actions = list(
+        ea_action("pdp", "Generate partial-dependence plot", icon = "chart-line",
+          hint = "Uses the variable chosen above. Slow on large forests.",
+          run = function(fit, f, pools) {
+            if (!requireNamespace("pdp", quietly = TRUE))
+              stop("Partial dependence needs the 'pdp' package.")
+            v <- f$roles$pdp_var
+            if (!isTruthy(v))
+              stop("Choose a partial-dependence variable first.")
+            if (!(v %in% rownames(fit$model$importance)))
+              stop("'", v, "' is not one of the predictors this forest used.")
+            p <- pdp::partial(fit$model, pred.var = v, train = fit$data)
+            list(message = paste0("Partial dependence for '", v, "' ready - see the ",
+                                  "Partial dependence view."),
+                 store = list(pdp = p, pdp_var = v))
+          })),
+      fit = function(df, r, p) {
+        if (!requireNamespace("randomForest", quietly = TRUE))
+          stop("Random forest needs the 'randomForest' package.")
+        tgt <- r$y; xs <- setdiff(r$x, tgt)
+        if (!length(xs)) stop("Choose at least one predictor other than the target.")
+        keep <- c(tgt, xs)
+        dm <- df[stats::complete.cases(df[, keep, drop = FALSE]), keep, drop = FALSE]
+        if (nrow(dm) < 5) stop("Not enough complete rows to train; this has ", nrow(dm), ".")
+        # Backtick every name so columns with digits/dots/spaces do not break
+        # formula parsing (the module learned this the hard way with VMI codes).
+        form <- stats::as.formula(paste0("`", tgt, "` ~ ",
+                  paste(sprintf("`%s`", xs), collapse = " + ")))
+        reg <- is.numeric(dm[[tgt]])
+        np <- length(xs)
+        mtry <- if (reg) max(floor(np / 3), 1) else floor(sqrt(np))
+        ntree <- as.integer(p$ntree %||% 500L)
+        fitm <- randomForest::randomForest(form, data = dm, ntree = ntree,
+                                           mtry = mtry, importance = TRUE)
+        cvres <- NULL
+        if (isTRUE(p$run_cv)) {
+          # Pass ntree AND the model's own mtry rule, so the CV describes THIS
+          # forest. The module passed neither.
+          cvres <- tryCatch(
+            randomForest::rfcv(dm[, xs, drop = FALSE], dm[[tgt]], cv.fold = 10,
+                               ntree = ntree, mtry = function(pp) mtry),
+            error = function(e) NULL)
+        }
+        list(model = fitm, data = dm, target = tgt, preds = xs, reg = reg,
+             ntree = ntree, mtry = mtry, cv = cvres)
+      },
+      plots = list(
+        importance = function(fit, f) {
+          randomForest::varImpPlot(fit$model, main = "Variable importance")
+        },
+        performance = function(fit, f) {
+          if (fit$reg) {
+            obs <- fit$data[[fit$target]]; pr <- fit$model$predicted
+            graphics::plot(obs, pr, pch = 16, col = "#2e7d3266",
+                           xlab = "Observed", ylab = "OOB predicted",
+                           main = "Out-of-bag predictions")
+            graphics::abline(0, 1, col = "#c62828", lwd = 2)
+            graphics::grid(col = "grey92")
+          } else {
+            print(.plot_conf_matrix(
+              table(Predicted = fit$model$predicted, Actual = fit$data[[fit$target]]),
+              title = "Out-of-bag confusion matrix"))
+          }
+        },
+        pdp = function(fit, f) {
+          p <- (f$extra %||% list())$pdp
+          if (is.null(p))
+            return(show_placeholder(paste("Choose a partial-dependence variable,",
+                                          "then press the button in the tool panel.")))
+          print(pdp::plotPartial(p, main = paste("Partial dependence on",
+                                                 (f$extra %||% list())$pdp_var)))
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        summary = tagList(
+          tags$pre(paste(utils::capture.output({
+            op <- options(width = 1000); on.exit(options(op)); print(fit$model)
+          }), collapse = "\n")),
+          if (!is.null(fit$cv)) tagList(
+            tags$h6(class = "text-uppercase text-muted small mt-2",
+                    "10-fold CV error by number of variables"),
+            DT::datatable(data.frame(Variables = as.integer(names(fit$cv$error.cv)),
+                                     Error = signif(as.numeric(fit$cv$error.cv), 5)),
+                          rownames = FALSE, options = list(dom = "t", pageLength = 25)))),
+        importance = ea_stat_plot(ns, "importance", if (solo) "520px" else "100%"),
+        performance = layout_columns(col_widths = c(6, 6),
+          card(card_header("Out-of-bag metrics"), tags$pre(paste(c(
+            sprintf("Trees        : %d", fit$ntree),
+            sprintf("mtry         : %d  (%s rule)", fit$mtry,
+                    if (fit$reg) "p/3" else "sqrt(p)"),
+            sprintf("Predictors   : %d", length(fit$preds)),
+            sprintf("Rows         : %d", nrow(fit$data)),
+            "",
+            if (fit$reg) paste(utils::capture.output(print(signif(unlist(
+                 uef_evaluation(fit$model$predicted,
+                                fit$data[[fit$target]])), 4))), collapse = "\n")
+            else sprintf("OOB accuracy : %.2f%%",
+                         100 * (1 - fit$model$err.rate[fit$model$ntree, "OOB"]))),
+            collapse = "\n"))),
+          card(ea_stat_plot(ns, "performance", if (solo) "100%" else "340px"))),
+        pdp = ea_stat_plot(ns, "pdp", if (solo) "480px" else "100%"))
     ),
 
     # ---- GLMM (backlog item 34) --------------------------------------------

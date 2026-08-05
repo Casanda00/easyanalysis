@@ -1532,7 +1532,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       bayesian       = list(nm = "Bayesian analysis",   grp = "Statistics", tools = bayesianToolsUI,canvas = bayesianCanvasUI),
       timeseries     = list(nm = "Time series",         grp = "Statistics", tools = timeseriesToolsUI, canvas = timeseriesCanvasUI),
       # --- Machine learning ---
-      rf             = list(nm = "Random Forest",       grp = "Machine Learning", tools = rfToolsUI,     canvas = rfCanvasUI),
+      # rf RETIRED 2026-08-05: it is a statistics.R entry now (stat_rf).
       # xgboost RETIRED 2026-08-04: it is a statistics.R entry now (stat_xgboost),
       # registered by the loop below. Keeping this line too would put the same
       # screen in the menu twice, from two different implementations.

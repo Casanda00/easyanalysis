@@ -8,6 +8,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.7 — 2026-08-05
+
+### Fixed
+- **Random Forest's 10-fold CV described a different forest than the one you trained.** It
+  never passed your tree count through, so the CV curve always came from 500-tree forests
+  however you set the slider — and it used the classification `sqrt(p)` rule for choosing
+  variables per split even on a regression model, whose displayed fit used `p/3`. Both now
+  match the model on screen.
+
+### Changed
+- **Random Forest is now a registry entry** (migration 7 of 9), verified to produce
+  **identical out-of-bag predictions and identical variable importance** to the module it
+  replaces, for both regression and classification, with the same `mtry` rules.
+- Its partial-dependence plot still sits behind its own button (it is slow on large forests)
+  and now reports clearly when the chosen variable was not one of the model's predictors.
+
 ## v0.9.6 — 2026-08-05
 
 ### Fixed

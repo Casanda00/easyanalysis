@@ -222,13 +222,25 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
       observeEvent(input[[paste0("act_", a$id)]], {
         f <- fit_obj()
         if (is.null(f)) return()
-        msg <- tryCatch(a$run(f$fit, f, list(table = dataset_pool)),
-                        error = function(e) {
-                          showNotification(paste0(a$label, " failed: ",
-                                                  conditionMessage(e)),
-                                           type = "error", duration = 8)
-                          NULL
-                        })
+        res <- tryCatch(
+          withProgress(message = paste0(a$label, "..."), value = 0.5,
+                       a$run(f$fit, f, list(table = dataset_pool))),
+          error = function(e) {
+            showNotification(paste0(a$label, " failed: ", conditionMessage(e)),
+                             type = "error", duration = 8)
+            NULL
+          })
+        if (is.null(res)) return()
+        # A list result may carry `store`, which is merged into the fit record so
+        # a plot can render what the action computed -- that is how a slow
+        # result (a partial-dependence curve) stays behind a button.
+        if (is.list(res)) {
+          if (!is.null(res$store)) {
+            f$extra <- utils::modifyList(f$extra %||% list(), res$store)
+            fit_obj(f)
+          }
+          msg <- res$message
+        } else msg <- res
         if (!is.null(msg) && nzchar(msg))
           showNotification(msg, type = "message", duration = 5)
       }, ignoreInit = TRUE)

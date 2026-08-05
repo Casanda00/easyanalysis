@@ -2408,13 +2408,15 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**6 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
-**pca ✅** · **gam ✅** · survival · anova · rf.
+**7 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
+**pca ✅** · **gam ✅** · **rf ✅** · survival · anova.
 
-**Running score: 6 screens migrated, 7 latent bugs.** The prediction made after PCA held
-exactly: PCA had no CV loop and was clean; **GAM had one and was the worst yet** — it could
-never fit a model at all, plus its CV dropped two settings. `rf` is the last screen with a
-hand-rolled CV loop and should be treated as suspect; `anova` and `survival` have none.
+**Running score: 7 screens migrated, 8 latent bugs.** RF forced a **refinement to the
+pattern**: its validation is not a hand-rolled loop at all — it calls `randomForest::rfcv()` —
+and it *still* lost the model's settings. So the rule is not "hand-written loops are risky";
+it is **any validation path that does not inherit the fitted model's parameters**, whether you
+wrote the loop or a package did. Only `survival` and `anova` remain, and neither has a
+validation path of its own.
 
 Every port has been bit-for-bit faithful, and four of the five turned up something broken
 that nobody had noticed. That remains the strongest argument for finishing: these screens are
@@ -2428,6 +2430,7 @@ not being exercised, and porting is what exercises them.
 | Neural network | both CV loops hardcoded `maxit = 200`, ignoring the user's setting | yes |
 | **PCA** | **none — clean** | **no** |
 | GAM | **could never fit a model at all** (`mgcv::s()` unparseable), plus CV dropped basis AND method | yes |
+| Random forest | `rfcv()` ignored `ntree` and used the classification `mtry` rule on regression models | not hand-rolled — a package call, and it still lost the settings |
 
 **The per-fold-refit pattern is confirmed in every screen that has one** — three for three —
 and should be the default suspicion rather than a surprise. SVM's refits ignored cost, gamma
@@ -2617,6 +2620,38 @@ R², including a non-default `k = 6, bs = "cr", method = "GCV.Cp"` (confirmed to
 different fit from the default). The per-predictor comparison table still flags a sine
 relationship as non-linear (gain 0.26). The action writes an `observed/lm_pred/gam_pred` table
 into the pool, one row per fitted row.
+
+##### Migration 7 — Random forest (2026-08-05)
+
+**Bug 9, and it REFINES the pattern rather than repeating it.** RF was flagged as suspect
+because it had validation — but its validation is not a hand-rolled loop at all: it calls
+`randomForest::rfcv()`. It still lost the model's settings, in two ways
+(`mod_rf.R:101`):
+
+- **`ntree` was never passed**, so the CV curve came from 500-tree forests no matter where the
+  slider was. Verified that `ntree` *does* reach `rfcv()` through `...` and *does* change
+  `error.cv`, so this was a passthrough that was simply omitted.
+- **`rfcv()`'s default `mtry` is `function(p) max(1, floor(sqrt(p)))`** — the *classification*
+  rule — and it was left at the default even for regression models, whose displayed fit used
+  `floor(p/3)`.
+
+**So the rule to carry into the last two ports is broader than "hand-written loops are
+risky":** it is **any validation path that does not inherit the fitted model's parameters**,
+whether you wrote the loop or a package did. Delegating to a package function does not make
+the settings travel with it.
+
+**Second `actions` use, and it needed one more capability.** GAM's action just had a side
+effect (write a table); RF's partial-dependence button must **produce something a view then
+renders**. `ea_action`'s `run()` may now return `list(message =, store =)`, and `store` is
+merged into the fit record as `extra`, which plots can read. That is what keeps a slow
+computation behind a button instead of recomputing every time its view is shown — the reason
+the module used a button in the first place.
+
+**Parity verified:** identical out-of-bag predictions and identical importance matrices
+against `randomForest::randomForest()` directly, for both regression (`mtry = p/3`) and
+classification (`mtry = sqrt(p)`), with `ntree` honoured. The PDP view shows guidance before
+the button is pressed rather than erroring, and reports clearly when the chosen variable is
+not one of the model's predictors.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

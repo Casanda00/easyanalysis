@@ -971,7 +971,7 @@ server <- function(input, output, session) {
   lme_ctx   <- lmeServer("lme", dataset_pool, active_dataset)
   anova_ctx <- anovaServer("anova", dataset_pool, active_dataset)
   log_ctx   <- logisticServer("logistic", dataset_pool, active_dataset)
-  rf_ctx    <- rfServer("rf", dataset_pool, active_dataset)
+  # rfServer is NOT bound: it is a statistics.R entry now (stat_rf).
   clust_ctx <- clusteringServer("clustering", dataset_pool, active_dataset)
   clf_ctx   <- classificationServer("classification", dataset_pool, active_dataset)
   da_ctx    <- daServer("da", dataset_pool, active_dataset)
@@ -1132,7 +1132,7 @@ server <- function(input, output, session) {
     descriptive = desc_ctx, tests = test_ctx,
     lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
     survival = surv_ctx, sem = sem_ctx, bayesian = bayes_ctx,
-    rf = rf_ctx,
+
 
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,
     timeseries = ts_ctx,
