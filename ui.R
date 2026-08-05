@@ -122,10 +122,24 @@ page_fillable(
     tags$script(HTML(paste0(
       "(function(){try{var t=localStorage.getItem('ea-theme');",
       "if(t) document.documentElement.setAttribute('data-ea-theme',t);}catch(e){}",
+      # Marks the chosen swatch in Settings. The active theme lives in
+      # localStorage / the data-ea-theme attribute, which the SERVER cannot know
+      # at render time (ui.R only sets the attribute when localStorage already
+      # holds one), so the selected state has to be resolved client-side. The
+      # default name is injected from R so it cannot drift from ea_palettes.
+      "window.eaMarkTheme=function(){",
+      "var cur=document.documentElement.getAttribute('data-ea-theme')||'",
+      names(ea_palettes)[1], "';",
+      "var g=document.querySelectorAll('.set-theme-sw');",
+      "for(var i=0;i<g.length;i++){",
+      "g[i].classList.toggle('on', g[i].getAttribute('data-theme-name')===cur);}};",
       "window.eaSetTheme=function(name){try{",
       "document.documentElement.setAttribute('data-ea-theme',name);",
       "localStorage.setItem('ea-theme',name);}catch(e){}",
+      "if(window.eaMarkTheme) window.eaMarkTheme();",
       "if(window.Shiny) setTimeout(function(){window.dispatchEvent(new Event('resize'));},60);};",
+      "document.addEventListener('DOMContentLoaded',function(){",
+      "if(window.eaMarkTheme) window.eaMarkTheme();});",
       "})();"))),
 
     tags$style(HTML("
@@ -1345,6 +1359,35 @@ page_fillable(
     }
     .settings-action-btn .fa { font-size: 13px; }
     .settings-hint { font-size: 11px; color: var(--bark); margin: 0; }
+    /* Theme picker. Two per row so the label stays readable; the swatch shows
+       the set's own paper + brand colour, which is the only honest preview.
+       Every colour here is a token so the picker itself re-themes (gotcha 31). */
+    .set-theme-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;
+    }
+    .set-theme-sw {
+      display: flex; align-items: center; gap: 7px; text-align: left;
+      background: var(--sunk); border: 1px solid var(--line); border-radius: 6px;
+      padding: 6px 8px; font-size: 11.5px; color: var(--bark); cursor: pointer;
+      transition: background .14s, border-color .14s, color .14s;
+    }
+    .set-theme-sw:hover { background: var(--tint); border-color: var(--canopy); color: var(--ink); }
+    /* Selected state is applied by eaMarkTheme() on load, on open and on click:
+       the server never knows which theme is active. */
+    .set-theme-sw.on {
+      border-color: var(--forest); color: var(--ink);
+      background: color-mix(in srgb, var(--forest) 14%, transparent);
+      box-shadow: inset 0 0 0 1px var(--forest);
+    }
+    .set-theme-chip {
+      position: relative; flex: 0 0 auto; width: 20px; height: 20px;
+      border-radius: 5px; border: 1px solid var(--line); display: block;
+    }
+    .set-theme-dot {
+      position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px;
+      border-radius: 50%; border: 1px solid var(--panel); display: block;
+    }
+    .set-theme-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .settings-flash { animation: setFlash 1.2s ease; }
     @keyframes setFlash { 0%, 100% { background: transparent; }
                           25% { background: color-mix(in srgb, var(--forest) 16%, transparent); } }
@@ -2260,6 +2303,9 @@ page_fillable(
         var p  = document.getElementById('settings-panel');
         var ov = document.getElementById('settings-overlay');
         ov.style.display = 'block';
+        /* Re-mark the active theme on every open: it can be changed from the
+           workspace View menu too, and the panel is built once and reused. */
+        if (window.eaMarkTheme) window.eaMarkTheme();
         requestAnimationFrame(function(){
           p.classList.add('open');
           ov.style.opacity = '1';
@@ -2749,6 +2795,42 @@ page_fillable(
 
     # Body
     tags$div(class = "settings-body",
+
+      # --- Section: Theme ---
+      # FIRST in the panel deliberately. The theme picker used to live only in
+      # the workspace's View menu, which is not reachable until a project is
+      # open -- so a user could not set the appearance before starting work, or
+      # from the Projects screen at all. The Settings gear is visible on every
+      # screen including Projects, so putting it here is what makes the theme
+      # changeable "upon the software loading".
+      #
+      # Client-side only: eaSetTheme() sets <html data-ea-theme> and writes
+      # localStorage. No Shiny input, no server round-trip, and it survives a
+      # restart. The same mechanism the View menu uses -- one implementation.
+      tags$div(class = "settings-section", id = "set-theme",
+        tags$p(class = "settings-section-title", "Theme"),
+        tags$div(class = "set-theme-grid",
+          lapply(names(ea_palettes), function(nm) {
+            p <- ea_palettes[[nm]]
+            tags$button(
+              class = "set-theme-sw", `data-theme-name` = nm,
+              title = p$label %||% nm,
+              onclick = sprintf("eaSetTheme('%s')", nm),
+              tags$span(class = "set-theme-chip",
+                style = sprintf("background:%s; border-color:%s;",
+                  p$paper  %||% ea_palette$paper,
+                  p$line   %||% ea_palette$line),
+                # A second dot in the set's brand colour: paper alone made the
+                # two light themes indistinguishable in the picker.
+                tags$span(class = "set-theme-dot",
+                  style = sprintf("background:%s;",
+                    p$forest %||% ea_palette$forest))),
+              tags$span(class = "set-theme-lbl", p$label %||% nm))
+          })
+        ),
+        tags$p(class = "settings-hint",
+          "Applies instantly and is remembered on this computer.")
+      ),
 
       # --- Section: Data History ---
       tags$div(class = "settings-section",

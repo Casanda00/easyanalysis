@@ -103,22 +103,41 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.5</b> · 47 releases ·
+      <p class="meta">Latest: <b>v0.10.6</b> · 48 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-5"><h2><a class="anchor" href="#v0-10-5">v0.10.5</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-6"><h2><a class="anchor" href="#v0-10-6">v0.10.6</a><span class="when">2026-08-05</span></h2>
+<h3>Added — turn the basemap off from the Layers panel</h3>
+<p>Data layers already had a switch each; the <strong>basemap</strong> was the one thing on the map with no row
+and no switch. Turning it off meant hunting for &quot;None&quot; at the bottom of a 14-entry menu.</p>
+<p>There is now a <strong>Basemap row</strong> at the bottom of the Layers panel — where it belongs, since the
+basemap draws beneath every data layer. Same toggle switch as a layer, but no remove button and
+no expander: it is tiles, not a project layer. Its label shows which basemap is active, so the
+row doubles as a readout. It appears even in an empty project, because there is still a map to
+turn off.</p>
+<p>The toggle is deliberately the <strong>same state</strong> as the menu&#39;s existing &quot;None&quot; entry rather than a
+second flag, so the two can never disagree — and switching back on restores the basemap you were
+using, not the default.</p>
+<h3>Added — pick your theme before you start</h3>
+<p>The theme picker used to live only in the workspace View menu, which does not exist until a
+project is open. <strong>Theme is now the first section in Settings</strong>, and the Settings gear is on the
+topbar from the moment the app loads — including on the Projects screen. Six swatches, each
+previewing its own background and accent colour.</p>
+<p>Both entry points call the same function, so there is one mechanism, not two. Changes apply
+instantly and are remembered on this computer.</p>
+<p><em>(A black &amp; white theme is still on the list — this change moves where the picker lives, it does
+not add a palette.)</em></p>
+</section><section class="rel" id="v0-10-5"><h2><a class="anchor" href="#v0-10-5">v0.10.5</a><span class="when">2026-08-05</span></h2>
 <h3>Fixed — CRS search really does query GDAL/PROJ now</h3>
-<blockquote>
-<p>&quot;searching for the coordinates feels hardcoded. and I cant find some coordinates.&quot;</p>
-</blockquote>
-<p>Both halves of that report were right, and for three separate reasons. The search function
-queried PROJ&#39;s <code>proj.db</code> correctly — but <strong>nothing ever called it with a query.</strong> Every picker
-was built from a <strong>static 500-entry list</strong>, which selectize then filtered in the browser, so
-what you typed never reached the database.</p>
+<p>CRS search felt hardcoded, and some coordinate systems could not be found at all. Both symptoms
+were real, and they had three separate causes. The search function queried PROJ&#39;s <code>proj.db</code>
+correctly — but <strong>nothing ever called it with a query.</strong> Every picker was built from a <strong>static
+500-entry list</strong>, which selectize then filtered in the browser, so what you typed never reached
+the database.</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -161,8 +180,8 @@ Dutch RD New (28992) simply were not in it.</li>
 name is &quot;WGS 84 / UTM zone 35N&quot;, which <code>%utm 35n%</code> cannot match. Matching is now tokenised:
 every word you type must appear somewhere in the entry, so a code, a name, or a mix all work.</li>
 <li><strong><code>RSQLite</code> was in neither dependency list</strong>, and it is the only way to read <code>proj.db</code>. On a
-fresh install every picker silently degraded to 8 hardcoded codes — the literal source of
-&quot;feels hardcoded&quot;. It is now an <code>extras</code> dependency.</li>
+fresh install every picker silently degraded to 8 hardcoded codes — which is what made the
+picker feel hardcoded in the first place. It is now an <code>extras</code> dependency.</li>
 <li>The catalogue is attached <strong>server-side</strong>, which is what makes 6,886 entries practical at all:
 embedding them measured 509 KB per picker and the app builds five of them.</li>
 <li><code>mod_raster.R</code> stopped claiming it was &quot;Querying 7,000+ official GDAL/PROJ EPSG…&quot; while

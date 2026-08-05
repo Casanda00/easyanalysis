@@ -38,6 +38,25 @@ const md = readFileSync(join(repo, "CHANGELOG.md"), "utf8");
 const firstRelease = md.search(/^## v/m);
 const body = firstRelease > 0 ? md.slice(firstRelease) : md;
 
+/* This page is PUBLIC, so a reporter's verbatim words must never reach it.
+   Feedback quotes belong in BACKLOG.md, which is not published. Three of them
+   were caught by eye on the way to the site once; a build that fails loudly is
+   cheaper than noticing again. Only release bodies are checked -- the preamble
+   above is already dropped, and editorial blockquotes that do not open with a
+   quotation mark (corrections, "Changelog gap" notes) are legitimate. */
+const quoted = body
+  .split("\n")
+  .map((l, i) => [i, l])
+  .filter(([, l]) => /^>\s*["“]/.test(l));
+if (quoted.length) {
+  console.error(
+    "\nERROR: CHANGELOG.md contains verbatim quotes, and this file is published.\n" +
+    "Move them to BACKLOG.md and describe the symptom in neutral language instead.\n" +
+    quoted.map(([i, l]) => `  line ${i + 1}: ${l.trim()}`).join("\n") + "\n"
+  );
+  process.exit(1);
+}
+
 /* Newest version, for the header line. */
 const latest = (body.match(/^## (v[\d.]+)/m) || [])[1] || "";
 const releaseCount = (body.match(/^## v/gm) || []).length;

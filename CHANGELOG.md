@@ -6,18 +6,57 @@ Every build/push gets a version and an entry here. Version is single-sourced in
 Format: `MAJOR.MINOR.PATCH`. Bump PATCH for fixes, MINOR for features, MAJOR for
 breaking changes. Newest first.
 
+**THIS FILE IS PUBLISHED.** `landing/build-release-notes.mjs` turns it into
+[easyanalysis.dev/release-notes](https://easyanalysis.dev/release-notes) on every push to
+`main`, so write it for **users**, not for the team:
+- **Never quote a reporter's words here.** Verbatim feedback is internal — it belongs in
+  `BACKLOG.md`, which is not published. Describe the symptom in neutral product language
+  instead ("CRS search felt hardcoded", not a pasted quote).
+- No names, no internal ticket chatter, no "the reporter said".
+- Say what changed and why it matters to someone using the app; keep file paths and
+  implementation detail to the minimum needed to make the change understandable.
+
 ---
+
+## v0.10.6 — 2026-08-05
+
+### Added — turn the basemap off from the Layers panel
+
+Data layers already had a switch each; the **basemap** was the one thing on the map with no row
+and no switch. Turning it off meant hunting for "None" at the bottom of a 14-entry menu.
+
+There is now a **Basemap row** at the bottom of the Layers panel — where it belongs, since the
+basemap draws beneath every data layer. Same toggle switch as a layer, but no remove button and
+no expander: it is tiles, not a project layer. Its label shows which basemap is active, so the
+row doubles as a readout. It appears even in an empty project, because there is still a map to
+turn off.
+
+The toggle is deliberately the **same state** as the menu's existing "None" entry rather than a
+second flag, so the two can never disagree — and switching back on restores the basemap you were
+using, not the default.
+
+### Added — pick your theme before you start
+
+The theme picker used to live only in the workspace View menu, which does not exist until a
+project is open. **Theme is now the first section in Settings**, and the Settings gear is on the
+topbar from the moment the app loads — including on the Projects screen. Six swatches, each
+previewing its own background and accent colour.
+
+Both entry points call the same function, so there is one mechanism, not two. Changes apply
+instantly and are remembered on this computer.
+
+*(A black & white theme is still on the list — this change moves where the picker lives, it does
+not add a palette.)*
 
 ## v0.10.5 — 2026-08-05
 
 ### Fixed — CRS search really does query GDAL/PROJ now
 
-> "searching for the coordinates feels hardcoded. and I cant find some coordinates."
-
-Both halves of that report were right, and for three separate reasons. The search function
-queried PROJ's `proj.db` correctly — but **nothing ever called it with a query.** Every picker
-was built from a **static 500-entry list**, which selectize then filtered in the browser, so
-what you typed never reached the database.
+CRS search felt hardcoded, and some coordinate systems could not be found at all. Both symptoms
+were real, and they had three separate causes. The search function queried PROJ's `proj.db`
+correctly — but **nothing ever called it with a query.** Every picker was built from a **static
+500-entry list**, which selectize then filtered in the browser, so what you typed never reached
+the database.
 
 | | Before | After |
 |---|---|---|
@@ -34,8 +73,8 @@ what you typed never reached the database.
   name is "WGS 84 / UTM zone 35N", which `%utm 35n%` cannot match. Matching is now tokenised:
   every word you type must appear somewhere in the entry, so a code, a name, or a mix all work.
 - **`RSQLite` was in neither dependency list**, and it is the only way to read `proj.db`. On a
-  fresh install every picker silently degraded to 8 hardcoded codes — the literal source of
-  "feels hardcoded". It is now an `extras` dependency.
+  fresh install every picker silently degraded to 8 hardcoded codes — which is what made the
+  picker feel hardcoded in the first place. It is now an `extras` dependency.
 - The catalogue is attached **server-side**, which is what makes 6,886 entries practical at all:
   embedding them measured 509 KB per picker and the app builds five of them.
 - `mod_raster.R` stopped claiming it was "Querying 7,000+ official GDAL/PROJ EPSG…" while

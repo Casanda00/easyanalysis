@@ -3226,15 +3226,32 @@ and is complete:
 It is also *already* implemented the way the gotcha-23 warning demands — inside the single
 `renderLeaflet` pass, not via a proxy.
 
-**So the report means something else, and must be clarified before any work.** The plausible
-readings, in order:
-1. **Discoverability** — the toggle is a small unlabelled switch on the layer row; the reporter
-   may simply not have found it. If so the fix is labelling/affordance, not function.
-2. **A standard leaflet layers control** — the familiar stacked-checkbox overlay control in the
-   map corner, which is what "turn the map layer on and off" describes in Arc/QGIS terms.
-3. **Sub-layer visibility** — individual bands of a raster, rather than the whole layer.
+**CLARIFIED by the reporter 2026-08-05 — and DONE (v0.10.6):**
+> "there is a toggle switch there already. but we should one for basemap in the layer panel so
+> that user can turn the basemap off."
 
-**Do not build until this is settled** — the feature as literally described is already there.
+The data layers were never the problem; the **basemap** was the one thing on the map with no row
+and no switch. Turning it off was possible only by hunting for "None" at the bottom of a
+14-entry menubar list.
+
+**Fix:** a Basemap row in the Layers panel, pinned to the bottom to match its draw order
+(`zIndex = 0`, beneath every data layer). It carries the same toggle switch as a layer row, but
+no remove button and no expander — it is tiles, not a project layer. Its type label shows which
+basemap is active, so the row doubles as a readout of the menubar choice. It renders even in an
+empty project, since there is still a map to turn off.
+
+**The one design decision worth keeping:** the toggle is **the same state** as the menubar's
+existing "None" entry, not a second visibility flag. `.draw_layers()` already treated `""` as
+off (`if (nzchar(bm))`), so the empty string *is* the off state and nothing downstream changed.
+A separate boolean would have let the panel say "on" while the menu said "None" — two controls
+for one thing, drifting apart. A `bm_last` reactiveVal remembers the last real basemap so
+toggling back on restores what was showing rather than snapping to the default.
+
+**Verified** (`testServer`): off sets `""` and `.draw_layers` skips the tiles; on restores;
+choosing Satellite → off → on returns **Satellite**, not the default; the menubar's "None"
+followed by the panel toggle restores correctly, proving no drift; the row renders both with and
+without data. Build OK, app serves HTTP 200.
+**Not verified here:** how the row looks (no browser automation) — worth an eyeball.
 
 ### 38. Delete features from the map via the attribute table
 > "use the attribute table to delete items in the map view using the attribute table - like arc and qgis."
@@ -3390,6 +3407,18 @@ already in this backlog, to be checked before it is relied on:
 **Next step:** treat this as its own planning exercise with the reporter, not as a task to
 start. It likely reframes the priority order of everything else in this file.
 
+**SEQUENCING DECIDED by the reporter 2026-08-05:**
+> "first, we fix the GIS side before even begin working on the intersection where mapping and
+> modeling happens under one roof."
+
+So **items 37–40 (and 39's symbology) come first, and item 42's integration work does not start
+until they are done.** This is the right call and worth recording *why*, so it is not quietly
+reversed later: the analyse-and-map intersection is built *on top of* the map — a
+predict-to-raster result or a model joined back to its features is only useful if you can then
+style it, click it, and inspect its attributes. Building the intersection on a map that cannot
+yet identify a feature would mean producing results no one can interrogate. GIS first is
+therefore a dependency order, not a preference.
+
 ### 43. A consistent image viewer across every screen with plots
 > "screens with multiple image view like cv and other images, perhaps we can add the slider across the screens (I i think it would be more flexible oif it was across all screens. also, a zoom button cus when you open the plot, it re-renders, which is good then overlapping texts gets spaced. more like what zoo button does in rstudio. also, we could add setting dimensions too."
 
@@ -3416,3 +3445,43 @@ Three related controls, wanted **on every screen that renders a plot**, not per-
 Items 37, 38, 40 all change the map's behaviour, so `spatial_design_reference.md` and
 `DESIGN.md`'s layout idiom need updating **with** the work, not after — the discipline round-4
 item 24 exists to enforce.
+
+### 45. Theme picker reachable before any analysis — **DONE (v0.10.6)**
+> "while at it. can you add the theme to the settings, that way the user can change the theme
+> upon the software loading before even going to the analyses."
+
+The theme picker existed only in the **workspace View menu** (`mod_workspace.R:411`), which is
+not reachable until a project is open. So the appearance could not be set from the Projects
+screen — the app's *first* view — and a user on a bright screen or a dark room had to open a
+project first just to fix the contrast.
+
+**Fix:** a **Theme** section in the Settings drawer, placed **first** in the panel. The Settings
+gear sits in the topbar with no `tb-ws` / `tb-coanalyst` class, so unlike Undo/Reset/Co-Analyst
+it is *not* hidden on the Projects screen — which is exactly what makes the theme changeable
+"upon the software loading". Six swatches, one per `ea_palettes` entry, each showing that set's
+own `paper` plus a dot in its `forest` brand colour (paper alone made the two light themes
+indistinguishable).
+
+**Design notes worth keeping:**
+- **One implementation, two entry points.** Both the View menu and the new section call the same
+  `eaSetTheme()`. No second mechanism, no server round-trip — it sets `<html data-ea-theme>` and
+  writes localStorage, so it applies instantly and survives a restart.
+- **The selected marker must be client-side.** `ui.R` only sets `data-ea-theme` when localStorage
+  already holds a value, so the **server cannot know** which theme is active at render time. A
+  new `eaMarkTheme()` resolves it in the browser and runs on load, on every `openSettings()` (the
+  panel is built once and reused, and the View menu can change the theme behind its back), and
+  after every `eaSetTheme()`.
+- **The default name is injected from R** (`names(ea_palettes)[1]`) rather than hardcoded as
+  `'forest'`, so adding or reordering a palette cannot silently break the marker.
+- **The picker is fully tokenised** — no hex anywhere in its CSS — so the picker re-themes along
+  with everything else (gotcha 31).
+
+**Verified:** build OK (a stray quote inside `HTML()` would have failed the parse — gotcha 1);
+all six palettes render a button with the right `data-theme-name` and a working `onclick`; the
+gear carries no screen-hiding class, so it is present on Projects; Theme is the first section;
+`eaMarkTheme` is defined and called from all three places; no hardcoded hex in the picker CSS;
+the View menu still uses the same function. App serves HTTP 200.
+**Not verified here:** appearance (no browser automation) — worth an eyeball.
+
+**Note:** a **black & white theme is still open** as round-4 item 25. This item only moves where
+the picker lives; it does not add a palette.

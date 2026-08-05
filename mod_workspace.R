@@ -215,9 +215,32 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           span(class = "ea-wsx-sc", style = "background:var(--earth)")))
     }
 
+    # The basemap as a row in the Layers panel, pinned to the BOTTOM because that
+    # is where it sits in the draw order (it is added with zIndex = 0, under
+    # every data layer). It carries no remove button and no expander: it is not a
+    # project layer, just tiles. The label shows which basemap is active, so the
+    # row doubles as a readout of the menubar's choice.
+    .basemap_row <- function() {
+      on <- nzchar(basemap())
+      nm <- names(BASEMAPS)[match(basemap(), unname(BASEMAPS))]
+      div(class = paste("ea-wsx-lyr2", if (on) "" else "off"),
+        div(class = "ea-wsx-lyrtop",
+          tags$span(class = paste("ea-wsx-sw-toggle", if (on) "on" else ""),
+                    onclick = .fire("ws_base_vis", "toggle"),
+                    title = if (on) "Hide basemap" else "Show basemap",
+                    tags$span(class = "knob")),
+          tags$span(class = "ea-wsx-sw", style = "background:#9AA5B1;"),
+          tags$span(class = "ea-wsx-nm", title = "Background map tiles", "Basemap"),
+          tags$span(class = "ea-wsx-ty", if (on) (nm %||% "on") else "off")))
+    }
+
     output$layers <- renderUI({
       ls <- layers(); act <- activeLayer()
-      if (!length(ls)) return(div(class = "ea-hint", "No data yet. Add data to the project."))
+      # The basemap row shows even with no data: there is still a map under it,
+      # and being able to turn the tiles off is exactly as useful when empty.
+      if (!length(ls)) return(tagList(
+        div(class = "ea-hint", "No data yet. Add data to the project."),
+        .basemap_row()))
       div(lapply(ls, function(l) {
         vis <- .vis(l$nm); ex <- isTRUE(lexp[[l$nm]])
         div(class = paste("ea-wsx-lyr2", if (identical(l$nm, act)) "active" else "",
@@ -255,7 +278,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               HTML("&times;")),
             tags$span(class = "ea-wsx-chev", onclick = .fire("ws_exp", l$nm), "▶")),
           div(class = "ea-wsx-leg", .legend(l)))
-      }))
+      }), .basemap_row())
     })
 
     # the active layer (if a table) drives the Data view; else fall back
@@ -278,7 +301,21 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       "Grey canvas"       = "Esri.WorldGrayCanvas",
       "None"              = "")
     basemap <- reactiveVal("OpenStreetMap")   # bright standard OSM by default
-    observeEvent(input$ws_basemap, { basemap(input$ws_basemap) })
+    # Remembers the last REAL basemap, so switching the layers-panel toggle back
+    # on restores what was showing rather than jumping to the default.
+    bm_last <- reactiveVal("OpenStreetMap")
+    observeEvent(input$ws_basemap, {
+      basemap(input$ws_basemap)
+      if (nzchar(input$ws_basemap)) bm_last(input$ws_basemap)
+    })
+    # The basemap's on/off switch in the Layers panel is the SAME state as the
+    # menubar's "None" entry -- deliberately not a second flag. Two controls for
+    # one thing drift apart, and then the panel says "on" while the map shows no
+    # tiles. `.draw_layers`'s `if (nzchar(bm))` already treats "" as off, so the
+    # empty string IS the off state and nothing downstream needs to change.
+    observeEvent(input$ws_base_vis, {
+      if (nzchar(basemap())) basemap("") else basemap(bm_last())
+    })
 
     .mi <- function(label, js = NULL, sub = FALSE, disabled = FALSE, icon_name = NULL) {
       if (disabled) return(tags$a(class = "gm-item disabled", label))
