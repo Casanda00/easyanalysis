@@ -22,7 +22,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.9.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.10.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -122,14 +122,34 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.9</b> · 51 releases ·
+      <p class="meta">Latest: <b>v0.10.10</b> · 52 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-9"><h2><a class="anchor" href="#v0-10-9">v0.10.9</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-10"><h2><a class="anchor" href="#v0-10-10">v0.10.10</a><span class="when">2026-08-05</span></h2>
+<h3>Added — no more terminal: download it, double-click it, done</h3>
+<p>Until now the only way in was to open PowerShell and paste a command — and because nothing
+created a shortcut, <strong>that was needed every single time you wanted to open the app</strong>, not just to
+install it. Someone who installed last week had no way back in except finding that command again.</p>
+<p>Two changes fix it:</p>
+<ul>
+<li><strong>The installer now creates an EasyAnalysis shortcut</strong> on your Desktop and in the Start Menu.
+After the first install you just double-click it. It starts in seconds, because it skips
+everything already downloaded.</li>
+<li><strong>There is a downloadable installer</strong> on the website for people who would rather not touch a
+terminal at all. The one-line command still works and is still documented for anyone who
+prefers it.</li>
+</ul>
+<p>The shortcut opens the app minimised rather than hidden, so if something ever goes wrong there is
+still a window to look at. Close the app with the <strong>Quit</strong> button.</p>
+<p>Windows may warn that the downloaded file came from the internet — choose <strong>More info → Run
+anyway</strong>. That warning appears for any installer that has not been signed with a paid
+certificate; it is not a sign that anything is wrong.</p>
+<p><em>(The shortcut is Windows-only for now, and it still uses a generic icon.)</em></p>
+</section><section class="rel" id="v0-10-9"><h2><a class="anchor" href="#v0-10-9">v0.10.9</a><span class="when">2026-08-05</span></h2>
 <h3>Fixed — nothing was clickable in v0.10.7 and v0.10.8</h3>
 <p>The Quit button added in v0.10.7 carried a hidden line-break character in its confirmation
 message. That one character was invalid where it landed, which stopped <strong>the whole block of the

@@ -18,6 +18,32 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.10 — 2026-08-05
+
+### Added — no more terminal: download it, double-click it, done
+
+Until now the only way in was to open PowerShell and paste a command — and because nothing
+created a shortcut, **that was needed every single time you wanted to open the app**, not just to
+install it. Someone who installed last week had no way back in except finding that command again.
+
+Two changes fix it:
+
+- **The installer now creates an EasyAnalysis shortcut** on your Desktop and in the Start Menu.
+  After the first install you just double-click it. It starts in seconds, because it skips
+  everything already downloaded.
+- **There is a downloadable installer** on the website for people who would rather not touch a
+  terminal at all. The one-line command still works and is still documented for anyone who
+  prefers it.
+
+The shortcut opens the app minimised rather than hidden, so if something ever goes wrong there is
+still a window to look at. Close the app with the **Quit** button.
+
+Windows may warn that the downloaded file came from the internet — choose **More info → Run
+anyway**. That warning appears for any installer that has not been signed with a paid
+certificate; it is not a sign that anything is wrong.
+
+*(The shortcut is Windows-only for now, and it still uses a generic icon.)*
+
 ## v0.10.9 — 2026-08-05
 
 ### Fixed — nothing was clickable in v0.10.7 and v0.10.8

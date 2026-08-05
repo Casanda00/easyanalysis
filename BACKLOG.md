@@ -3692,3 +3692,53 @@ parse** and carry the intended `@type`; `vercel.json` still parses and serves th
 **Not verified here:** live headers and crawler behaviour after deploy — worth checking
 `easyanalysis.dev/llms.txt`, `/robots.txt` and `/sitemap.xml` return 200 with the right
 content types once Vercel has picked the commit up.
+
+### 46 (parts A + B) — **DONE (v0.10.10)**: Desktop shortcut and a double-click installer
+
+Item 47's Quit button (v0.10.7) unblocked this, exactly as that entry predicted: the console
+window was the only way to stop the app, so it could not be tucked away until Quit existed.
+
+**A — shortcuts created during install (`install.ps1`).**
+- Writes a small **local launcher** at `%LOCALAPPDATA%\EasyAnalysis\launch.ps1` and points
+  Desktop + Start Menu `.lnk` files at it. It has to be a *generated* script: `install.ps1` is
+  normally run via `iwr | iex`, so there is **no file on disk** for a shortcut to target.
+- The launcher **skips the download and dependency steps** (both already cached) and just starts
+  the app — that is what makes the second launch quick. `$App` and `$LibDir` are baked in at
+  install time, but **R is re-resolved at run time**, so installing or upgrading a system R later
+  does not break the shortcut.
+- **Minimized, NOT Hidden.** Hidden looks tidier, but a failed start would then show the user
+  absolutely nothing — and the v0.10.7 regression is a fresh reminder of how bad a silent failure
+  is. Minimized keeps the window in the taskbar as an escape hatch.
+- Shortcut creation is wrapped in `try/catch`: it **must never fail the install**, since the app
+  works fine without one.
+- The launcher guards both failure modes it can actually hit (no R, missing app files) and tells
+  the user the one command that fixes it, rather than closing instantly.
+
+**B — `landing/EasyAnalysis-Setup.bat`.** Double-click instead of pasting a command; it runs the
+same `install.ps1`, so there is no second install path to maintain. `vercel.json` serves it as
+`application/octet-stream` with `Content-Disposition: attachment` so browsers download rather
+than display it.
+
+**Docs (part of the item, not a follow-up).** The landing page now leads with **Download for
+Windows** and keeps the one-liner below under "Prefer the command line?". It warns plainly about
+the SmartScreen prompt (**More info → Run anyway**) — an unsigned download *will* trigger it, and
+a user who is not warned reads it as "this is malware". It also stops saying "keep the terminal
+open while you work", which Quit made untrue.
+
+**Verified** (`verify_shortcut.ps1`): `install.ps1` still parses; the generated `launch.ps1`
+parses and bakes in the right paths, re-resolves R, calls `launcher\run.R` and guards both
+failure modes; a **real `.lnk` was created and read back** — it targets `powershell.exe`, points
+at the launcher, is `-WindowStyle Minimized` and never `Hidden`, bypasses execution policy for
+that process only, and quotes the path (needed: `%LOCALAPPDATA%` paths contain spaces); the
+`.bat` fetches the real installer, handles failure and pauses; `vercel.json` forces the download.
+
+**Still open on item 46:**
+- **No custom icon.** No `.ico` ships, so the shortcut shows the PowerShell icon — functional but
+  scruffy. Needs an icon file before it looks like a real app.
+- **Windows only.** `install.sh` creates no `.desktop` entry (Linux) or `.app` (macOS).
+- **Option C (a signed `.exe`/`.msi`) is untouched and still gated on a code-signing
+  certificate.** The `.bat` reduces the terminal problem but does not remove the security prompt;
+  only signing does.
+- **Not verified end-to-end here**: this machine already has the app, so a genuine
+  clean-machine install → shortcut → double-click → app opens run has not been done. Worth doing
+  once on a fresh profile.
