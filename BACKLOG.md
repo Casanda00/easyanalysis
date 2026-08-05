@@ -3206,16 +3206,35 @@ The framing throughout is explicit and consistent: **"like arc and qgis"**. Thes
 separate asks, but they are one job — they are the interactions any desktop GIS gives you on a
 layer, and the workspace map currently gives none of them.
 
-### 37. Turn map layers on and off
+### 37. Turn map layers on and off — **ALREADY BUILT; this entry was wrong, needs clarification**
 > "users should be able to turn the map layer on and off."
 
-Per-layer visibility toggle in the Layers panel. Today a layer is either in the pool and drawn,
-or not in the pool at all — so the only way to hide something is to delete it, which loses it.
-This is the smallest of the four and the most obviously missing.
-- **Where:** the Layers panel in `mod_workspace.R`, and the leaflet draw pass in `mod_raster.R`.
-- **Watch out:** CLAUDE.md gotcha 23 — `leafletProxy` calls are lost when the map element is
-  re-created, so visibility must be part of the single `renderLeaflet` pass, not a proxy
-  afterthought. A naive `addLayer`/`removeLayer` toggle is exactly the shape that bug punishes.
+**Correction (2026-08-05, same day).** The first version of this entry claimed "a layer is either
+in the pool and drawn, or not in the pool at all — the only way to hide something is to delete
+it". **That is false, and it was written without checking.** Per-layer visibility already exists
+and is complete:
+
+| Piece | Where |
+|---|---|
+| State | `lvis` reactiveValues + `.vis(nm)` accessor, `mod_workspace.R:92-93` |
+| Toggle handler | `observeEvent(input$ws_vis, …)`, `:132` |
+| UI control | a real switch per layer row (`ea-wsx-sw-toggle`), `:233-237` |
+| Right-click menu | `eaLayerMenu(...)` also offers hide, `:227-232` |
+| Honoured by the map | `.draw_layers()` filters on `.vis()`, `:1188` |
+| Honoured by legend + export | `:795`, `:1279`, `:1323` |
+
+It is also *already* implemented the way the gotcha-23 warning demands — inside the single
+`renderLeaflet` pass, not via a proxy.
+
+**So the report means something else, and must be clarified before any work.** The plausible
+readings, in order:
+1. **Discoverability** — the toggle is a small unlabelled switch on the layer row; the reporter
+   may simply not have found it. If so the fix is labelling/affordance, not function.
+2. **A standard leaflet layers control** — the familiar stacked-checkbox overlay control in the
+   map corner, which is what "turn the map layer on and off" describes in Arc/QGIS terms.
+3. **Sub-layer visibility** — individual bands of a raster, rather than the whole layer.
+
+**Do not build until this is settled** — the feature as literally described is already there.
 
 ### 38. Delete features from the map via the attribute table
 > "use the attribute table to delete items in the map view using the attribute table - like arc and qgis."
@@ -3223,11 +3242,27 @@ This is the smallest of the four and the most obviously missing.
 Select row(s) in the attribute table → delete the corresponding features from the layer, with
 the map redrawing. This makes the attribute table an **editing** surface rather than a read-only
 view, which is a genuine step up in scope.
-- **Depends on** item 40 (there has to be an attribute table worth selecting in first).
+
+**The attribute table already exists** — `output$attr` / `output$attr_dt`, `mod_workspace.R:1396-1441`,
+showing the active vector layer's own `st_drop_geometry()` attributes. So this is not "build a
+table", it is "make the existing table selectable and give it a write path". Three concrete gaps:
+
+1. **`attr_dt` is capped at `utils::head(df, 200)`** (`:1440`). Any layer with more than 200
+   features can only ever expose its first 200 rows, so a delete built on it would silently be
+   unable to reach the rest. The cap is also unnecessary — the table is already
+   `server = TRUE`, so DT pages server-side and does not need pre-truncating. **Remove the cap
+   as a prerequisite**, not as part of the delete work.
+2. **No selection is wired.** Nothing reads a `_rows_selected` input, and multi-row selection is
+   not enabled.
+3. **No row ↔ feature link.** Selecting a row highlights nothing on the map, and there is no map
+   click to go the other way (item 40).
+
 - **Open question to settle before building:** does deleting edit the layer in place, or write a
   new derived layer? In-place editing needs undo — and round-4 item 32 already asks for
   multi-step undo on the Data screen, so the two should share one mechanism rather than invent a
-  second.
+  second. **Recommendation: in place, behind an explicit edit-mode toggle** (the QGIS pencil
+  idiom the reporter is invoking) — deriving a new layer per delete would flood the Layers panel,
+  and an always-live delete on a shared pool is too easy to trigger by accident.
 
 ### 39. Symbology
 > "symbology (was previously documented)."
@@ -3246,16 +3281,82 @@ band. The standard GIS identify tool.
   clicked point, raster needs `terra::extract`.
 - **Watch out:** the click point is WGS84 (leaflet always is) and must be transformed to the
   layer's CRS first — the same trap already recorded for drawn shapes.
+- **Nothing handles map clicks today** — there is no `_map_click` / `_map_shape_click` observer
+  anywhere in `mod_workspace.R`, and no popups. This one is genuinely absent.
+
+### How to approach 37–40 (agreed sequencing)
+
+**These are not four independent features.** 38 and 40 are two directions of the *same* missing
+primitive: a **selection model** that links a map feature to its attribute row. Build that once
+and both become small; build them separately and there will be two selection mechanisms that
+disagree. 39 is genuinely independent, and 37 is already done.
+
+**Step 0 — settle 37, and remove the row cap.** Confirm what 37 actually means (it is built);
+drop `head(df, 200)` from `attr_dt`. Small, and both unblock what follows.
+
+**Step 1 — the selection model.** One `reactiveVal`: `list(layer = <name>, rows = <integer idx>)`.
+Everything reads and writes only this. It is the whole design.
+
+**Step 2 — item 40, identify (read-only).** Map click → transform the point to the layer CRS →
+`sf::st_intersects` for vector, `terra::extract` for raster → show the attributes. Writing the hit
+into the selection model gives *"click the map, the row highlights"* for free.
+**Do 40 before 38.** It is read-only, so it cannot corrupt anything, and it builds and proves the
+exact hit-testing 38 depends on. Doing 38 first means writing the delete path against a lookup
+that has never been exercised.
+
+**Step 3 — the reverse link.** DT row selection writes the same selection model, and the map
+draws a highlight from it. Now selection works both ways, still with nothing destructive.
+
+**Step 4 — item 38, delete.** Only now add edit mode + delete + undo. By this point the only new
+thing is the *write*, because selection is already proven in both directions.
+
+**Step 5 — item 39, symbology.** Independent of the above and touches the same draw pass, so
+doing it last avoids two sets of conflicting edits to `.draw_layers()`. Vector styling is
+currently hardcoded (`mod_workspace.R:1249`, `:1255`), which is the seam it plugs into.
+
+**The one real design tension — how the highlight is drawn.** The map is deliberately built in a
+single `renderLeaflet` pass because proxy calls are lost when the element is re-created
+(gotcha 23). But making the highlight part of that pass means **every selection change redraws
+the whole map**, which is slow with a large raster underneath. Resolution: **do both, from one
+source of truth** — draw the highlight inside the render pass (so a freshly created map is
+correct) *and* update it via `leafletProxy` on selection change (so selection alone never forces
+a redraw). Both read the selection model, so they cannot drift. This is the part most likely to
+be got wrong, and it is the reason the selection model has to exist before either item.
 
 ### 41. Data source manager
 > "data source manager-"
 
-Recorded verbatim; the line is unfinished. In Arc/QGIS a Data Source Manager is the single dialog
-for adding every layer type from every source (file, database, service, delimited text). The app
-already centralises uploads in the left rail (Phase 3 change 7), so **the ask may be about
-sources the rail cannot reach** — databases, WMS/WFS, or a path/URL — rather than about the file
-upload that exists. **Do not build until the reporter confirms which**, since those are very
-different pieces of work.
+**CONFIRMED 2026-08-05:** *"41, yes. different data sources."* — the ask is about **sources the
+current upload cannot reach**, not about the file upload that already exists. So this is a
+connectors job, not a dialog job (though a Data Source Manager dialog is the natural home once
+there is more than one connector).
+
+Candidate sources, roughly by expected value for this app:
+
+| Source | Route in R | Notes |
+|---|---|---|
+| **Path / URL to a file** | existing readers | Cheapest by far, and removes the "I must upload a 3 GB .laz" problem. Projects already store spatial layers as **path references**, so this fits the existing model exactly. |
+| **PostGIS / PostgreSQL** | `DBI` + `RPostgres`, `sf::st_read(conn, …)` | The standard GIS database. Needs connection storage — see the credentials question below. |
+| **WMS / XYZ tiles** | `leaflet::addWMSTiles` | Basemap-style; display-only, so it never enters a pool and never becomes an analysis input. Easiest of the services. |
+| **WFS / OGC API Features** | `sf::st_read("WFS:…")` via GDAL | Returns real vector features, so it *does* enter `vector_pool` and behaves like any other layer. |
+| **SQLite / GeoPackage / DuckDB** | `DBI` | GeoPackage is already readable as a file; the database case is about picking a *table* out of one. |
+| **Generic tabular DB** | `DBI` | Feeds `dataset_pool`, so it serves the statistics half rather than the map half. |
+
+**Decisions needed before building:**
+- **Credentials.** A saved connection means storing a host, user and password. Projects are
+  plain JSON on disk (`project_store.R`), so a password would land in cleartext in the project
+  folder. Either keep connections session-only, or store them outside the project and reference
+  them by name. **This must be decided first** — it constrains everything else.
+- **Live or imported?** A database layer can be read once into a pool (simple, consistent with
+  everything else) or stay live (re-queried, always current, but every pool consumer must cope
+  with a layer that can change or vanish). **Recommendation: import first.** It matches the
+  existing pool contract; live connections can come later without breaking it.
+- **`DBI` + drivers are new dependencies** — `extras`, guarded at the server binding per gotcha 27.
+  Note `RSQLite` is now already present (v0.10.5), so the SQLite/GeoPackage case is free.
+
+**Suggested first slice:** *path/URL* + *WMS*. Neither needs credentials, neither changes the
+pool contract, and together they cover a large share of "I can't get my data in" without opening
+the database question at all.
 
 ### 42. Big question — has the platform actually met its founding goal?
 > "big question: one goal was to analyze data and map it in the same platform. has the platform truly solved that goal. we should set a multiobjective multi step process cus it does not look entire fixd and clear that this moment."
