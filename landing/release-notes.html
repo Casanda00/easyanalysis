@@ -103,14 +103,27 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.6</b> · 48 releases ·
+      <p class="meta">Latest: <b>v0.10.7</b> · 49 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-6"><h2><a class="anchor" href="#v0-10-6">v0.10.6</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-7"><h2><a class="anchor" href="#v0-10-7">v0.10.7</a><span class="when">2026-08-05</span></h2>
+<h3>Added — a Quit button</h3>
+<p>There was no way to close EasyAnalysis from inside the app. Stopping it meant closing the R
+console window the launcher opened — which is also why the app could not be started from a
+tidy desktop shortcut: hiding that window would have left no way to stop it at all.</p>
+<p><strong>Quit</strong> now sits at the right of the top bar, on every screen. It confirms first, stops the R
+session, and replaces the page with a plain &quot;EasyAnalysis has closed — you can close this tab&quot;
+message rather than the grey disconnected screen, which looked like a crash.</p>
+<h3>Fixed — an invisible R process could be left running</h3>
+<p>Closing the browser cleared the app&#39;s data but never shut down the background R session used for
+heavy, cancellable jobs. That session kept running with nothing attached to it, invisible, until
+the machine was restarted. It is now shut down both when the browser closes and when you press
+Quit.</p>
+</section><section class="rel" id="v0-10-6"><h2><a class="anchor" href="#v0-10-6">v0.10.6</a><span class="when">2026-08-05</span></h2>
 <h3>Added — turn the basemap off from the Layers panel</h3>
 <p>Data layers already had a switch each; the <strong>basemap</strong> was the one thing on the map with no row
 and no switch. Turning it off meant hunting for &quot;None&quot; at the bottom of a 14-entry menu.</p>

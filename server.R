@@ -1169,6 +1169,22 @@ server <- function(input, output, session) {
       for (p in list(raw_pool, dataset_pool, raster_pool, las_pool, vector_pool))
         for (k in .pool_names(p)) p[[k]] <- NULL
     }, error = function(e) NULL)
+    # compute_worker.R holds a persistent callr R session. Clearing the pools
+    # never touched it, so closing the browser left an ORPHAN R process running
+    # with no UI attached — invisible, and it survives until the machine is
+    # rebooted or it is killed by hand. Shut it down on the way out.
+    tryCatch(ea_worker_shutdown(), error = function(e) NULL)
     gc(FALSE)
+  })
+
+  # Quit from the top bar. Ends the R session, which is what allows a desktop
+  # shortcut to launch with the console window hidden (backlog items 46/47) —
+  # closing that window used to be the only way to stop the app.
+  observeEvent(input$app_quit, {
+    # Kill the worker FIRST: stopApp() does not wait, so anything left after it
+    # may never run, and an orphaned callr session is the exact failure this
+    # button exists to prevent.
+    tryCatch(ea_worker_shutdown(), error = function(e) NULL)
+    stopApp()
   })
 }

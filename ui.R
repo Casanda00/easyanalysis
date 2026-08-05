@@ -538,6 +538,34 @@ page_fillable(
     .topbar-action-btn:hover {
       background: rgba(255,255,255,.15); color: #fff;
     }
+    /* Quit reads as destructive only on hover, so it does not shout from the
+       bar the whole time -- it is used once per session, not constantly. */
+    .topbar-action-btn.tb-quit:hover {
+      background: color-mix(in srgb, var(--danger) 82%, transparent); color: #fff;
+    }
+    /* Post-quit veil. Tokenised so it matches whatever theme is active. */
+    #ea-quit-veil {
+      position: fixed; inset: 0; z-index: 100000; display: none;
+      align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--paper) 94%, transparent);
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    #ea-quit-veil.on { display: flex; }
+    .ea-quit-card {
+      text-align: center; max-width: 420px; padding: 30px 34px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.32);
+      color: var(--ink); font-family: var(--ui);
+    }
+    .ea-quit-card h3 { margin: 14px 0 8px; font-size: 17px; }
+    .ea-quit-card p { margin: 0 0 6px; font-size: 13px; color: var(--bark); }
+    .ea-quit-sub { font-size: 12px !important; opacity: .8; }
+    .ea-quit-mark {
+      width: 46px; height: 46px; margin: 0 auto; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--forest) 16%, transparent);
+      color: var(--forest); font-size: 19px;
+    }
     .topbar-sep {
       width: 1px; height: 20px;
       background: rgba(255,255,255,.28); margin: 0 4px;
@@ -2298,6 +2326,17 @@ page_fillable(
         }
       }
 
+      /* ---- Quit ----
+         Confirm, then show the veil BEFORE telling the server to stop: once
+         stopApp() runs the websocket drops, and anything we try to render after
+         that never arrives. The veil is therefore purely client-side. */
+      function eaQuitApp(){
+        if(!confirm('Close EasyAnalysis?\n\nThe R session will stop. Your project is saved automatically.')) return;
+        var v = document.getElementById('ea-quit-veil');
+        if(v) v.classList.add('on');
+        Shiny.setInputValue('app_quit', Date.now(), {priority:'event'});
+      }
+
       /* ---- Settings drawer ---- */
       function openSettings(section){
         var p  = document.getElementById('settings-panel');
@@ -2677,9 +2716,33 @@ page_fillable(
           title = "Settings & Preferences  (Ctrl+,)",
           onclick = "openSettings()",
           icon("gear", style = "font-size:12px;"), "Settings"
+        ),
+        # Quit. Separated from everything else because it is the only control up
+        # here that ends the session -- and it is what makes a desktop shortcut
+        # safe to launch with the console window hidden, since closing that
+        # window was previously the ONLY way to stop the app.
+        tags$div(class = "topbar-sep"),
+        tags$button(
+          class = "topbar-action-btn tb-quit",
+          id    = "app-quit-btn",
+          title = "Close EasyAnalysis and stop the R session",
+          onclick = "eaQuitApp()",
+          icon("power-off", style = "font-size:12px;"), "Quit"
         )
       )
     ),
+
+    # Shown after Quit. The server CANNOT close the browser tab -- window.close()
+    # is refused for a window the script did not open, and the launcher opens the
+    # browser itself -- so say so plainly rather than leaving Shiny's grey
+    # "disconnected" veil, which reads as a crash.
+    tags$div(id = "ea-quit-veil",
+      tags$div(class = "ea-quit-card",
+        tags$div(class = "ea-quit-mark", icon("power-off")),
+        tags$h3("EasyAnalysis has closed"),
+        tags$p("The R session has stopped. You can close this tab now."),
+        tags$p(class = "ea-quit-sub",
+               "To start again, use the EasyAnalysis shortcut or run the launcher."))),
 
     # =================== BODY ===================
     # Starts on Projects, so ship the layout class in the MARKUP. Adding it via

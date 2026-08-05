@@ -18,6 +18,25 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.7 — 2026-08-05
+
+### Added — a Quit button
+
+There was no way to close EasyAnalysis from inside the app. Stopping it meant closing the R
+console window the launcher opened — which is also why the app could not be started from a
+tidy desktop shortcut: hiding that window would have left no way to stop it at all.
+
+**Quit** now sits at the right of the top bar, on every screen. It confirms first, stops the R
+session, and replaces the page with a plain "EasyAnalysis has closed — you can close this tab"
+message rather than the grey disconnected screen, which looked like a crash.
+
+### Fixed — an invisible R process could be left running
+
+Closing the browser cleared the app's data but never shut down the background R session used for
+heavy, cancellable jobs. That session kept running with nothing attached to it, invisible, until
+the machine was restarted. It is now shut down both when the browser closes and when you press
+Quit.
+
 ## v0.10.6 — 2026-08-05
 
 ### Added — turn the basemap off from the Layers panel
