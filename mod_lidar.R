@@ -512,7 +512,7 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
     output$eval_plot <- renderPlot({ eval_plot_fn() })
     
 
-    # Context (+ plot) for the AI Co-Pilot (shared across the 3 LiDAR views).
+    # Context (+ plot) for the Co-Analyst (shared across the 3 LiDAR views).
     list(
       context = reactive({
         parts <- c()

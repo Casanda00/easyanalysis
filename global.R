@@ -9,7 +9,7 @@
 # App version — single source of truth. Bump on every build/push and add a
 # matching entry to CHANGELOG.md. Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.10.1"
+APP_VERSION <- "0.10.2"
 
 library(shiny)
 library(bslib)
@@ -140,7 +140,7 @@ source("evaluation_function.R")  # uef_evaluation() for LiDAR model evaluation
 source("references.R")           # in-app References screen (papers implemented)
 source("mod_docs.R")             # in-app Documentation / user guide (static screen)
 source("mod_rconsole.R")         # in-app R console (browser build = per-user sandbox)
-source("agent_tools.R")          # AI Co-Pilot agent: tool registry + dispatcher
+source("agent_tools.R")          # Co-Analyst agent: tool registry + dispatcher
 
 # Shared green theme used across the whole app.
 # Colour lives in ONE place: theme.R. It produces both the bslib theme and the

@@ -398,7 +398,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Download spatial data", .setTool("rs_search"))
         )),
         .menu("Analysis", "gears", tagList(
-          .mi("AI Assistant", "document.getElementById('chat-panel').classList.add('open')"),
+          # "Co-Analyst", NOT "AI Assistant": this menu entry was the only place
+          # in the UI still using a second name for the same panel, whose own
+          # header and top-bar button both say Co-Analyst. One feature, one name.
+          .mi("Co-Analyst", "document.getElementById('chat-panel').classList.add('open')"),
           .msep(),
           proc_items,
           .msep(),

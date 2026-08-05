@@ -8,6 +8,20 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.2 — 2026-08-05
+
+### Fixed
+- **The References page was unreadable in every theme except light.** Each reference card was
+  pinned to a white background with fixed grey text, so on any dark set the card stayed white
+  while the text that had no explicit colour inherited the app's light body colour — which is
+  why some lines read as black and others vanished. The whole page now uses theme colours,
+  including the Implemented / In progress / Cataloged badges.
+
+### Changed
+- **One name for the assistant: "Co-Analyst".** The Analysis menu offered it as "AI
+  Assistant" while its own panel header and the top-bar button both said Co-Analyst — three
+  names in the code for one feature. Everything now says Co-Analyst.
+
 ## v0.10.1 — 2026-08-05
 
 ### Fixed

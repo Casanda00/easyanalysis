@@ -1582,6 +1582,32 @@ plots render on their own light canvas regardless of the app theme, exactly like
 each matching its palette's `ink`; all six new rules present in the served markup; and **no
 fixed-light panel hex remains in any module** outside the two ggplot strips.
 
+#### References page FIXED 2026-08-05 — reported, and the worst instance yet
+
+> "in dark mode, the reference page is not fixed. the references, texts and background are
+> kinda white -ish. some texts are black but others arent. its true for all modes except white"
+
+**Exactly diagnosed by that description.** `references.R` pinned every reference card to
+`background:#fff` (line 35) and gave *some* of its text fixed greys (`#6c757d`, `#495057`,
+`#adb5bd`) while leaving the rest uncoloured. On any dark set the card stayed white, the
+explicitly-grey text stayed readable — "some texts are black" — and everything without an
+explicit colour inherited the app's light `--ink` and vanished into the white card. Light mode
+was the only theme where both halves happened to agree, which is why it looked fine there
+alone.
+
+12 colour sites, all now theme tokens: the card uses `.ea-subpanel`, body text `var(--ink)`,
+secondary text `var(--bark)`, headings and accents `var(--forest)`, links `var(--canopy)`.
+The status badges (Implemented / In progress / Cataloged) were a fixed green/amber/grey with
+`color:#fff`; they now use `var(--forest)` / `var(--warn)` / `var(--bark)` with
+`var(--onbrand)` text, so they shift with the theme instead of being one fixed palette.
+
+**Verified:** zero colour literals in the rendered page.
+
+**This is a reminder that the colour sweep is not finished.** The v0.8.4 pass fixed the
+screens that were reported then; `references.R` was never examined. The static scan in the
+"scope agreed" section above — hunt every raw hex outside `theme.R` — has still not been run
+across the whole app, and this page is proof it would find more.
+
 **Still open in this item:** the wider taste half (screen background, results-surface colours),
 and a per-mode contrast measurement across all 6 sets — which wants a real browser, so it is
 flagged for the reporter rather than claimed. Item 25's black & white set should land before

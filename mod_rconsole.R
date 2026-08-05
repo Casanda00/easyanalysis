@@ -451,7 +451,7 @@ rconsoleServer <- function(id, dataset_pool, active_dataset,
       if (.is_ggplot(p)) print(p) else grDevices::replayPlot(p)
     })
 
-    # Co-Pilot context contract
+    # Co-Analyst context contract
     list(
       context = reactive({
         nms <- tryCatch(names(dataset_pool), error = function(err) character(0))

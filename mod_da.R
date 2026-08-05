@@ -802,7 +802,7 @@ daServer <- function(id, dataset_pool, active_dataset) {
       }
     })
 
-    # Context (+ plot) for the AI Co-Pilot.
+    # Context (+ plot) for the Co-Analyst.
     list(
       context = reactive({
         if (isTruthy(input$main_mode) && input$main_mode == "1. Assumption Checks")

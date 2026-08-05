@@ -198,7 +198,7 @@ surfaceServer <- function(id, las_pool = NULL, raster_pool = NULL) {
       }
     )
 
-    # AI Co-Pilot context
+    # Co-Analyst context
     list(
       context = reactive({
         r <- rv_surf$result

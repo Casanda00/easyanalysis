@@ -1313,7 +1313,7 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
 
     
 
-    # Context (+ the current EDA plot) for the AI Co-Pilot.
+    # Context (+ the current EDA plot) for the Co-Analyst.
     list(
       context = reactive({
         df <- rv$working_data

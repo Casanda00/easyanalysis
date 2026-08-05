@@ -226,7 +226,7 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
 
     
 
-    # Context (+ plot) for the AI Co-Pilot.
+    # Context (+ plot) for the Co-Analyst.
     list(
       context = reactive({
         res <- model_obj()
