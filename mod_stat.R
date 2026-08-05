@@ -46,6 +46,9 @@ statToolsUI <- function(id, spec) {
       lapply(spec$params, ctl)),
     actionButton(ns("run"), tagList(icon("play"), " Run"),
                  class = "btn-success w-100 mt-2"),
+    # Extra actions render server-side: they only make sense once a fit exists,
+    # so showing them beforehand would offer something that cannot work.
+    uiOutput(ns("actions_ui")),
     uiOutput(ns("status"))
   )
 }
@@ -197,6 +200,38 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
                  else fn(f$fit, f),
                  error = function(e) show_placeholder(conditionMessage(e)))
       })
+    })
+
+    # ---- Extra actions (spec$actions) --------------------------------------
+    # A second button that operates on an existing fit rather than producing
+    # one -- GAM's "predictions to data pool", Random forest's PDP. Bound once
+    # here; the buttons themselves appear only after a successful Run.
+    output$actions_ui <- renderUI({
+      acts <- spec$actions %||% list()
+      if (!length(acts) || is.null(fit_obj())) return(NULL)
+      tagList(lapply(acts, function(a) tagList(
+        actionButton(ns(paste0("act_", a$id)),
+                     tagList(icon(a$icon %||% "bolt"), " ", a$label),
+                     class = "btn-outline-success w-100 mt-2"),
+        if (!is.null(a$hint))
+          tags$p(class = "text-muted small mt-n1 mb-2", a$hint))))
+    })
+
+    for (.a in spec$actions %||% list()) local({
+      a <- .a
+      observeEvent(input[[paste0("act_", a$id)]], {
+        f <- fit_obj()
+        if (is.null(f)) return()
+        msg <- tryCatch(a$run(f$fit, f, list(table = dataset_pool)),
+                        error = function(e) {
+                          showNotification(paste0(a$label, " failed: ",
+                                                  conditionMessage(e)),
+                                           type = "error", duration = 8)
+                          NULL
+                        })
+        if (!is.null(msg) && nzchar(msg))
+          showNotification(msg, type = "message", duration = 5)
+      }, ignoreInit = TRUE)
     })
 
     # The plot-appearance control belongs WITH the plot and only where there is

@@ -8,6 +8,26 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.6 — 2026-08-05
+
+### Fixed
+- **The GAM screen could never fit a model at all.** Every "Fit GAM" ended in an error
+  notification. It built its smooth terms as `mgcv::s(...)`, and mgcv does not recognise a
+  namespaced smooth — it identifies one by the term label starting with `s(`, so the
+  namespaced form was treated as an ordinary variable and the fit failed with
+  `invalid type (list) for variable 'mgcv::s(...)'`. The screen now fits.
+- **Its cross-validation also dropped two of your settings** — the fold models were built
+  without the smooth type you chose (always the thin-plate default) and with smoothness
+  selection hardcoded to REML. So a cubic-regression GAM selected by GCV.Cp would have been
+  validated as a thin-plate REML fit. Both now match the model on screen.
+
+### Changed
+- **GAM is now a registry entry** (migration 6 of 9), verified against `mgcv::gam` directly:
+  identical coefficients, fitted values and R-squared, including a non-default basis and
+  selection method.
+- Its "Predictions to data pool" button is preserved, and GAM now says what went wrong when a
+  fit fails (too large a basis, too many predictors) instead of showing a raw message.
+
 ## v0.9.5 — 2026-08-04
 
 ### Changed

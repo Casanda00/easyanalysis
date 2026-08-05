@@ -1017,7 +1017,7 @@ server <- function(input, output, session) {
   ntl_ctx        <- ntlServer("ntl", dataset_pool, active_dataset, vector_pool)
   climate_ctx    <- climateTrendServer("climate_trend", raster_pool)
   wind_ctx       <- windServer("wind", dataset_pool, active_dataset)
-  gam_ctx        <- gamServer("gam", dataset_pool, active_dataset)
+  # gamServer is NOT bound: it is a statistics.R entry now (stat_gam).
   rconsole_ctx   <- rconsoleServer("rconsole", dataset_pool, active_dataset,
                                    raster_pool, las_pool, vector_pool,
                                    on_data_change = function() ds_refresh(ds_refresh() + 1))
@@ -1141,7 +1141,7 @@ server <- function(input, output, session) {
     suitability = suit_ctx, land_classify = land_cls_ctx,
     recommend = rec_ctx,
     ntl = ntl_ctx,
-    climate_trend = climate_ctx, wind = wind_ctx, gam = gam_ctx,
+    climate_trend = climate_ctx, wind = wind_ctx,
     rconsole = rconsole_ctx
   )
   # Every processing algorithm reports what it produced, keyed by its tool key,

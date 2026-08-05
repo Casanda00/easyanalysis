@@ -67,6 +67,15 @@ ea_chk <- function(key, label, value = FALSE, hint = NULL, show_if = NULL)
 ea_stat_plot <- function(ns, name, height = "400px")
   plotOutput(ns(paste0("plot_", name)), height = height)
 
+# An EXTRA action beyond Run -- a second button that does something with an
+# existing fit rather than producing one. GAM's "predictions to data pool" is
+# the case that needed it; Random forest's partial-dependence button is the
+# other. `run(fit, f, pools)` gets the fitted object, the whole fit record, and
+# the app's pools; return a message string to show, or NULL for silence.
+# Buttons only appear once there IS a fit -- they are meaningless before.
+ea_action <- function(id, label, run, icon = "bolt", hint = NULL)
+  list(id = id, label = label, run = run, icon = icon, hint = hint)
+
 # Does a column satisfy a role's type filter?
 ea_role_ok <- function(x, types) {
   switch(types,
@@ -1141,6 +1150,171 @@ ea_statistics <- function() {
                        check.names = FALSE))
           DT::datatable(d, rownames = FALSE,
                         options = list(pageLength = 20, scrollX = TRUE))
+        })
+    ),
+
+    # ---- GAM -- MIGRATION 6 of 9 -------------------------------------------
+    # Ported from mod_gam.R: same s(pred, k, bs) terms, same lm comparison, same
+    # per-predictor nonlinearity table.
+    #
+    # Sixth latent bug, and the fold pattern for the FOURTH time: mod_gam.R:319-321
+    # rebuilt the CV formula WITHOUT the chosen basis (always the `tp` default)
+    # and hardcoded `method = "REML"`, so a GAM fitted with a cubic-regression
+    # basis under GCV.Cp was validated as a thin-plate REML fit. Two settings
+    # dropped at once.
+    #
+    # It also needed the new `actions` slot: the module had a second button that
+    # writes the predictions into the data pool as a new table.
+    list(
+      id = "gam", label = "GAM (smooth curves)", group = "Regression",
+      summary = paste("Generalised additive model: fits a smooth curve per",
+                      "predictor instead of a straight line, and reports how much",
+                      "that curvature actually bought you over a linear fit."),
+      roles = list(
+        ea_role("y", "Response", "numeric"),
+        ea_role("x", "Predictors", "numeric", multiple = TRUE,
+                hint = "Each gets its own smooth term.")),
+      params = list(
+        ea_num("k_basis", "Basis dimension (k)", 10, 3, 50, 1,
+               hint = "How wiggly a curve is allowed to be."),
+        ea_sel("smooth_type", "Smooth type",
+               c("Thin plate (tp)" = "tp", "Cubic regression (cr)" = "cr",
+                 "P-spline (ps)" = "ps"), "tp"),
+        ea_sel("method", "Smoothness selection",
+               c("REML", "GCV.Cp", "ML"), "REML"),
+        ea_sel("cv_method", "Validation",
+               c("K-fold" = "kfold", "LOOCV (leave-one-out)" = "loocv"), "kfold"),
+        ea_num("cv_k", "Number of folds (k)", 5, 2, 20, 1,
+               show_if = "input.p_cv_method == 'kfold'")),
+      views = c(smooths = "Smooth plots", comparison = "Model comparison",
+                summary = "GAM summary", cv = "Validation & metrics"),
+      views_plot = c("smooths"),
+      actions = list(
+        ea_action("to_pool", "Predictions to data pool", icon = "database",
+          hint = "Adds observed / lm_pred / gam_pred as a new table.",
+          run = function(fit, f, pools) {
+            nm <- paste0("gam_predictions_", format(Sys.time(), "%H%M%S"))
+            pools$table[[nm]] <- fit$pred_df
+            paste0("'", nm, "' added to the data pool.")
+          })),
+      fit = function(df, r, p) {
+        if (!requireNamespace("mgcv", quietly = TRUE))
+          stop("GAM needs the 'mgcv' package.")
+        resp <- r$y; preds <- setdiff(r$x, resp)
+        if (!length(preds)) stop("Choose at least one predictor other than the response.")
+        dm <- df[, c(resp, preds), drop = FALSE]
+        dm <- dm[stats::complete.cases(dm), , drop = FALSE]
+        if (nrow(dm) <= 10) stop("Need more than 10 complete rows; this has ", nrow(dm), ".")
+        k   <- max(3L, min(as.integer(p$k_basis %||% 10L), nrow(dm) - 2L))
+        bs  <- p$smooth_type %||% "tp"
+        mth <- p$method %||% "REML"
+
+        lm_fml <- stats::as.formula(paste0("`", resp, "` ~ ",
+                    paste0("`", preds, "`", collapse = " + ")))
+        lm_mdl <- tryCatch(stats::lm(lm_fml, data = dm), error = function(e) NULL)
+
+        # PLAIN s(), never mgcv::s(). mgcv's interpret.gam() recognises a smooth
+        # by the term LABEL starting with "s(" -- a namespaced `mgcv::s(...)`
+        # does not match, so gam treats it as an ordinary variable, model.frame
+        # tries to evaluate it, and it fails with
+        # "invalid type (list) for variable 'mgcv::s(...)'".
+        # mod_gam.R built its terms exactly that way, which is why that screen
+        # never fitted a model at all. The formula's environment carries `s` so
+        # this works whether or not mgcv happens to be attached (it is an
+        # optional package, so it may not be).
+        .genv <- list2env(list(s = mgcv::s), parent = globalenv())
+        .mk_fml <- function(txt) {
+          f <- stats::as.formula(txt); environment(f) <- .genv; f
+        }
+        s_terms <- paste0("s(`", preds, "`, k=", k, ", bs='", bs, "')",
+                          collapse = " + ")
+        gam_fml <- .mk_fml(paste0("`", resp, "` ~ ", s_terms))
+        gam_mdl <- tryCatch(mgcv::gam(gam_fml, data = dm, method = mth),
+                            error = function(e)
+                              stop("GAM failed: ", conditionMessage(e),
+                                   ". Try a smaller k, or fewer predictors."))
+
+        # Per-predictor: how much did the smooth buy over a straight line?
+        comp <- do.call(rbind, lapply(preds, function(pv) {
+          dp <- dm[, c(resp, pv), drop = FALSE]
+          lp <- tryCatch(stats::lm(stats::as.formula(paste0("`", resp, "`~`", pv, "`")),
+                                   data = dp), error = function(e) NULL)
+          gp <- tryCatch(mgcv::gam(.mk_fml(paste0("`", resp, "` ~ s(`", pv,
+                           "`, k=", k, ", bs='", bs, "')")),
+                           data = dp, method = mth), error = function(e) NULL)
+          l2 <- if (!is.null(lp)) summary(lp)$adj.r.squared else NA_real_
+          g2 <- if (!is.null(gp)) summary(gp)$r.sq else NA_real_
+          gain <- g2 - l2
+          data.frame(Predictor = pv, lm_adj_R2 = round(l2, 4),
+                     GAM_R2 = round(g2, 4), Gain = round(gain, 4),
+                     Nonlinear = ifelse(!is.na(gain) & gain > 0.1, "Yes", "No"),
+                     stringsAsFactors = FALSE)
+        }))
+
+        pred_df <- data.frame(
+          observed = dm[[resp]],
+          lm_pred  = if (!is.null(lm_mdl)) stats::predict(lm_mdl) else NA_real_,
+          gam_pred = stats::predict(gam_mdl))
+
+        # Validation, once, WITH the chosen basis and method (the module used
+        # neither: it dropped bs and hardcoded REML).
+        n <- nrow(dm)
+        kf <- if (identical(p$cv_method, "loocv")) n
+              else max(2L, as.integer(p$cv_k %||% 5L))
+        lbl <- .cv_label(kf, n)
+        set.seed(42); folds <- sample(rep_len(seq_len(kf), n))
+        ap <- c(); aa <- c()
+        for (i in seq_len(kf)) {
+          tr <- dm[folds != i, , drop = FALSE]; te <- dm[folds == i, , drop = FALSE]
+          m <- tryCatch(mgcv::gam(gam_fml, data = tr, method = mth),
+                        error = function(e) NULL)
+          if (is.null(m)) next
+          pv <- tryCatch(as.numeric(stats::predict(m, newdata = te)),
+                         error = function(e) NULL)
+          if (is.null(pv)) next
+          ap <- c(ap, pv); aa <- c(aa, as.numeric(te[[resp]]))
+        }
+        list(gam = gam_mdl, lm = lm_mdl, data = dm, resp = resp, preds = preds,
+             k = k, bs = bs, method = mth, comparison = comp, pred_df = pred_df,
+             cv = if (length(ap)) list(actual = aa, predicted = ap, lbl = lbl) else NULL)
+      },
+      plots = list(
+        smooths = function(fit, f) {
+          np <- length(fit$preds)
+          mgcv::plot.gam(fit$gam, pages = 1, residuals = TRUE, pch = 16,
+                         cex = .4, shade = TRUE, shade.col = "#4caf5044",
+                         col = "#2e7d32", seWithMean = TRUE)
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        smooths = ea_stat_plot(ns, "smooths", if (solo) "520px" else "100%"),
+        comparison = tagList(
+          tags$p(class = "text-muted small",
+                 "Gain = how much R-squared the smooth added over a straight line. ",
+                 "Above 0.1 is flagged as genuinely non-linear."),
+          DT::datatable(fit$comparison, rownames = FALSE,
+                        options = list(dom = "t", pageLength = 50, scrollX = TRUE))),
+        summary = tags$pre(paste(utils::capture.output(summary(fit$gam)),
+                                 collapse = "\n")),
+        cv = {
+          s <- summary(fit$gam)
+          e <- as.numeric(fit$data[[fit$resp]]) - as.numeric(fit$pred_df$gam_pred)
+          card(card_header("Fit and validation"), tags$pre(paste(c(
+            sprintf("Basis / k       : %s / %d", fit$bs, fit$k),
+            sprintf("Selection       : %s", fit$method),
+            sprintf("Effective df    : %.2f", sum(s$edf)),
+            sprintf("Deviance expl.  : %.1f%%", 100 * s$dev.expl),
+            "",
+            sprintf("Train RMSE      : %.4f", sqrt(mean(e^2, na.rm = TRUE))),
+            sprintf("Train R-squared : %.4f", s$r.sq),
+            if (!is.null(fit$cv)) {
+              e2 <- fit$cv$actual - fit$cv$predicted
+              paste(c(
+                sprintf("%-16s: %.4f", paste(fit$cv$lbl, "RMSE"), sqrt(mean(e2^2))),
+                sprintf("%-16s: %.4f", paste(fit$cv$lbl, "R-sq"),
+                        1 - sum(e2^2) / sum((fit$cv$actual - mean(fit$cv$actual))^2))),
+                collapse = "\n")
+            } else "Validation      : not available"),
+            collapse = "\n")))
         })
     ),
 

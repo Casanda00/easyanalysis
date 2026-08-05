@@ -2408,15 +2408,13 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**5 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
-**pca ✅** · gam · survival · anova · rf.
+**6 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
+**pca ✅** · **gam ✅** · survival · anova · rf.
 
-**Running score: 5 screens migrated, 5 latent bugs.** PCA is the first port that found
-**nothing wrong** — worth recording, because it is evidence the bug rate is about *what kind*
-of screen it is, not about the codebase being uniformly rotten. The four buggy ones all had
-hand-rolled cross-validation loops; PCA has none. **That sharpens the prediction for the
-remaining four:** `gam` and `rf` have CV loops and should be treated as suspect; `anova` and
-`survival` do not, and may well be clean.
+**Running score: 6 screens migrated, 7 latent bugs.** The prediction made after PCA held
+exactly: PCA had no CV loop and was clean; **GAM had one and was the worst yet** — it could
+never fit a model at all, plus its CV dropped two settings. `rf` is the last screen with a
+hand-rolled CV loop and should be treated as suspect; `anova` and `survival` have none.
 
 Every port has been bit-for-bit faithful, and four of the five turned up something broken
 that nobody had noticed. That remains the strongest argument for finishing: these screens are
@@ -2429,6 +2427,7 @@ not being exercised, and porting is what exercises them.
 | Decision tree | validation scored rpart's DEFAULT tree, not the configured one | yes |
 | Neural network | both CV loops hardcoded `maxit = 200`, ignoring the user's setting | yes |
 | **PCA** | **none — clean** | **no** |
+| GAM | **could never fit a model at all** (`mgcv::s()` unparseable), plus CV dropped basis AND method | yes |
 
 **The per-fold-refit pattern is confirmed in every screen that has one** — three for three —
 and should be the default suspicion rather than a surprise. SVM's refits ignored cost, gamma
@@ -2582,6 +2581,42 @@ the same complete-case filter so it stays aligned with the points.
 **One improvement:** factor analysis with more factors than the variables support used to
 surface R's bare `2 factors are too many for 4 variables`. It now names the failure and says
 what to try (fewer factors, or Principal axis) — verified by the guard test.
+
+##### Migration 6 — GAM (2026-08-05)
+
+**The prediction made after PCA held exactly.** GAM had a hand-rolled CV loop, so it was
+flagged as suspect before it was opened — and it turned out to be the worst screen yet, with
+**two** bugs, one of them total.
+
+**Bug 7 — the GAM screen could never fit a model. At all.** `mod_gam.R:154` built its smooth
+terms as `mgcv::s(...)`. mgcv identifies a smooth by the term LABEL starting with `s(`, so a
+namespaced call does not match: `gam()` treats it as an ordinary variable, `model.frame`
+evaluates it, gets the smooth-spec list back and dies with
+`invalid type (list) for variable 'mgcv::s(...)'`. The call was wrapped in
+`tryCatch(..., error = function(e) showNotification(...))`, so pressing "Fit GAM" produced an
+error toast and nothing else — every single time.
+
+Verified both forms directly: `mgcv::s(...)` errors, plain `s(...)` fits with R² 0.949 on the
+same data. The port uses plain `s()` and attaches `s` to the formula's environment, so it
+works whether or not mgcv happens to be attached (it is an optional package, so it may not
+be).
+
+**Bug 8 — its CV dropped TWO settings.** `mod_gam.R:319-321` rebuilt the fold formula without
+the chosen basis (always the `tp` default) and hardcoded `method = "REML"`. A cubic-regression
+GAM selected by GCV.Cp was validated as a thin-plate REML fit. This is the fold pattern for
+the fourth time, and the first instance where *two* settings were lost at once.
+
+**New capability this port forced: `actions`.** GAM has a second button ("Predictions to data
+pool") that operates on an existing fit rather than producing one. The spec now takes an
+`actions` list; `ea_action(id, label, run)` gets the fit and the app's pools, and the buttons
+appear only once a fit exists. **Random forest's partial-dependence button needs the same
+slot**, so this was not a one-off.
+
+**Parity verified against `mgcv::gam` directly:** identical coefficients, fitted values and
+R², including a non-default `k = 6, bs = "cr", method = "GCV.Cp"` (confirmed to be a genuinely
+different fit from the default). The per-predictor comparison table still flags a sine
+relationship as non-linear (gain 0.26). The action writes an `observed/lm_pred/gam_pred` table
+into the pool, one row per fitted row.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:
