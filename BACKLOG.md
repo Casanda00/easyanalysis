@@ -3297,15 +3297,26 @@ drop `head(df, 200)` from `attr_dt`. Small, and both unblock what follows.
 **Step 1 — the selection model.** One `reactiveVal`: `list(layer = <name>, rows = <integer idx>)`.
 Everything reads and writes only this. It is the whole design.
 
-**Step 2 — item 40, identify (read-only).** Map click → transform the point to the layer CRS →
-`sf::st_intersects` for vector, `terra::extract` for raster → show the attributes. Writing the hit
-into the selection model gives *"click the map, the row highlights"* for free.
-**Do 40 before 38.** It is read-only, so it cannot corrupt anything, and it builds and proves the
-exact hit-testing 38 depends on. Doing 38 first means writing the delete path against a lookup
-that has never been exercised.
+**Step 2 — row → map highlight.** Reordered after the reporter named this exact interaction:
+> "you know how we can click on a attribute in the attribute table and it gets highlighted in the map.."
 
-**Step 3 — the reverse link.** DT row selection writes the same selection model, and the map
-draws a highlight from it. Now selection works both ways, still with nothing destructive.
+**This is the cheapest step in the whole sequence and should come first**, because it needs *no
+spatial hit-testing at all*. Row *i* of `attr_dt` is feature *i* of `vector_pool[[act]]` — the
+table is a plain `st_drop_geometry()` of the layer, so the mapping is pure indexing:
+`input$attr_dt_rows_selected` → `vector_pool[[act]][idx, ]` → draw as a highlight group. DT
+returns indices into the original data even when the table is sorted, filtered or server-paged,
+so the 1:1 holds. (It only holds once the `head(df, 200)` cap is gone — Step 0.)
+
+Enable `selection = "multiple"` while here; multi-select is what item 38 needs and it costs
+nothing now.
+
+**Step 3 — item 40, identify (map → row).** The harder direction, and the only one needing
+geometry: transform the click point out of WGS84 into the layer CRS, then `sf::st_intersects`
+for vector / `terra::extract` for raster. Writing the hit into the same selection model makes the
+table highlight in response — the mirror image of Step 2, for free.
+
+**Both directions are read-only**, so neither can corrupt a layer, and together they prove the
+selection model in both directions before anything destructive is built on it.
 
 **Step 4 — item 38, delete.** Only now add edit mode + delete + undo. By this point the only new
 thing is the *write*, because selection is already proven in both directions.
