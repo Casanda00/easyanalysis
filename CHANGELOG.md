@@ -18,6 +18,23 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.11 — 2026-08-05
+
+### Added — EasyAnalysis now has its icon, everywhere
+
+The Desktop shortcut added in the previous version used a generic PowerShell icon. It now uses
+the EasyAnalysis mark, built at seven sizes so it stays sharp from the taskbar to large-icon
+view.
+
+### Fixed — the website and the app had no icon at all
+
+The favicon had been in the project since July, but it was never placed where the website could
+serve it and no page ever referred to it. So the site showed a blank icon in browser tabs and
+bookmarks, and `favicon.ico` returned "not found" — despite an earlier release note saying this
+was done. It works now.
+
+The app's own browser tab had the same problem and now shows the icon too.
+
 ## v0.10.10 — 2026-08-05
 
 ### Added — no more terminal: download it, double-click it, done

@@ -9,6 +9,9 @@
     content="What changed in each version of EasyAnalysis, newest first.">
   <link rel="canonical" href="https://easyanalysis.dev/release-notes">
   <meta name="robots" content="index, follow, max-snippet:-1">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/favicon.png">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="EasyAnalysis">
   <meta property="og:url" content="https://easyanalysis.dev/release-notes">
@@ -22,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.10.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.11.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -122,14 +125,25 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.10</b> · 52 releases ·
+      <p class="meta">Latest: <b>v0.10.11</b> · 53 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-10"><h2><a class="anchor" href="#v0-10-10">v0.10.10</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-11"><h2><a class="anchor" href="#v0-10-11">v0.10.11</a><span class="when">2026-08-05</span></h2>
+<h3>Added — EasyAnalysis now has its icon, everywhere</h3>
+<p>The Desktop shortcut added in the previous version used a generic PowerShell icon. It now uses
+the EasyAnalysis mark, built at seven sizes so it stays sharp from the taskbar to large-icon
+view.</p>
+<h3>Fixed — the website and the app had no icon at all</h3>
+<p>The favicon had been in the project since July, but it was never placed where the website could
+serve it and no page ever referred to it. So the site showed a blank icon in browser tabs and
+bookmarks, and <code>favicon.ico</code> returned &quot;not found&quot; — despite an earlier release note saying this
+was done. It works now.</p>
+<p>The app&#39;s own browser tab had the same problem and now shows the icon too.</p>
+</section><section class="rel" id="v0-10-10"><h2><a class="anchor" href="#v0-10-10">v0.10.10</a><span class="when">2026-08-05</span></h2>
 <h3>Added — no more terminal: download it, double-click it, done</h3>
 <p>Until now the only way in was to open PowerShell and paste a command — and because nothing
 created a shortcut, <strong>that was needed every single time you wanted to open the app</strong>, not just to

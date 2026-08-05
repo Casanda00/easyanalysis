@@ -201,7 +201,16 @@ function New-Shortcut($linkPath, $target) {
   $sc.Arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Minimized -File `"$target`""
   $sc.WorkingDirectory = $AppHome
   $sc.Description = "EasyAnalysis - analyse data and map it, in one place"
-  # No custom .ico ships yet, so this falls back to the PowerShell icon.
+  # The app's own icon, built from favicon.png by tools/make-icon.ps1 and shipped
+  # with the app. Copied into $AppHome first: the shortcut stores a PATH, so if it
+  # pointed into $App it would break the moment the app folder is replaced by a
+  # reinstall. Without this the shortcut shows the PowerShell icon.
+  $ico = Join-Path $App "launcher\easyanalysis.ico"
+  if (Test-Path $ico) {
+    $localIco = Join-Path $AppHome "easyanalysis.ico"
+    Copy-Item $ico $localIco -Force -ErrorAction SilentlyContinue
+    if (Test-Path $localIco) { $sc.IconLocation = "$localIco,0" }
+  }
   $sc.Save()
 }
 

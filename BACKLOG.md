@@ -3742,3 +3742,52 @@ that process only, and quotes the path (needed: `%LOCALAPPDATA%` paths contain s
 - **Not verified end-to-end here**: this machine already has the app, so a genuine
   clean-machine install → shortcut → double-click → app opens run has not been done. Worth doing
   once on a fresh profile.
+
+### 49. The app icon — shortcut, website favicon and browser tab — **DONE (v0.10.11)**
+> "we can use the favicon for the custom icon."
+
+Closes item 46's "no custom icon" follow-up — and uncovered that **the favicon was not working
+anywhere either.**
+
+**What was actually wrong (checked, not assumed):**
+- `favicon.png` (369x369) and `easyanalysis-favicon.png` (677x369, the uncropped original) had
+  been in the **repo root** since 2026-07-30. `landing/` — the deploy root — contained **no
+  favicon at all**, and **not one page linked to it** (0 matches across all three static pages).
+- So `easyanalysis.dev` served no icon and still 404'd `/favicon.ico`, despite a changelog entry
+  claiming the favicon was "copied into the site root … and linked from the page `<head>` (also
+  stops the `/favicon.ico` 404)". **That claim was false in the deployed site.**
+- This is the **same failure as `llms.txt` (item 48)**: an asset added at the repo root, where it
+  is never served. Twice now. **When adding a web asset, put it in `landing/` and confirm a page
+  references it.**
+- The **app itself** had no favicon either, so the tab at `127.0.0.1:7788` showed the browser's
+  blank-page glyph.
+
+**Fix — one piece of artwork, four destinations:**
+- **`tools/make-icon.ps1`** builds `launcher/easyanalysis.ico` from `favicon.png` using
+  `System.Drawing` (ships with Windows), so regenerating needs nothing installed. **Seven sizes**
+  (16/24/32/48/64/128/256) because Windows picks per context — 16px in the taskbar, 32px on the
+  Desktop, 256px in large-icon view; shipping only 256 makes Windows downscale badly. Output is
+  **committed**, so the script only re-runs if the artwork changes.
+- **The shortcut** (`install.ps1`) sets `IconLocation`. The `.ico` is **copied into `$AppHome`
+  first**: a shortcut stores a *path*, so pointing into `$App` would break the moment a reinstall
+  replaces that folder. Guarded — a missing icon must not fail the install.
+- **The website**: `landing/favicon.ico` + `landing/favicon.png`, linked from all four pages. The
+  release-notes tags went into **`build-release-notes.mjs`**, not the generated HTML, so they
+  survive a rebuild.
+- **The app**: `www/favicon.ico` + `www/favicon.png` (Shiny serves `www/` at the app root) linked
+  from `ui.R` with **relative** paths — an absolute `/favicon.ico` would point at the wrong host
+  when the app is served from `127.0.0.1`.
+
+**Verified:** the `.ico` was parsed **byte by byte** rather than trusted — header reserved/type
+correct, 7 entries, every one square, contiguous, in-bounds and carrying a valid PNG payload,
+file length matching the last entry, with 16/32/256 all present and 256 stored as `0` per spec.
+Windows loaded it back via `System.Drawing`. (Requesting 256px returns 128 — a known limitation
+of that API with PNG-compressed entries, not a defect: the byte-level parse confirms the 256
+entry is present and well-formed.) All four pages link both forms; the generator carries them;
+`ui.R` uses relative paths; the shortcut sets `IconLocation`, copies the file out of `$App` and
+guards its absence. Build OK, `check_ui_js` PASS, app serves HTTP 200, shortcut checks still pass.
+**Not verified here:** how the icon actually looks in Explorer and on a browser tab — no
+browser/shell automation. Worth an eyeball after installing.
+
+**Note:** `easyanalysis-favicon.png` (the uncropped 677x369 original) is kept at the repo root as
+the source artwork. It is **not** served and should not be linked.

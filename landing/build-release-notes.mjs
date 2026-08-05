@@ -86,6 +86,9 @@ const page = `<!doctype html>
     content="What changed in each version of EasyAnalysis, newest first.">
   <link rel="canonical" href="https://easyanalysis.dev/release-notes">
   <meta name="robots" content="index, follow, max-snippet:-1">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/favicon.png">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="EasyAnalysis">
   <meta property="og:url" content="https://easyanalysis.dev/release-notes">

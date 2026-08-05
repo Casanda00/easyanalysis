@@ -113,6 +113,12 @@ page_fillable(
       "if(g){var t=g.querySelector('input[type=text].form-control'); if(t)t.value='';",
       "var pb=g.querySelector('.progress-bar'); if(pb){pb.style.width='0%';pb.textContent='';}}}});}",
       "})();"))),
+    # Browser-tab icon. Shiny serves www/ at the app root, so these resolve
+    # without any extra resource handler. The app had no favicon at all, so the
+    # tab showed the browser's blank-page glyph — the same artwork now used for
+    # the Desktop shortcut (launcher/easyanalysis.ico).
+    tags$link(rel = "icon", href = "favicon.ico", sizes = "any"),
+    tags$link(rel = "icon", type = "image/png", href = "favicon.png"),
     # Design tokens, generated from ea_palette in theme.R — the single source of
     # truth for colour. Never hardcode a hex below; use var(--token).
     tags$style(HTML(ea_css_vars())),
