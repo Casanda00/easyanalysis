@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EasyAnalysis sitemap.
+
+  URLs are written WITHOUT the .html extension because landing/vercel.json sets
+  cleanUrls: true, so /documentation is the canonical form and /documentation.html
+  308-redirects to it. Listing the .html form would point every crawler at a
+  redirect (and 308s have caused trouble on this project before).
+
+  Keep in step with the pages in landing/ — there are only four, so this is a
+  hand-maintained file, not a generated one.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://easyanalysis.dev/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://easyanalysis.dev/documentation</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://easyanalysis.dev/how-to-use</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://easyanalysis.dev/release-notes</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

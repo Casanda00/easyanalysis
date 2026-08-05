@@ -1,0 +1,62 @@
+# EasyAnalysis — https://easyanalysis.dev
+#
+# Everything here is public documentation for a free tool, so everything is
+# crawlable. AI/LLM crawlers are allowed DELIBERATELY: people increasingly find
+# tools by asking an assistant, and there is nothing on this site worth
+# withholding. See /llms.txt for a summary written for that audience.
+
+User-agent: *
+Allow: /
+
+# Named explicitly rather than relying on the wildcard above: several of these
+# ignore "User-agent: *" for training/answering, and an explicit Allow is the
+# only unambiguous signal.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+Sitemap: https://easyanalysis.dev/sitemap.xml

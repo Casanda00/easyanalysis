@@ -29,6 +29,9 @@ with the app. Deployed from `landing/` to **easyanalysis.dev** (see [DEPLOY.md](
 | [landing/how-to-use.html](landing/how-to-use.html) | **Practical walkthrough** — the task-oriented companion to the reference. |
 | [landing/release-notes.html](landing/release-notes.html) | **Published release notes — GENERATED, do not hand-edit.** Built from `CHANGELOG.md` by `landing/build-release-notes.mjs` and regenerated automatically by `.github/workflows/release-notes.yml` on any push to `main` that touches the changelog. Edit `CHANGELOG.md` instead; the page follows. One anchor per version (`#v0-10-4`). |
 | [landing/install.ps1](landing/install.ps1) / [landing/install.sh](landing/install.sh) | Static copies of the installers, served with explicit MIME headers via `landing/vercel.json`. They must stay in sync with the repo-root originals. |
+| [landing/llms.txt](landing/llms.txt) | **Machine-readable summary for LLMs / AI assistants** ([llmstxt.org](https://llmstxt.org) convention), served at `/llms.txt`. **This is the only copy** — a repo-root duplicate existed, was never served, and had gone stale describing the deprecated WebAssembly build; it was deleted rather than kept in sync. Keep it current with what the app actually is. |
+| [landing/sitemap.xml](landing/sitemap.xml) | The four public URLs, hand-maintained. Uses the **extensionless** form because `vercel.json` sets `cleanUrls` — listing `.html` would point crawlers at a 308. |
+| [landing/robots.txt](landing/robots.txt) | Allows everything and points at the sitemap. AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot, …) are named **explicitly and allowed on purpose** — several ignore `User-agent: *`, and being findable by assistants is the goal. |
 
 **Previously-recorded gaps, all now CLOSED (re-verified 2026-08-05):** the app links to these
 pages (Docs button), the in-app tour runs **9 steps** (it was 6 when the note said 2 — the note
@@ -43,7 +46,6 @@ itself (item 24).
 | [dev_updates.md](dev_updates.md) | Dated developer action log (early history; not actively maintained). |
 | [spatial_design_reference.md](spatial_design_reference.md) | Design reference for the spatial / remote-sensing / LiDAR screens (map-centric GeoLibre layout). |
 | [papers/METHODS.md](papers/METHODS.md) | Papers-as-methods notes — published methods to implement and auto-cite. |
-| [llms.txt](llms.txt) | Machine-readable project summary for LLM tools. |
 
 ## Direction (important)
 The app is **LOCAL-FIRST.** The **server build run via `launcher/run.R` (port 7788)** is THE

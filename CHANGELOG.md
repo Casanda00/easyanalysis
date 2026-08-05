@@ -18,6 +18,31 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.8 — 2026-08-05
+
+### Added — the site can now be found
+
+The website had no sitemap and no `robots.txt`, so nothing told a search engine or an AI
+assistant which pages existed. Both now exist, and AI crawlers are welcomed explicitly rather
+than left to guess — people increasingly find tools by asking an assistant, and there is nothing
+here worth withholding.
+
+Every page also gained a canonical URL, link-preview tags (so a shared link shows a title and
+summary instead of a bare address), and structured data describing what EasyAnalysis is, what it
+costs, and what it runs on.
+
+### Fixed — the summary written for AI assistants was unreachable, and wrong
+
+`llms.txt` is a plain-language description of the tool intended for AI assistants. It was sitting
+in the wrong folder, so **the published site returned "not found" for it**, and its contents still
+described the old browser-based version — claiming the app ran inside the browser with no install,
+which stopped being true some time ago. It also used the assistant's former name.
+
+It is now published at `easyanalysis.dev/llms.txt` and describes the current app: a local install,
+the real setup commands, and what it can actually do.
+
+*(No link-preview image yet — one still needs to be made.)*
+
 ## v0.10.7 — 2026-08-05
 
 ### Added — a Quit button

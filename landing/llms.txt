@@ -1,0 +1,104 @@
+# EasyAnalysis
+
+> EasyAnalysis is a free, local-first platform for running statistical, machine-learning and
+> spatial/geospatial analysis by pointing and clicking — no coding required. You install it on
+> your own computer with a single command; it opens in your web browser but computes natively on
+> your machine, so your data never leaves it. Live at https://easyanalysis.dev
+
+## What it is
+
+EasyAnalysis lets students, researchers and professionals run rigorous analyses on their own
+data without writing code. Open a project, add a dataset, pick what you want to do, click Run,
+and read the results — including model metrics and plain-English interpretation. A built-in AI
+Co-Analyst can run analyses for you and explain plots and results, grounded strictly in the
+tool's own methods and your actual data.
+
+The tool is domain-general and works with any tabular or spatial data. Its founding reference
+domain is Finnish National Forest Inventory (NFI/VMI) data for forest trafficability and
+tree-growth modelling, but nothing in the core is forestry-specific.
+
+## How to get it
+
+One command, no Docker and no administrator rights. R is downloaded automatically if it is not
+already installed.
+
+- Windows (PowerShell): `iwr -useb https://easyanalysis.dev/install.ps1 | iex`
+- macOS / Linux: `curl -fsSL https://easyanalysis.dev/install.sh | sh`
+
+The first run installs R packages and takes a few minutes; afterwards it starts in seconds. The
+app opens at `http://127.0.0.1:7788`.
+
+## Key features
+
+- **Point-and-click analysis** — no scripting. Nothing computes until you press Run.
+- **Runs entirely on your own computer.** There is no analysis server and no upload step: the
+  browser is only the interface, and the computation happens in R on your machine. This is a
+  privacy property of the architecture, not a policy.
+- **Projects** — your work is saved to disk as you go, so closing the app and coming back
+  resumes where you stopped. Large spatial files are referenced in place rather than copied.
+- **AI Co-Analyst** — ask it to run an analysis, or to explain a plot or a result. It is
+  grounded in the app's own data and methods and will not invent numbers or column names.
+- **Recommend** — a plain-English read on what your data looks like and which methods suit it,
+  before you model.
+- **Built-in R console** — optionally run R directly against your data.
+- **Cancellable heavy jobs** — large spatial operations run in a separate process so they can be
+  stopped.
+- **Themes** — several light and dark colour schemes, switchable at any time.
+
+## Data it accepts
+
+CSV, Excel (.xlsx) and delimited text; and spatial formats: GeoTIFF (.tif) rasters, LAS/LAZ
+LiDAR point clouds, GeoJSON, GeoPackage (.gpkg) and Shapefiles. Datasets can also be typed or
+pasted in from scratch, and edited in a spreadsheet grid.
+
+## Analyses available
+
+- **Statistical models**: linear regression, ANOVA, linear mixed-effects models, logistic
+  regression, discriminant analysis (LDA/QDA/WLDA/RLDA/KDA/LLDA/MMC), principal component
+  analysis (PCA), generalized additive models (GAM), survival analysis, and statistical tests.
+- **Machine learning**: random forest, support vector machines, neural networks, decision trees,
+  gradient boosting (XGBoost), classification, and clustering (k-means, hierarchical, PAM/Gower).
+- **Spatial, LiDAR and remote sensing**: point-cloud viewing and individual tree detection,
+  canopy height models, raster analysis and band maths, terrain analysis (slope, aspect,
+  hillshade, curvature, TPI/TRI, roughness), hydrology (flow direction, accumulation, streams,
+  TWI), vector operations, zonal statistics, vegetation indices (NDVI, NDWI, NBR, NDRE), and
+  satellite data search and download.
+- **Other**: time-series analysis, structural equation modelling (SEM), and Bayesian analysis.
+
+Coordinate reference systems are searched against GDAL/PROJ's own database, so any of the ~6,900
+non-deprecated EPSG systems can be selected by code or by name.
+
+## How it works (technical)
+
+EasyAnalysis is an R Shiny application that runs locally. The installer fetches R (if needed) and
+the required R packages into a private library, then starts the app and opens your browser at a
+local address. Statistical methods and spatial operations are each defined in a registry, so the
+same runner drives many analyses consistently.
+
+The AI Co-Analyst calls the OpenAI API using tool-calling that invokes the app's own analysis
+functions. It is the only component that uses the network, and only when you send it a message.
+
+A browser-only build (R compiled to WebAssembly via Shinylive) was previously offered and is now
+**deprecated** — it proved too slow and too limited for real datasets. The local install is the
+supported way to run EasyAnalysis.
+
+## Privacy
+
+Your data is read and analysed by R on your own computer and is never sent anywhere. The AI
+Co-Analyst sends only what you ask about, plus the current screen's context, to the language
+model — and only when you send a message. If you do not use the Co-Analyst, the app makes no
+network requests with your data at all.
+
+## Notes
+
+- EasyAnalysis is an independent project. The University of Eastern Finland is acknowledged for
+  code contributions and for data used in analyses and testing.
+- Author: Tim Casanda Gibson.
+
+## Links
+
+- Site: https://easyanalysis.dev
+- Documentation: https://easyanalysis.dev/documentation
+- How to use: https://easyanalysis.dev/how-to-use
+- Release notes: https://easyanalysis.dev/release-notes
+- Source: https://github.com/Casanda00/easyanalysis

@@ -84,6 +84,25 @@ const page = `<!doctype html>
   <title>Release notes — EasyAnalysis</title>
   <meta name="description"
     content="What changed in each version of EasyAnalysis, newest first.">
+  <link rel="canonical" href="https://easyanalysis.dev/release-notes">
+  <meta name="robots" content="index, follow, max-snippet:-1">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="EasyAnalysis">
+  <meta property="og:url" content="https://easyanalysis.dev/release-notes">
+  <meta property="og:title" content="Release notes — EasyAnalysis">
+  <meta property="og:description"
+    content="What changed in each version of EasyAnalysis, newest first.">
+  <meta name="twitter:card" content="summary">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "EasyAnalysis release notes",
+    "url": "https://easyanalysis.dev/release-notes",
+    "description": "Version history for EasyAnalysis, newest first. Latest release ${latest}.",
+    "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
+  }
+  </script>
   <style>
     :root {
       --paper: #0F1310; --panel: #171C17; --sunk: #131813; --tint: #1D2A1E;

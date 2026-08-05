@@ -7,6 +7,53 @@
   <title>EasyAnalysis — analyse data and map it, in one place</title>
   <meta name="description"
     content="A local-first platform for statistics, machine learning and spatial/LiDAR analysis. Point-and-click, plain-English results, your data never leaves your machine.">
+
+  <!-- Canonical uses the extensionless form: vercel.json sets cleanUrls, so
+       /index.html and / are the same page and the bare origin is the real one. -->
+  <link rel="canonical" href="https://easyanalysis.dev/">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+
+  <!-- Open Graph / Twitter: without these, a shared link renders as a bare URL
+       with no title or summary. No og:image yet -- there is no artwork in
+       landing/assets, and a broken image reference is worse than none. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="EasyAnalysis">
+  <meta property="og:url" content="https://easyanalysis.dev/">
+  <meta property="og:title" content="EasyAnalysis — analyse data and map it, in one place">
+  <meta property="og:description"
+    content="Free, local-first platform for statistics, machine learning and spatial/LiDAR analysis. Point and click, no coding, and your data never leaves your computer.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="EasyAnalysis — analyse data and map it, in one place">
+  <meta name="twitter:description"
+    content="Free, local-first platform for statistics, machine learning and spatial/LiDAR analysis. No coding, and your data never leaves your computer.">
+
+  <!-- Structured data. SoftwareApplication is what makes an assistant or a search
+       engine able to answer "what is it, what does it cost, what does it run on"
+       without parsing the prose. Kept consistent with /llms.txt. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EasyAnalysis",
+    "url": "https://easyanalysis.dev/",
+    "applicationCategory": "Statistical and geospatial analysis software",
+    "operatingSystem": "Windows, macOS, Linux",
+    "description": "A free, local-first platform for statistical, machine-learning and spatial/LiDAR analysis by pointing and clicking. Installs with one command and runs on your own computer, so uploaded data never leaves it.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Tim Casanda Gibson" },
+    "softwareHelp": "https://easyanalysis.dev/documentation",
+    "releaseNotes": "https://easyanalysis.dev/release-notes",
+    "codeRepository": "https://github.com/Casanda00/easyanalysis",
+    "featureList": [
+      "Point-and-click statistical modelling",
+      "Machine learning (random forest, SVM, XGBoost, neural networks, clustering)",
+      "Spatial, raster, terrain, hydrology and LiDAR analysis",
+      "AI Co-Analyst that runs analyses and explains results",
+      "Projects saved to disk",
+      "Runs locally — no data is uploaded"
+    ]
+  }
+  </script>
   <style>
     :root {
       --paper: #0F1310;

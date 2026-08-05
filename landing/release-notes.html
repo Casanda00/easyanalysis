@@ -7,6 +7,25 @@
   <title>Release notes — EasyAnalysis</title>
   <meta name="description"
     content="What changed in each version of EasyAnalysis, newest first.">
+  <link rel="canonical" href="https://easyanalysis.dev/release-notes">
+  <meta name="robots" content="index, follow, max-snippet:-1">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="EasyAnalysis">
+  <meta property="og:url" content="https://easyanalysis.dev/release-notes">
+  <meta property="og:title" content="Release notes — EasyAnalysis">
+  <meta property="og:description"
+    content="What changed in each version of EasyAnalysis, newest first.">
+  <meta name="twitter:card" content="summary">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "EasyAnalysis release notes",
+    "url": "https://easyanalysis.dev/release-notes",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.8.",
+    "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
+  }
+  </script>
   <style>
     :root {
       --paper: #0F1310; --panel: #171C17; --sunk: #131813; --tint: #1D2A1E;
@@ -103,14 +122,31 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.7</b> · 49 releases ·
+      <p class="meta">Latest: <b>v0.10.8</b> · 50 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-7"><h2><a class="anchor" href="#v0-10-7">v0.10.7</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-8"><h2><a class="anchor" href="#v0-10-8">v0.10.8</a><span class="when">2026-08-05</span></h2>
+<h3>Added — the site can now be found</h3>
+<p>The website had no sitemap and no <code>robots.txt</code>, so nothing told a search engine or an AI
+assistant which pages existed. Both now exist, and AI crawlers are welcomed explicitly rather
+than left to guess — people increasingly find tools by asking an assistant, and there is nothing
+here worth withholding.</p>
+<p>Every page also gained a canonical URL, link-preview tags (so a shared link shows a title and
+summary instead of a bare address), and structured data describing what EasyAnalysis is, what it
+costs, and what it runs on.</p>
+<h3>Fixed — the summary written for AI assistants was unreachable, and wrong</h3>
+<p><code>llms.txt</code> is a plain-language description of the tool intended for AI assistants. It was sitting
+in the wrong folder, so <strong>the published site returned &quot;not found&quot; for it</strong>, and its contents still
+described the old browser-based version — claiming the app ran inside the browser with no install,
+which stopped being true some time ago. It also used the assistant&#39;s former name.</p>
+<p>It is now published at <code>easyanalysis.dev/llms.txt</code> and describes the current app: a local install,
+the real setup commands, and what it can actually do.</p>
+<p><em>(No link-preview image yet — one still needs to be made.)</em></p>
+</section><section class="rel" id="v0-10-7"><h2><a class="anchor" href="#v0-10-7">v0.10.7</a><span class="when">2026-08-05</span></h2>
 <h3>Added — a Quit button</h3>
 <p>There was no way to close EasyAnalysis from inside the app. Stopping it meant closing the R
 console window the launcher opened — which is also why the app could not be started from a

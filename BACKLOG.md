@@ -3635,3 +3635,60 @@ and it matches how the pill was already solved.
 cancellable** (i.e. it is in the worker). An always-visible Stop that silently does nothing
 during in-process work is worse than no Stop — it reads as broken, and it would be the second
 time a control looked dead because Shiny was busy.
+
+### 48. Discoverability — sitemap, robots, llms.txt and structured data — **DONE (v0.10.8)**
+> "please create a sitemap and other things for llm and others to find the tool."
+
+**Three gaps, one of them actively misleading:**
+
+1. **No `sitemap.xml` and no `robots.txt`** anywhere in `landing/`. Nothing told a crawler what
+   pages existed or that they were welcome.
+2. **`llms.txt` existed but was NOT SERVED.** It sat at the repo root; `landing/` is the deploy
+   root (`vercel.json` `outputDirectory: "."`), so `easyanalysis.dev/llms.txt` was a 404. The one
+   document written specifically so assistants could describe the tool was unreachable.
+3. **Worse, its content was wrong.** It described the **deprecated WebAssembly build** as the
+   product — "runs entirely in the user's web browser", "R compiled to WebAssembly", "there is no
+   analysis backend", "first visit takes 3-5 minutes while the R environment downloads". The app
+   has been **local-first** for a long time. It also still said "AI Co-Pilot", renamed to
+   Co-Analyst in v0.10.2. So the file most likely to be quoted by an assistant was describing a
+   product that no longer exists.
+
+**Fix:**
+- **`landing/sitemap.xml`** — the four public URLs, in the **extensionless** form, because
+  `cleanUrls` is on and listing `.html` would point every crawler at a 308 (a redirect class that
+  has caused trouble here before — round-3 item 16). `lastmod` is deliberately **omitted** rather
+  than guessed: a stale or invented date is worse than none.
+- **`landing/robots.txt`** — allows everything, points at the sitemap, and names AI crawlers
+  **explicitly** (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot, Google-Extended, Applebot-
+  Extended, CCBot, Meta-ExternalAgent, Amazonbot, …). Several ignore `User-agent: *` for
+  training/answering, so an explicit `Allow` is the only unambiguous signal. Being findable by
+  assistants is the goal, and there is nothing on the site worth withholding.
+- **`landing/llms.txt`** — rewritten from scratch to describe what the app actually is: local
+  install, the real one-line commands, `127.0.0.1:7788`, projects on disk, Co-Analyst, the CRS
+  catalogue, cancellable jobs — and it states plainly that the browser build is deprecated. The
+  **root copy was deleted, not synced**: two copies of a discovery document is exactly how this
+  one went stale.
+- **Meta + structured data on all four pages** — `canonical` (extensionless), `robots`,
+  OpenGraph and Twitter card, plus JSON-LD: `SoftwareApplication` on the home page (so an
+  assistant can answer "what is it, what does it cost, what does it run on" without parsing
+  prose), `TechArticle` on documentation and release notes, and `HowTo` on the walkthrough — the
+  type distinction is what lets an assistant cite the *right* page.
+- **`release-notes.html` is generated**, so its tags went into
+  `landing/build-release-notes.mjs`, not the output file.
+- **`vercel.json`** serves the three new files with explicit content types.
+
+**Deliberately NOT done:** no `og:image`. There is no artwork in `landing/assets/` (only
+`site.css`), and a reference to a non-existent image is worse than none — a social card would
+render broken instead of plain. **Open follow-up:** make one, then add `og:image`/
+`twitter:image` and switch the cards to `summary_large_image`.
+
+**Verified:** files exist where they are *served*; no root duplicate remains; sitemap uses the
+correct `sitemaps.org` namespace (the first draft had `sitemap.org`, caught by the check) and has
+exactly one entry per real page with no `.html` forms; robots points at the sitemap and has no
+`Disallow`; llms.txt no longer makes any of the four wasm-era claims and uses the current name;
+every page has a canonical matching its real URL plus OG/Twitter tags; **all five JSON-LD blocks
+parse** and carry the intended `@type`; `vercel.json` still parses and serves the sitemap as
+`application/xml`.
+**Not verified here:** live headers and crawler behaviour after deploy — worth checking
+`easyanalysis.dev/llms.txt`, `/robots.txt` and `/sitemap.xml` return 200 with the right
+content types once Vercel has picked the commit up.
