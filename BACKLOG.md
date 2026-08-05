@@ -2161,6 +2161,40 @@ arrived at by adding a menu.**
 **Suggested split:** ship 1 + 2 as one piece of work (rename + real editor, which also closes
 C11-C13); treat 3 as a launcher button; and hold 4 until the toolchain question is answered.
 
+#### 26a. DECIDED 2026-08-05 — the menu is called **"Write code"**, in the top menu
+> "create a new menu where R, Python, Jupyter notebook will live and name it as Write code.
+> should be in the top menu."
+
+Naming and placement are settled: a **top-level menubar entry named "Write code"**, holding
+**R**, **Python** and **Jupyter Notebook**. It is a sibling of the existing groups (Data /
+Models / Machine Learning / Spatial & LiDAR), not a submenu buried inside one.
+
+**What can ship immediately vs. what is gated:**
+
+| Entry | State | Gate |
+|---|---|---|
+| **R** | Shippable now | `mod_rconsole.R` exists; point the menu at it and rename it "mini R terminal" (part 1 above). Part 2 — a real editor instead of `textAreaInput` — is what makes it worth visiting. |
+| **Python** | **Gated** | No Python integration exists anywhere in the app. Requires a Python toolchain on the user's machine. |
+| **Jupyter Notebook** | **Gated** | Needs Python *plus* a local Jupyter server running *plus* relaxed framing headers before it can be shown in a panel. |
+
+**So the menu can be created now, but two of its three entries cannot yet do anything.** Two
+honest ways to handle that, and the choice should be deliberate:
+1. **Ship "Write code" with R only**, and add Python/Jupyter to it when the toolchain question
+   (part 4 above) is answered. The menu is never misleading.
+2. **Ship all three**, with Python and Jupyter opening a short "requires Python on this
+   computer — set it up" panel that detects whether Python is present and says what to do.
+
+**Recommendation: option 2**, because it makes the *product direction* visible without pretending
+the capability is there, and the detection panel is small. But note it does soften the install
+promise in the user's eyes even before any code runs — the menu itself is a statement that
+EasyAnalysis is multi-language. That is the positioning decision part 4 flags, and creating the
+menu is effectively taking it.
+
+**Cross-reference:** this is the "one dataset, several languages" idea recorded around
+BACKLOG:2324 (item 31, multi-language sync) — the menu is where that would surface. Note the
+menu-free workspace flow in DESIGN.md: check that adding a top-level group is still consistent
+with it before building.
+
 ---
 
 ### 27. Remove the Co-Analyst suggestion chips — FIXED 2026-08-04
@@ -3485,3 +3519,54 @@ the View menu still uses the same function. App serves HTTP 200.
 
 **Note:** a **black & white theme is still open** as round-4 item 25. This item only moves where
 the picker lives; it does not add a palette.
+
+### 46. Launching without a terminal — the biggest barrier for non-technical users
+> "many non technical users have no idea on how to use the terminal, what is a very simple way
+> to allow them to get the app to work without opening the terminal?"
+
+**This is a fair hit, and the problem is worse than "the install needs a terminal".**
+
+**Grounded facts, checked 2026-08-05:**
+- The only documented way in is `iwr -useb https://easyanalysis.dev/install.ps1 | iex`
+  (`install.ps1:5`), which requires opening PowerShell and pasting a command. `install.sh` is the
+  same on macOS/Linux.
+- **`install.ps1` creates no shortcut of any kind** — no Desktop, no Start Menu, no `.lnk`.
+  Verified by grep: there is no `WScript.Shell`, no `Desktop`, no `StartMenu` anywhere in it.
+- **Therefore the terminal is not a one-off cost — it is required on every single launch.** A
+  user who installed successfully last week has no way to reopen the app except finding and
+  pasting that command again. That is the more damaging half, and it is invisible in the
+  install docs because they only describe the first run.
+- `install.ps1:141` tells the user "Keep the R window open while you work; close it to stop the
+  app", so the console window is currently also the app's only stop control.
+
+**The options, cheapest first:**
+
+| # | Approach | Cost | What it fixes | Honest downside |
+|---|---|---|---|---|
+| **A** | **Create shortcuts during install** (Desktop + Start Menu `.lnk` → the launcher) | ~15 lines of PowerShell (`WScript.Shell`) | **Every launch after the first** | Does nothing for the first install |
+| **B** | **A downloadable `EasyAnalysis-Setup.bat`** the user double-clicks instead of pasting | Small; wraps the existing `install.ps1` with `-ExecutionPolicy Bypass` | The **first** install | Browsers flag `.bat` downloads; SmartScreen warns on unsigned files |
+| **C** | **A real `.exe` / `.msi` installer** (Inno Setup or NSIS) | A build pipeline + **code-signing certificate (recurring cost)** | Everything; matches what non-technical users expect | Unsigned, it shows "Windows protected your PC", which is *scarier* than a terminal. Signing is the actual cost, not the packaging |
+| **D** | **Electron / Tauri desktop wrapper** | Large | Everything, plus a native feel | A second big toolchain, and R still has to be installed underneath. Overkill for the problem |
+| **E** | **Hosted version** (no install at all) | Deployment + running cost | Everything, for users who can use a hosted app | The project deliberately went **LOCAL-FIRST** because the browser build was too slow and shinyapps.io's RAM limits broke LiDAR. Viable only for small tabular work |
+
+**Recommendation: A + B, in that order, and treat C as the real answer later.**
+
+- **A is the highest value per line of code in this entire backlog.** It converts a
+  paste-a-command-every-time app into a double-click app for everyone who has already installed,
+  and it is a change to a script that already runs. Do it first.
+- **B** removes the terminal from the first install too, and reuses `install.ps1` unchanged.
+- **C** is what a non-technical audience actually expects, but its cost is the **certificate**,
+  not the installer — an unsigned `.exe` produces a security warning that will lose more users
+  than the terminal does. Do not start C until signing is settled.
+- **D** and **E** are recorded to be dismissed, not pursued: D duplicates the install problem it
+  claims to solve, and E contradicts the local-first decision.
+
+**One design consequence to decide with A:** if a shortcut launches the app with the console
+window hidden (nicer), the user loses the only way to stop it — `install.ps1` currently relies on
+"close the R window". So a hidden-console launch needs a **Quit** control in the app itself, or a
+tray icon. **Recommendation: keep the console window visible in the first version** — an ugly but
+working stop beats a tidy launch with no way out. Revisit once the app has its own Quit.
+
+**Also worth fixing while in there:** the landing page and `README.md` document only the paste-a-
+command route, so even after A and B exist, a first-time visitor would still be sent to the
+terminal. The docs are part of this item, not a follow-up.
