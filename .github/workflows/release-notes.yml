@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Regenerate landing/release-notes.html from CHANGELOG.md.
+#
+# Backlog item 24, approach C. The landing site is a PURE STATIC Vercel deploy
+# (landing/vercel.json has buildCommand: null) — that is what makes the
+# installer one-liners work, so the generation happens here in CI and the
+# rendered page is committed. The site itself keeps needing no build step.
+#
+# NO INFINITE LOOP: this workflow triggers only on CHANGELOG.md and its own
+# generator, and it only ever writes landing/release-notes.html. The commit it
+# pushes therefore cannot re-trigger it. (GitHub also suppresses workflow runs
+# for pushes made with the default GITHUB_TOKEN, which is a second guard, but
+# the path filter is the one being relied on.)
+# ---------------------------------------------------------------------------
+name: Release notes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "CHANGELOG.md"
+      - "landing/build-release-notes.mjs"
+      - ".github/workflows/release-notes.yml"
+  workflow_dispatch: {}          # so it can be run by hand after a manual edit
+
+permissions:
+  contents: write                # needed to push the regenerated page back
+
+concurrency:                     # two quick pushes must not race each other
+  group: release-notes
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # `marked` is the only dependency and is not vendored: installing it here
+      # keeps node_modules out of the repo, which matters because landing/ is
+      # deployed as-is.
+      - name: Install marked
+        run: npm install --no-save marked
+
+      - name: Generate release-notes.html
+        run: node landing/build-release-notes.mjs
+
+      # Commit ONLY if the rendered page actually changed, so a push that did
+      # not touch the changelog's content leaves no empty commit behind.
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- landing/release-notes.html; then
+            echo "release-notes.html is already up to date — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add landing/release-notes.html
+          git commit -m "docs: regenerate release notes from CHANGELOG.md [skip ci]"
+          git push

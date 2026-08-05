@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release notes — EasyAnalysis</title>
+  <meta name="description"
+    content="What changed in each version of EasyAnalysis, newest first.">
+  <style>
+    :root {
+      --paper: #0F1310; --panel: #171C17; --sunk: #131813; --tint: #1D2A1E;
+      --bar: #1B3A1D; --ink: #E8EDE4; --bark: #93A08C; --line: #2A322A;
+      --forest: #5FBF62; --canopy: #7ED481; --onbrand: #08120A;
+      --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+      --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --wrap: 900px;
+      color-scheme: dark;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --paper: #F7F8F4; --panel: #FFFFFF; --sunk: #EEF1EA; --tint: #E7F0E7;
+        --bar: #2E7D32; --ink: #10150F; --bark: #5C6657; --line: #DCE1D6;
+        --forest: #2E7D32; --canopy: #3E9B44; --onbrand: #FFFFFF;
+        color-scheme: light;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--ui); line-height:1.6; -webkit-font-smoothing:antialiased; }
+    .wrap { max-width:var(--wrap); margin:0 auto; padding:0 20px; }
+    nav { position:sticky; top:0; z-index:10; background:color-mix(in srgb,var(--paper) 88%,transparent);
+          backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+    nav .wrap { display:flex; align-items:center; gap:18px; height:56px; }
+    .brand { font-weight:700; letter-spacing:-.01em; display:flex; align-items:center; gap:9px; }
+    .mk { width:24px; height:24px; border-radius:7px; background:var(--forest);
+          display:grid; place-items:center; }
+    .mk svg { width:13px; height:13px; fill:var(--onbrand); }
+    nav a { color:var(--bark); text-decoration:none; font-size:14px; }
+    nav a:hover { color:var(--ink); }
+    nav .links { margin-left:auto; display:flex; align-items:center; gap:18px; }
+    header { padding:52px 0 26px; border-bottom:1px solid var(--line); }
+    h1 { margin:0 0 8px; font-size:34px; letter-spacing:-.02em; }
+    .lede { color:var(--bark); margin:0; max-width:62ch; }
+    .meta { margin-top:14px; font-family:var(--mono); font-size:12.5px; color:var(--bark); }
+    .meta b { color:var(--forest); }
+    main { padding:8px 0 60px; }
+    .rel { border-bottom:1px solid var(--line); padding:26px 0; }
+    .rel:last-child { border-bottom:0; }
+    .rel h2 { font-size:22px; margin:0 0 4px; display:flex; align-items:baseline;
+              gap:12px; flex-wrap:wrap; }
+    .rel h2 .anchor { color:var(--forest); text-decoration:none; font-family:var(--mono); }
+    .rel h2 .anchor:hover { text-decoration:underline; }
+    .rel h2 .when { font-size:13px; color:var(--bark); font-weight:400; }
+    .rel h3 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
+              color:var(--bark); margin:20px 0 6px; font-weight:700; }
+    .rel h4 { font-size:15px; margin:18px 0 6px; color:var(--ink); }
+    .rel ul { margin:0; padding-left:20px; }
+    .rel li { margin:7px 0; }
+    .rel p { margin:10px 0; }
+    code { font-family:var(--mono); font-size:.9em; background:var(--sunk);
+           color:var(--canopy); padding:1.5px 5px; border-radius:4px; }
+    pre { background:var(--sunk); border:1px solid var(--line); border-radius:8px;
+          padding:12px 14px; overflow-x:auto; }
+    pre code { background:none; padding:0; color:var(--ink); }
+    blockquote { margin:12px 0; padding:10px 14px; border-left:3px solid var(--forest);
+                 background:var(--sunk); border-radius:0 8px 8px 0; color:var(--bark); }
+    blockquote p { margin:0; }
+    a { color:var(--canopy); }
+    /* Wide tables scroll inside their own box; the page must never scroll sideways. */
+    .tw { overflow-x:auto; margin:12px 0; }
+    table { border-collapse:collapse; width:100%; font-size:14px; }
+    th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+    th { background:var(--sunk); font-size:12.5px; text-transform:uppercase;
+         letter-spacing:.04em; color:var(--bark); }
+    footer { border-top:1px solid var(--line); padding:22px 0 40px; color:var(--bark);
+             font-size:13.5px; }
+    footer .wrap { display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
+    footer a { color:var(--bark); text-decoration:none; }
+    footer a:hover { color:var(--ink); }
+  </style>
+</head>
+
+<body>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="index.html" style="color:inherit;text-decoration:none;">
+        <span class="mk"><svg viewBox="0 0 24 24">
+            <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2z" />
+          </svg></span>
+        EasyAnalysis
+      </a>
+      <span class="links">
+        <a href="how-to-use.html">How to use</a>
+        <a href="documentation.html">Docs</a>
+        <a href="release-notes.html" style="color:var(--ink)">Release notes</a>
+      </span>
+    </div>
+  </nav>
+
+  <header>
+    <div class="wrap">
+      <h1>Release notes</h1>
+      <p class="lede">What changed in each version, newest first. Every entry says what
+        was actually fixed and why it mattered — not just that something changed.</p>
+      <p class="meta">Latest: <b>v0.10.4</b> · 46 releases ·
+        generated from CHANGELOG.md</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+<section class="rel" id="v0-10-4"><h2><a class="anchor" href="#v0-10-4">v0.10.4</a><span class="when">2026-08-05</span></h2>
+<h3>Added</h3>
+<ul>
+<li><strong>Release notes on the website, kept up to date automatically.</strong> Every version&#39;s entry is
+now published at <strong>easyanalysis.dev/release-notes.html</strong>, generated from this file and
+regenerated by CI whenever it changes — so the page can never drift behind the app. Each
+version has its own link, so a support answer can point at one release.</li>
+<li><strong>&quot;What&#39;s new in this version&quot;</strong> next to the version number in the app&#39;s About panel. The
+notes existed nowhere a user could reach them before.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>The About panel read &quot;an Co-Analyst&quot; — a slip from renaming the assistant in the previous
+version.</li>
+</ul>
+</section><section class="rel" id="v0-10-3"><h2><a class="anchor" href="#v0-10-3">v0.10.3</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>More fixed-light surfaces found by an app-wide scan</strong>, the same fault as the References
+page rather than new ones: the confusion-matrix cells on Classification, the F1 bar, the
+macro-average row in every precision/recall table, and GAM&#39;s Yes/No non-linearity column
+were all fixed pastels that stayed pale on a dark theme. They are translucent tints of the
+theme&#39;s own colours now, so they keep their meaning and follow the theme.</li>
+<li>The Recommender&#39;s priority colours, a Download-spatial-data caption, the active dataset
+row&#39;s text, and the Co-Analyst&#39;s typing dot and disabled send button were likewise pinned
+to fixed colours.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>The Recommender&#39;s &quot;Ask AI&quot; button — a robot emoji plus a <strong>fourth</strong> name for the same panel
+— is now an icon and &quot;Ask Co-Analyst&quot;. (The visual language rules emojis out.)</li>
+</ul>
+</section><section class="rel" id="v0-10-2"><h2><a class="anchor" href="#v0-10-2">v0.10.2</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The References page was unreadable in every theme except light.</strong> Each reference card was
+pinned to a white background with fixed grey text, so on any dark set the card stayed white
+while the text that had no explicit colour inherited the app&#39;s light body colour — which is
+why some lines read as black and others vanished. The whole page now uses theme colours,
+including the Implemented / In progress / Cataloged badges.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>One name for the assistant: &quot;Co-Analyst&quot;.</strong> The Analysis menu offered it as &quot;AI
+Assistant&quot; while its own panel header and the top-bar button both said Co-Analyst — three
+names in the code for one feature. Everything now says Co-Analyst.</li>
+</ul>
+</section><section class="rel" id="v0-10-1"><h2><a class="anchor" href="#v0-10-1">v0.10.1</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Discriminant Analysis validated a different model than the one you configured.</strong> Its
+cross-validation refitted each fold with the package defaults instead of the settings you
+chose — Kernel DA ran at the default RBF width and cost rather than yours, Maximum Margin
+ignored its cost, and Locally Linear DA always used 5 neighbours whatever the slider said.
+Measured on test data: a default-parameter fold agreed with the configured model on only
+<strong>38% of rows</strong>, so the reported accuracy described a substantially different classifier.</li>
+<li><strong>Locally Linear DA&#39;s validation silently scored a different method entirely.</strong> When that
+fit falls back to its PCA-decorrelated form (which happens whenever the local covariance is
+singular), the validation no longer recognised it and quietly cross-validated plain LDA
+instead. It now validates the method actually used, and says so honestly when it cannot.</li>
+</ul>
+</section><section class="rel" id="v0-10-0"><h2><a class="anchor" href="#v0-10-0">v0.10.0</a><span class="when">2026-08-05</span></h2>
+<h3>Changed</h3>
+<ul>
+<li><strong>ANOVA is now a registry entry</strong> — the last of the nine screens migrated. Verified against
+<code>aov()</code> and <code>TukeyHSD()</code> directly: identical ANOVA table, identical Tukey comparisons,
+identical eta-squared, Cohen&#39;s f and leave-one-out cross-validation. <strong>No bug was found in
+this screen.</strong></li>
+<li><strong>All nine screens are migrated.</strong> XGBoost, SVM, Decision Tree, Neural Network, PCA/FA/MDS,
+GAM, Random Forest, Survival and ANOVA now share one variable picker, one result layout and
+one place to add the next analysis. Adding one is a list entry rather than a new screen.</li>
+</ul>
+<h3>Fixed across the migration (v0.9.1 – v0.10.0)</h3>
+<p>Nine screens were ported; <strong>ten faults were found in seven of them</strong>, every one pre-existing
+and none reported by a user — because each failed silently or produced plausible-looking
+numbers:</p>
+<ul>
+<li><strong>Three screens could not produce a result at all.</strong> XGBoost errored the moment you pressed
+Train (a package API had moved underneath it); GAM never fitted a model, ever; Survival&#39;s
+Cox proportional-hazards model never fitted.</li>
+<li><strong>Five screens validated a different model than the one on display</strong> — SVM, Decision Tree,
+Neural Network, GAM and Random Forest all refitted their folds with settings you had not
+chosen, so the accuracy figures described a model you were not looking at. In SVM&#39;s case the
+cross-validation had never produced any result at all.</li>
+<li><strong>PCA and ANOVA were clean.</strong></li>
+</ul>
+</section><section class="rel" id="v0-9-8"><h2><a class="anchor" href="#v0-9-8">v0.9.8</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The Cox proportional-hazards model never fitted.</strong> Adding covariates produced nothing at
+all, with no error shown. The formula it built used internal column names starting with
+underscores, which R cannot parse as variable names — so the formula failed before the model
+was ever attempted, and the failure was silently discarded. Cox models now fit, with the
+proportional-hazards check alongside them.</li>
+<li>Kaplan-Meier and the log-rank test were unaffected and always worked; only the Cox half was
+broken.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>Survival analysis is now a registry entry</strong> (migration 8 of 9), verified against the
+<code>survival</code> package directly: identical survival curves, risk sets, log-rank chi-square and
+Cox coefficients, under both tie-handling methods.</li>
+<li>An event indicator that is not 0/1 is now refused with a message naming the offending
+values, instead of producing a meaningless model.</li>
+<li>The Cox and log-rank views explain what to choose when you have not selected covariates or
+a grouping variable, rather than showing an empty panel.</li>
+</ul>
+</section><section class="rel" id="v0-9-7"><h2><a class="anchor" href="#v0-9-7">v0.9.7</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Random Forest&#39;s 10-fold CV described a different forest than the one you trained.</strong> It
+never passed your tree count through, so the CV curve always came from 500-tree forests
+however you set the slider — and it used the classification <code>sqrt(p)</code> rule for choosing
+variables per split even on a regression model, whose displayed fit used <code>p/3</code>. Both now
+match the model on screen.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>Random Forest is now a registry entry</strong> (migration 7 of 9), verified to produce
+<strong>identical out-of-bag predictions and identical variable importance</strong> to the module it
+replaces, for both regression and classification, with the same <code>mtry</code> rules.</li>
+<li>Its partial-dependence plot still sits behind its own button (it is slow on large forests)
+and now reports clearly when the chosen variable was not one of the model&#39;s predictors.</li>
+</ul>
+</section><section class="rel" id="v0-9-6"><h2><a class="anchor" href="#v0-9-6">v0.9.6</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The GAM screen could never fit a model at all.</strong> Every &quot;Fit GAM&quot; ended in an error
+notification. It built its smooth terms as <code>mgcv::s(...)</code>, and mgcv does not recognise a
+namespaced smooth — it identifies one by the term label starting with <code>s(</code>, so the
+namespaced form was treated as an ordinary variable and the fit failed with
+<code>invalid type (list) for variable &#39;mgcv::s(...)&#39;</code>. The screen now fits.</li>
+<li><strong>Its cross-validation also dropped two of your settings</strong> — the fold models were built
+without the smooth type you chose (always the thin-plate default) and with smoothness
+selection hardcoded to REML. So a cubic-regression GAM selected by GCV.Cp would have been
+validated as a thin-plate REML fit. Both now match the model on screen.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>GAM is now a registry entry</strong> (migration 6 of 9), verified against <code>mgcv::gam</code> directly:
+identical coefficients, fitted values and R-squared, including a non-default basis and
+selection method.</li>
+<li>Its &quot;Predictions to data pool&quot; button is preserved, and GAM now says what went wrong when a
+fit fails (too large a basis, too many predictors) instead of showing a raw message.</li>
+</ul>
+</section><section class="rel" id="v0-9-5"><h2><a class="anchor" href="#v0-9-5">v0.9.5</a><span class="when">2026-08-04</span></h2>
+<h3>Changed</h3>
+<ul>
+<li><p><strong>PCA / Factor analysis / MDS is now a registry entry</strong> (migration 5 of 9), verified against
+<code>prcomp</code>, <code>cmdscale</code> and <code>factanal</code> directly: identical loadings, scores, standard
+deviations, MDS coordinates and factor uniquenesses.</p>
+</li>
+<li><p>Factor analysis now explains itself when it cannot run. Asking for more factors than the
+variables support used to surface R&#39;s bare complaint; it now says what failed and what to
+try instead (fewer factors, or Principal axis).</p>
+</li>
+<li><p>The method-specific options (rotation, distance metric, component axes) appear only for the
+method they belong to, and &quot;Colour points by&quot; only for PCA.</p>
+</li>
+<li><p>The colour-by column is subset by the same complete-case filter as the data, so it stays
+aligned with the points when a variable has missing values. (Verified rather than changed —
+the old screen did this correctly too.)</p>
+</li>
+</ul>
+</section><section class="rel" id="v0-9-4"><h2><a class="anchor" href="#v0-9-4">v0.9.4</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The Neural Network screen&#39;s validation ignored your Max iterations setting.</strong> Both of its
+cross-validation loops trained each fold for a hardcoded 200 iterations, so a network you
+trained for 1000 was being scored against one trained for 200. Third screen in a row with
+a validation that measured a different model than the one on display. The folds now use the
+iteration count you set.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>Neural Network is now a registry entry</strong> (migration 4 of 9), verified to produce
+<strong>identical predictions and an identical final objective value</strong> to the module it replaces,
+for both regression and classification, including a non-default architecture (hidden units,
+decay, iterations, restarts and scaling all changed together).</li>
+<li>Its validation is computed once when you press Run, and a regression network now refuses a
+categorical response with a clear message instead of failing inside <code>nnet</code>.</li>
+</ul>
+</section><section class="rel" id="v0-9-3"><h2><a class="anchor" href="#v0-9-3">v0.9.3</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The Decision Tree screen&#39;s validation scored the wrong tree.</strong> Its per-fold refits were
+built with rpart&#39;s <em>default</em> settings instead of the max depth, cp, min-split and
+min-bucket you had set — so the validation numbers described a tree you were not looking
+at. Measured on the test data: the default tree had <strong>8 leaves</strong> where the configured one
+had <strong>2</strong>. The folds now use the same controls as the tree on screen.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>Decision Tree is now a registry entry</strong> (migration 3 of 9), verified to produce
+<strong>identical predictions and an identical CP table</strong> to the module it replaces, for both
+regression and classification trees, including non-default depth/cp/min-split settings.</li>
+<li>Its validation is computed once when you press Run, rather than being recomputed every
+time the results redrew — the same change SVM got.</li>
+<li>A regression tree now refuses a categorical response with a clear message instead of
+failing inside rpart, and the pruning control is labelled to distinguish it from the
+separate hold-out validation.</li>
+</ul>
+</section><section class="rel" id="v0-9-2"><h2><a class="anchor" href="#v0-9-2">v0.9.2</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>SVM&#39;s cross-validation never worked.</strong> It always showed &quot;Awaiting SVM CV results…&quot; and
+no result ever arrived. The refit inside each fold passed the fitted model&#39;s <code>kernel</code> back
+to <code>svm()</code> — but an e1071 model stores the kernel as an integer <strong>code</strong> (radial = 2), and
+feeding that back errors with &quot;wrong kernel specification!&quot;. The error was swallowed by a
+<code>tryCatch</code> that returned <code>NULL</code>, so every fold failed silently and the screen waited
+forever. Now the kernel name is passed, and validation produces a result — and it honours
+the cost, gamma and scaling you actually set, which the old fold refits ignored.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>SVM is now a registry entry</strong> (migration 2 of 9), verified to produce <strong>identical
+predictions and identical support vectors</strong> to the module it replaces, for regression,
+classification and a non-default kernel.</li>
+<li><strong>SVM validation is computed once, when you press Run.</strong> The old screen recomputed the
+whole k-fold loop inside its render outputs, so every time the metrics table redrew it
+refitted k models. It now runs once under the progress bar, where a slow job belongs.</li>
+<li>SVM&#39;s two cross-validation controls are labelled so you can tell them apart — one is
+e1071&#39;s own built-in check, the other a separate hold-out validation. Both were present
+before with no indication which was which.</li>
+</ul>
+</section><section class="rel" id="v0-9-1"><h2><a class="anchor" href="#v0-9-1">v0.9.1</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>XGBoost was broken and would error the moment you pressed Train.</strong> Not a regression —
+the <code>xgboost</code> package changed its API in version 3.x and the screen was never updated. Two
+separate breakages: <code>xgboost(data =, params =, verbose =)</code> no longer exists (<code>params</code> was
+removed and <code>data</code> renamed to <code>x</code>), and <code>xgb.cv()</code>&#39;s <code>best_iteration</code> moved out of the top
+level into <code>early_stop</code>, so the screen read <code>NULL</code> and passed it straight to the trainer.
+Both fixed while porting the screen, and the best-iteration lookup now checks both
+locations and falls back to the minimum of the test metric, so the next API move degrades
+instead of erroring.</li>
+<li>XGBoost also refuses a binary task on a response that does not have exactly 2 classes,
+instead of silently encoding a continuous column into hundreds of &quot;classes&quot;.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li><strong>XGBoost is now a registry entry</strong> rather than its own module — the first of the existing
+screens migrated onto <code>statistics.R</code>. Same method, same hyperparameters, same views;
+verified to produce <strong>identical predictions</strong> to the module&#39;s own computation. The old
+<code>mod_xgboost.R</code> is retired: still present, no longer registered or bound, so the screen
+appears once rather than twice.</li>
+</ul>
+<h3>Added</h3>
+<ul>
+<li>The registry can render <strong>plots</strong>, which it could not before. A spec declares drawing
+functions in <code>plots</code> and the runner binds one <code>renderPlot</code> per entry — a plot needs a
+device, so unlike a table it cannot simply be returned as UI. Also added boolean options
+and conditional options (a setting that only appears when it applies).</li>
+</ul>
+</section><section class="rel" id="v0-9-0"><h2><a class="anchor" href="#v0-9-0">v0.9.0</a><span class="when">2026-08-04</span></h2>
+<h3>Added</h3>
+<ul>
+<li><strong>Five new analyses</strong>, and a registry so the next ones are cheap:
+<strong>Ordinal regression</strong>, <strong>Robust regression</strong>, <strong>Poisson regression (counts)</strong>,
+<strong>Negative binomial</strong>, and <strong>GLMM (generalised mixed effects)</strong>. Find them under
+Regression, or search for them.</li>
+<li><strong>GLMM fills a real gap.</strong> The existing Mixed effects screen is <code>nlme::lme</code>, which fits
+Gaussian responses only — it has no <code>family</code> argument at all, so a yes/no or count outcome
+with random effects could not be fitted anywhere in the app. The new screen does binomial
+and Poisson with random intercepts, random slopes, and crossed or nested grouping
+variables, and reports singular fits and convergence trouble in plain language with the
+usual remedies rather than as a raw error.</li>
+<li><strong><code>statistics.R</code> + <code>mod_stat.R</code></strong> — one spec per method, one generic runner, the same move
+<code>algorithms.R</code> made for spatial operations. Adding an analysis is now a list entry: no new
+module, no new variable pickers, no new view plumbing. Methods that genuinely do not fit
+(Tests, Discriminant analysis, Descriptive, Clustering) stay as they are.</li>
+<li>Every registry method shares one variable picker, generated from the roles the method
+declares — so predictor selection is finally identical across them, and the Co-Analyst sees
+a registry method exactly as it sees a hand-written screen.</li>
+<li><code>lme4</code> added to the optional packages.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><code>CLAUDE.md</code>&#39;s note that <code>uef_evaluation()</code> was &quot;available but unused&quot; was out of date — it
+is called by the LME, Random forest and Linear regression screens, and now by the registry
+too. Corrected so the next reader does not wire up something that already works.</li>
+</ul>
+</section><section class="rel" id="v0-8-4"><h2><a class="anchor" href="#v0-8-4">v0.8.4</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Model results were unreadable in light mode.</strong> The Model Summary, Performance Metrics and
+Cross-Validation blocks rendered light grey on white on every model screen. Bootstrap
+colours <code>&lt;pre&gt;</code> from <code>--bs-emphasis-color-rgb</code> — an <code>R,G,B</code> <strong>triplet</strong>, not the
+<code>--bs-emphasis-color</code> the app was overriding — and bslib compiles that triplet once from the
+default dark palette, so it stayed light text on every theme. It was never only <code>&lt;pre&gt;</code>: the
+same variable colours <code>code</code>, <code>.well</code>, <code>.navbar</code> and <code>.link-body-emphasis</code>, which is why the
+problem showed up across many screens. Each palette now emits the triplet, <strong>derived from
+its own <code>ink</code></strong> with <code>grDevices::col2rgb()</code> so it cannot drift.</li>
+<li><strong>Fixed light panels stayed light in dark mode.</strong> Twelve inline
+<code>background-color: #f8f9fa</code> / <code>#fff8e1</code> / <code>#e9ecef</code> blocks across six modules kept a cream
+or pale background while the app&#39;s light text ran across them — the Quick Builder and
+Convergence Options panels on Mixed effects being the reported case. Replaced with reusable
+classes (<code>.ea-subpanel</code>, <code>.ea-subpanel-warn</code>, <code>.formula-box</code>, <code>.ea-row-warn</code>,
+<code>.ea-row-flat</code>). The warn variants are translucent tints of the semantic colour, so they
+take their lightness from whatever is behind them and work on every set.</li>
+<li>No fixed-light panel hex remains in any module. The two <code>strip.background</code> values inside
+<code>mod_da.R</code>&#39;s ggplots are deliberately kept: plots render on their own light canvas
+regardless of theme, so a themed colour there would be wrong.</li>
+</ul>
+</section><section class="rel" id="v0-8-3"><h2><a class="anchor" href="#v0-8-3">v0.8.3</a><span class="when">2026-08-04</span></h2>
+<h3>Changed</h3>
+<ul>
+<li><strong>Column types are spelled out.</strong> The dataset summary showed tibble/pillar abbreviations
+(<code>dbl</code>, <code>int</code>, <code>fct</code>, <code>chr</code>, <code>lgl</code>) that mean nothing to anyone who does not write R — and
+this app exists so people do not have to. They now read <strong>number, whole number, text,
+category, true/false, date</strong>, with the R class kept as the cell&#39;s tooltip. The coloured
+badge behind them is gone too: it carried six hardcoded hex values that followed no theme,
+and the colour never said anything the word did not. (Backlog item 28.)</li>
+<li><strong>The Co-Analyst no longer offers suggestion chips.</strong> They were the last place the app
+volunteered a next step, which contradicted its own system prompt — that already forbids
+the model from proposing one. The Recommend screen is kept and is where suggestions belong.
+(Backlog item 27.)</li>
+</ul>
+<h3>Added</h3>
+<ul>
+<li><strong>Undo now goes back 5 steps, not 1.</strong> <code>snap()</code> was already the single choke point every
+data operation passes through, so the change is one bounded stack. Each undo reports how
+many steps remain, so the last press reads as &quot;no further undo steps&quot; rather than a dead
+button. Capped deliberately — each entry is a full copy of the data frame. (Backlog item 32.)</li>
+<li><strong>A &quot;Docs&quot; button in the app.</strong> The documentation pages have been live on the website for
+days, but nothing inside the app pointed at them, so users who never visited the site never
+found them. It sits in the top bar on both the projects screen and the analysis area, and
+opens in a new tab so a running project is never navigated away from. (Backlog item 17.)</li>
+<li><strong>The guided tour covers 9 steps, up from 6</strong> — added the tool search, Undo/Reset, and the
+new Docs link, clearing the &quot;at least 8&quot; requirement. (Backlog item F24.)</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Undo could corrupt a dataset.</strong> The undo snapshot was a single slot shared across every
+dataset, so switching from A to B and pressing Undo restored <strong>A&#39;s data into B</strong>. The stack
+is now per dataset, and stacks for deleted datasets are pruned.</li>
+</ul>
+</section><section class="rel" id="v0-8-2"><h2><a class="anchor" href="#v0-8-2">v0.8.2</a><span class="when">2026-08-04</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>The app would not start on a machine without <code>plotly</code></strong> — the failure every fresh
+install hits. <code>plotly</code> was in <strong>neither</strong> the <code>core</code> nor the <code>extras</code> list in
+<code>launcher/deps.R</code>, so the installer reported <code>deps: OK</code> and the app then died at boot with
+<code>there is no package called &#39;plotly&#39;</code>. Three causes, all fixed: <code>plotly</code> added to <code>extras</code>;
+the workspace&#39;s <code>output$chart_i &lt;- plotly::renderPlotly(...)</code> binding guarded the way its
+UI already was (a <code>pkg::</code> in a binding resolves when the module server is <strong>built</strong>, so it
+threw before the UI&#39;s <code>requireNamespace()</code> guard could degrade to the static plot); and the
+<code>observeEvent(workspace_ctx$tool_open())</code> in <code>server.R</code> moved <strong>after</strong> the assignment it
+references, so a failure there no longer surfaces as a misleading &quot;object not found&quot; on
+every flush. Audited every other eager <code>output$x &lt;- pkg::render*</code> binding — all use core
+packages, so <code>plotly</code> was the only one exposed. (CLAUDE.md gotcha 27.)</li>
+<li><strong>Nothing showed that the app was working.</strong> Only 12 of 42 modules use <code>withProgress</code>, so
+on the other 30 — including most model screens — a slow fit looked like a frozen app. Worse,
+<code>ui.R</code> deliberately disables Shiny&#39;s own dimming (<code>--shiny-fade-opacity: 1</code>) on the promise
+of a &quot;Running pill&quot; that had never been built, leaving less feedback than stock Shiny. Added
+the global <code>#ea-busy</code> pill: pure CSS keyed off Shiny&#39;s <code>shiny-busy</code> class, so it needs no
+per-module wiring and works even while R is blocked (a server-rendered spinner cannot).
+Shown only by real request state, never a timer, and only after 400 ms so quick actions do
+not flash it. Also extended the existing skeleton shimmer to the model canvas.
+(CLAUDE.md gotcha 29.)</li>
+<li><strong>Native <code>&lt;select&gt;</code> popups and scrollbars ignored the theme.</strong> Page CSS colours the closed
+control but not the browser-drawn popup list. Every colour set now declares
+<code>scheme = &quot;light&quot;|&quot;dark&quot;</code> in <code>theme.R</code> and <code>ea_theme_css()</code> emits a real <code>color-scheme</code>
+declaration; <code>:root</code> declares it too, since a first-time visitor has no <code>data-ea-theme</code>
+attribute yet while the default palette is dark. Added <code>option</code> colour rules as the
+Chromium-specific complement. (CLAUDE.md gotcha 28.)</li>
+</ul>
+<h3>Docs</h3>
+<ul>
+<li><code>BACKLOG.md</code>: Round 4 (items 18-25) and a Round 5 reconciliation table mapping a re-sent
+batch of 24 reports onto existing entries — all 24 were already recorded.</li>
+<li>Recorded the <strong>verified</strong> state of the docs/tour surface: the landing documentation and
+how-to-use pages are built and linked, but the in-app tour has <strong>2 of the 8+</strong> steps asked
+for and <strong>nothing in the app links to the docs</strong>.</li>
+<li><code>DOCS.md</code> now indexes the published <code>landing/</code> pages, which were missing from it entirely.</li>
+</ul>
+<blockquote>
+<p><strong>Changelog gap, stated rather than papered over:</strong> work landed between v0.8.1 and this
+entry (2026-07-30 → 08-01: B6, B8, C9, C14, D17, round-3 items 7/9/10/14/16, the custom
+domain and the landing-site rewrite) that was never given a version or an entry here.
+<code>BACKLOG.md</code> records it in full. This is exactly the drift BACKLOG item 24 is about — a
+release-notes page publishes from this file, so an entry has to be part of finishing work.</p>
+</blockquote>
+</section><section class="rel" id="v0-8-1"><h2><a class="anchor" href="#v0-8-1">v0.8.1</a><span class="when">2026-07-29</span></h2>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Model screens opened with empty variable selectors.</strong> Linear regression, ANOVA and
+Random forest could not be run at all — by hand or by the Co-Analyst — because the
+workspace renders a module&#39;s panel lazily and <code>updateSelectInput</code> fired before the
+element existed. <code>active_dataset()</code> now depends on <code>ds_refresh</code>, bumped when a tool
+opens. (CLAUDE.md gotcha 18.)</li>
+<li><strong>Raster invisible on the map</strong> although the view zoomed to it: layers were added by
+<code>leafletProxy</code> after the map element had been re-created. Tiles, view and layers are
+built in one pass now. Reprojection also ran at full resolution before downsampling
+(18.1 s, and a <code>warp failure</code> under memory pressure that <code>tryCatch</code> swallowed) — it is
+downsampled first, memoised, and the fit comes from the extent alone.</li>
+<li><strong>Zoom to layer</strong> was wired to the same input as Zoom to layers, so it always framed
+everything; it now targets one layer and reports honestly when there is nothing to
+zoom to.</li>
+<li><strong>Adding a file yanked the map view.</strong> The automatic fit now applies only to the first
+spatial layer; everything after overlays.</li>
+<li><strong>Dark surfaces on the light colour sets</strong> (data tables, accordions, the R console,
+buttons) — Bootstrap&#39;s component variables restated from the tokens. (Gotcha 22.)</li>
+<li><strong>The R console cleared your script on every Run.</strong> It keeps it now.</li>
+</ul>
+<h3>Added</h3>
+<ul>
+<li><strong>R console write-back.</strong> Objects a script produces become project layers by class
+(data.frame, SpatRaster, sf, LAS), so a clip appears in the Layers panel and on the map.
+Only genuine OUTPUTS: consumed intermediates and aliases of loaded layers are skipped.
+Modes <code>auto</code> (default) and <code>ask</code> via <code>options(ea.console_sync)</code>.</li>
+<li><strong>Plot appearance app-wide</strong> — title, axis labels and colour on every screen, stored per
+screen. ggplot via a <code>renderPlot</code> wrapper; base-R plots per call site, with multi-panel
+diagnostic grids taking only an overall title.</li>
+<li><strong><code>.ea-pop</code></strong>, a reusable hover panel behind one icon; plot appearance is its first user.</li>
+<li><strong>Co-Analyst <code>run_in_app</code></strong> — opens the real screen, fills it and presses Run. Every name
+is verified against the loaded data; near-misses and case differences are refused, never
+substituted. Linear regression only so far.</li>
+<li><strong>True-colour RGB</strong> for multi-band rasters with a per-layer band mapping (detected from
+the file, never guessed), point clouds drawn and a density slider reaching the file&#39;s
+full point count, a 3D view button, a dockable/floatable R console with line numbers,
+and a guided tour that now runs inside the workspace.</li>
+</ul>
+<hr>
+</section><section class="rel" id="v0-8-0"><h2><a class="anchor" href="#v0-8-0">v0.8.0</a><span class="when">2026-07-27</span></h2>
+<p><strong>The unified workspace.</strong> The ~35 separate analysis screens are now one workspace:
+a GeoLibre-style menu bar, a layers panel, a canvas that follows your data, a tool
+panel and a results dock. Plus a public site and a macOS/Linux installer.</p>
+<h3>Workspace</h3>
+<ul>
+<li><strong>One frame, two views</strong> — <em>Map view</em> and <em>Data view</em>, plus a resizable <em>Split</em>.
+A project with spatial data opens on the map; a table-only project opens on data.</li>
+<li><strong>GeoLibre menu bar in the top bar</strong> — Project · Edit · View · Add Data · Processing ·
+Controls · Packages · Settings · Help, with hover fly-outs and a tool search box.
+Every analysis is launched from <strong>Processing</strong>; the old per-screen menus are retired.</li>
+<li><strong>Layers panel</strong> — every dataset and layer in one list, each with a visibility toggle
+and an expandable legend / styling.</li>
+<li><strong>Tools open in the side panel, results in the centre.</strong> A tool can be floated
+(draggable, resizable) or minimised to the dock; past results park there as chips.</li>
+<li><strong>R console</strong> is a bottom dock that slides up on demand.</li>
+<li><strong>Data &amp; Exploration operations are individual menu entries</strong> — pick &quot;Row filtering&quot;
+and only that operation&#39;s controls appear.</li>
+<li><strong>Map:</strong> real layer rendering (rasters + vectors), 14 basemaps, and the view is
+preserved when you switch basemap. The attribute table shows the <strong>active vector
+layer&#39;s own attributes</strong>.</li>
+<li><strong>Charts:</strong> a plot builder with a <strong>Static ⇄ Interactive</strong> toggle (plotly), and a
+draggable split between plot and table.</li>
+</ul>
+<h3>Look &amp; feel</h3>
+<ul>
+<li><strong>Six colour sets</strong> (Forest, Light, Midnight, Ocean, Plum, Paper) — instant, remembered.</li>
+<li><strong>App icon is now a lightbulb</strong>; the app is <strong>emoji-free</strong> (icons only).</li>
+<li><strong>Fixed the startup dim at the root</strong> — Shiny fades every output while it recomputes;
+now suppressed and replaced with a proper boot screen, shimmer loaders and subtle
+result reveals (CSS only — no animation library).</li>
+<li><strong>Contrast swept:</strong> 0 low-contrast text in all six themes.</li>
+</ul>
+<h3>Assistant</h3>
+<ul>
+<li><strong>Recommend is merged into the Co-Analyst</strong> — one surface: recommend a method, then
+ask it to run the analysis.</li>
+</ul>
+<h3>Packages</h3>
+<ul>
+<li><strong>Packages menu</strong> (was &quot;Plugins&quot;) with a real CRAN search that tolerates typos, honest
+per-package progress, and immediate loading — <strong>no restart needed</strong>.</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Single click on a project card opens it (pre-rendered clicks were being lost).</li>
+<li>Map zooms to your raster (the fit is applied when the map is built, not via a proxy
+call that could be discarded).</li>
+<li>Uploading a file no longer jumps you to another screen.</li>
+<li>LAS/LAZ: reopening a project no longer runs out of memory.</li>
+<li>Memory: the results store is bounded, the CRAN index is released, and session state is
+cleared on disconnect.</li>
+</ul>
+<h3>Distribution</h3>
+<ul>
+<li><strong><code>install.sh</code></strong> — one-line install for <strong>macOS and Linux</strong> (mirrors <code>install.ps1</code>).</li>
+<li><strong><code>landing/</code></strong> — public site: landing page with a 3D LiDAR hero, a how-to-use
+walkthrough and full documentation. Self-contained; no CDN.</li>
+</ul>
+<h3>Security</h3>
+<ul>
+<li>Documented in ARCHITECTURE.md §10: no secrets in the repo, no user data tracked, and
+the only outbound calls are the Co-Analyst (opt-in), CRAN, basemap tiles and satellite
+search. Removed unused PowerShell dialog helpers.</li>
+</ul>
+<hr>
+</section><section class="rel" id="v0-7-15"><h2><a class="anchor" href="#v0-7-15">v0.7.15</a><span class="when">2026-07-22</span></h2>
+<ul>
+<li><strong>DA plots now show something useful with &gt;1 predictor.</strong> The 1-D decision plots
+(Scatter+Regions/Class Lanes/Class Density) require a single axis; with 2+ predictors they
+showed &quot;requires exactly 1 numeric predictor&quot;. Now they <strong>fall back to the 2-D PCA/LD
+projection</strong> (points by class + predicted-class ellipses) so a plot renders whatever&#39;s
+selected. (TODO next: true filled decision-boundary regions in the 2-D PCA plane — needs a
+grid-predict that also handles the PCA-decorrelated LLDA model.)</li>
+<li><strong>Download hardening.</strong> The <code>ea-download</code> blob save now runs against the top document when
+possible, to escape iframe download restrictions (CSV/TSV export).</li>
+</ul>
+</section><section class="rel" id="v0-7-14"><h2><a class="anchor" href="#v0-7-14">v0.7.14</a><span class="when">2026-07-22</span></h2>
+<ul>
+<li><strong>Fix: CSV/TSV export wasn&#39;t downloading in the browser build.</strong> The standard Shiny
+<code>downloadHandler</code> doesn&#39;t reliably trigger a file download under webR. Replaced it with a
+message-based download — R builds the file text and sends it to the browser, where a small
+JS handler saves it as a Blob. Multi-format (CSV / TSV) + optional filename preserved.
+(Same webR limitation likely affects the hover plot-PNG download — a follow-up.)</li>
+</ul>
+</section><section class="rel" id="v0-7-13"><h2><a class="anchor" href="#v0-7-13">v0.7.13</a><span class="when">2026-07-22</span></h2>
+<ul>
+<li><strong>LLDA now works with multiple correlated predictors.</strong> <code>klaR::loclda</code> inverts a <em>local</em>
+covariance; with &gt;1 collinear predictor (e.g. two diameter columns) that&#39;s singular
+(<code>dgesv: system is exactly singular</code>), so the fit died before any plot. Now, on that
+failure the numeric predictors are <strong>decorrelated via PCA</strong> (orthogonal → never collinear)
+and loclda is refit on the components — labelled &quot;Locally Linear DA (PCA-decorrelated)&quot;.
+Multi-predictor LLDA plots (the PCA-projection scatter) now render because the fit succeeds.
+(A 3D rotating scatter is the next increment.)</li>
+</ul>
+</section><section class="rel" id="v0-7-12"><h2><a class="anchor" href="#v0-7-12">v0.7.12</a><span class="when">2026-07-21</span></h2>
+<ul>
+<li><strong>Fix: the Rows overview tile showed a blank icon</strong> — <code>icon(&quot;rows&quot;)</code> isn&#39;t a real FontAwesome
+name; swapped for a valid one.</li>
+</ul>
+</section><section class="rel" id="v0-7-11"><h2><a class="anchor" href="#v0-7-11">v0.7.11</a><span class="when">2026-07-21</span></h2>
+<ul>
+<li><strong>Fix: a deleted dataset reappeared in the left data rail.</strong> The list now explicitly drops
+any pool entry whose value is NULL — in this webR build <code>pool[[key]] &lt;- NULL</code> can leave the
+name behind, so the deleted dataset kept showing. Now it stays gone.</li>
+<li><strong>Fix: CSV download on the Dataset Overview could error.</strong> The handler now guards against no
+active dataset / empty data and sanitizes the filename.</li>
+<li><strong>Clickable overview tiles (drill-down).</strong> Each tile on the Dataset Overview now opens a
+detail modal: <strong>Total NA</strong> → per-column NA counts + a table of the actual rows with missing
+values; Columns → type/missing/unique per column; Numeric/Categorical → those columns;
+Complete rows → the incomplete rows; Rows → the full table.</li>
+<li><strong>Multi-format, named export.</strong> The export toolbar now offers <strong>CSV / TSV</strong> and an optional
+<strong>file name</strong> (defaults to the dataset name). TSV opens directly in Excel; native <code>.xlsx</code>
+export is a follow-up (the <code>writexl</code> wasm bundle needs sorting — shinylive skipped it).</li>
+</ul>
+</section><section class="rel" id="v0-7-10"><h2><a class="anchor" href="#v0-7-10">v0.7.10</a><span class="when">2026-07-21</span></h2>
+<ul>
+<li><strong>Added the EasyAnalysis favicon</strong> (the EA app icon). Center-cropped to a square PNG,
+copied into the site root as <code>favicon.png</code> + <code>favicon.ico</code>, and linked from the page
+<code>&lt;head&gt;</code> (also stops the <code>/favicon.ico</code> 404 in the console).</li>
+<li><strong>First-boot UX (the &quot;doesn&#39;t work on new browsers&quot; report).</strong> Confirmed by watching a
+<em>fresh, uncached</em> browser boot the deployed site end-to-end: v0.7.9 boots fine — it just
+takes ~5–8 min the first time (downloading the R environment). The problem was the splash&#39;s
+<strong>safety timeout removing the splash after only 8 min</strong>, so a slower first boot got cut off
+and looked like &quot;loads forever then ends&quot;. Raised the timeout to <strong>20 min</strong>, and the splash
+note now says &quot;3–8 minutes (longer on a slow connection) … keep this tab open.&quot; The splash
+still fades immediately once the app is actually ready (<code>ea-app-ready</code>).</li>
+</ul>
+</section><section class="rel" id="v0-7-9"><h2><a class="anchor" href="#v0-7-9">v0.7.9</a><span class="when">2026-07-20</span></h2>
+<ul>
+<li><strong>Critical fix: the app was stuck on the splash and never booted</strong> (regression from v0.7.7).
+<code>mod_docs.R</code>&#39;s <code>.doc_b()</code> helper took a single argument but was called with two in the
+Documentation overview, throwing &quot;unused argument&quot; <em>while building the UI</em> — so the app never
+rendered and the splash never received its ready signal. <code>.doc_b()</code> now accepts <code>...</code>.
+(Parse-checks pass on this kind of bug; the full <code>source(global/ui/server)</code> build check is now
+the gate before every push.)</li>
+</ul>
+</section><section class="rel" id="v0-7-8"><h2><a class="anchor" href="#v0-7-8">v0.7.8</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Splash: removed the sliding light-sweep</strong> (and leftover progress-bar CSS) — no sliding
+bar element on the splash at all now; the globe/satellite/radar/bars motion stays.</li>
+<li><strong>Co-Pilot: Enter now reliably sends.</strong> The old handler clicked the send button, which could
+fire before Shiny had synced the typed text (sending stale/empty). Enter now passes the
+input&#39;s current value straight to the server (<code>input$enter</code>), race-free.</li>
+<li><strong>Added <code>llms.txt</code></strong> (llmstxt.org) served at <code>/llms.txt</code> — a detailed description of
+EasyAnalysis for LLMs and search: what it is, features, data formats, analyses, privacy,
+tech, and author. Copied into the site on every build by <code>webapp_export.R</code>.</li>
+</ul>
+</section><section class="rel" id="v0-7-7"><h2><a class="anchor" href="#v0-7-7">v0.7.7</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Honest &quot;Running…&quot; progress indicator.</strong> A global pill shows the <em>elapsed</em> time
+(&quot;Running… 0:08&quot;, counting up) whenever the app is computing for more than half a
+second — no fabricated &quot;time remaining&quot; (we can&#39;t know an analysis&#39;s duration, so we
+don&#39;t pretend to). Driven by Shiny&#39;s busy/idle events; works on every screen.</li>
+<li><strong>Co-Pilot status now reflects the real step.</strong> Instead of a hardcoded &quot;Thinking…&quot;,
+the progress message updates to what the agent is actually doing — &quot;Reading your data…&quot;,
+&quot;Running a random forest…&quot;, &quot;Computing correlations…&quot;, etc. — via a status callback
+threaded through the agent&#39;s tool loop.</li>
+<li><strong>New in-app Documentation screen</strong> (<code>mod_docs.R</code>): a full user guide — interface,
+loading data, exploring, running analyses, the AI Co-Pilot, R Console, privacy, and a
+Tips/FAQ — reachable from the top menu, with a jump-to-section contents list.</li>
+</ul>
+</section><section class="rel" id="v0-7-6"><h2><a class="anchor" href="#v0-7-6">v0.7.6</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Redesigned loading splash.</strong> Replaced the plain screen with an animated hero — a
+rotating Earth-observation globe (raster shimmer, meridian wireframe), an orbiting
+satellite, radar pings and rising data bars — over a frosted-glass card with drifting
+aurora depth and a panning data-lattice. SVG line-icons (no emoji) for the four
+highlights: AI Co-Pilot, Recommend, Any data, Fully private. Respects
+<code>prefers-reduced-motion</code>.</li>
+<li>Also includes the v0.7.5 fixes below (delete-name fix, About/Acknowledgements split).</li>
+</ul>
+</section><section class="rel" id="v0-7-5"><h2><a class="anchor" href="#v0-7-5">v0.7.5</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Fix: deleted dataset&#39;s name lingered in the left data panel.</strong> Clicking × removed
+the data from the pool but the label stayed, because <code>reactiveValuesToList()</code> reliably
+re-fires on key ADDs (uploads appear) but not on key REMOVALs in this webR build. Added
+a <code>ds_refresh</code> trigger that the delete handler bumps and <code>datasets_list</code> depends on, so
+the list re-renders and the removed name disappears.</li>
+<li><strong>About / Acknowledgements split.</strong> About now reads &quot;a platform for conducting analyses
+without writing complex code…&quot;. Moved &quot;University of Eastern Finland&quot; out of About into
+a new <strong>Acknowledgements</strong> section crediting UEF for code contributions and for data used
+in analyses and testing — EasyAnalysis is an independent build, not a university product.</li>
+</ul>
+</section><section class="rel" id="v0-7-4"><h2><a class="anchor" href="#v0-7-4">v0.7.4</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Reverted the v0.7.3 boot-load experiment</strong> (it broke booting — see below) and confirmed
+the finding in <code>webapp/global.R</code>: compiled ML/stats packages can&#39;t link in this
+spatial-heavy browser build, late OR at boot. Fix is a separate lean build.</li>
+<li>Retained: <code>.ensure_pkg()</code> retry helper (v0.7.2), Decision Tree <code>pickerInput</code> selector,
+and the &quot;3–5 minutes&quot; splash estimate.</li>
+</ul>
+</section><section class="rel" id="v0-7-3"><h2><a class="anchor" href="#v0-7-3">v0.7.3</a><span class="when">2026-07-19</span></h2>
+<ul>
+<li><strong>Boot-load the compiled analysis packages that fail on late link (experiment).</strong>
+v0.7.2&#39;s retry fixed <em>R-level</em> packages (klaR::loclda works), but compiled ones
+loaded lazily still fail to register native routines: rpart <code>C_rpart not found</code>,
+xgboost <code>XGDMatrixCreateFromMat_R not found</code>, tidyr <code>bad export type &#39;_ZTINSt3…&#39;</code>
+(the kmeans cluster-map uses tidyr via factoextra). The proven fix is linking at
+BOOT (as the lidR stack does). Now <code>webapp/global.R</code> links <strong>base64enc first</strong>
+(so boot is safe), then <strong>tidyr, rpart, xgboost</strong> — a small measured set; will
+grow once confirmed boot survives the module-link budget in the browser.</li>
+<li><strong>Decision Tree predictor selector</strong> now uses the <code>pickerInput</code> chip/search
+widget (with select-all), matching Random Forest instead of a plain dropdown.</li>
+</ul>
+</section><section class="rel" id="v0-7-2"><h2><a class="anchor" href="#v0-7-2">v0.7.2</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>Fix: bundled optional packages still showed &quot;install package&quot; on first use.</strong>
+The v0.7.1 packages (klaR, kernlab, xgboost, rpart, glmnet, mgcv, survival,
+car, lavaan, tseries, trend, Hmisc, BayesFactor) are bundled and work, but in
+the browser (webR) a compiled package&#39;s <strong>first</strong> lazy-load can transiently
+fail (&quot;file could not be read&quot;) even though a retry succeeds — proven in-app:
+<code>klaR::loclda()</code> fits fine, yet the screen&#39;s one-shot <code>requireNamespace()</code>
+reported it missing. Replaced every guard with a retrying <code>.ensure_pkg()</code>
+helper (helpers.R) that attempts the load up to 8× before giving up, so the
+first-try flake no longer surfaces as a false &quot;install package&quot; message.</li>
+<li>Splash note now reads &quot;3–5 minutes&quot; for the first-visit load estimate.</li>
+</ul>
+</section><section class="rel" id="v0-7-1"><h2><a class="anchor" href="#v0-7-1">v0.7.1</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>Bundle the optional analysis packages into the browser build.</strong> klaR, kernlab,
+xgboost, glmnet, mgcv, survival, rpart, car, lavaan, tseries, trend, Hmisc, and
+BayesFactor are now included, so the Discriminant Analysis (LLDA/RLDA/KDA/MMC),
+GAM, Survival, Decision Tree, SEM, Bayesian, Time Series, XGBoost, and Ridge/Lasso
+screens can load them. Added via <code>webapp/_deps.R</code> (shinylive&#39;s scanner doesn&#39;t
+follow <code>requireNamespace()</code> guards, so these were simply never being bundled).</li>
+<li><strong>Correction to the v0.7.0 &quot;hard budget&quot; note.</strong> The &quot;install package&quot; messages
+were <em>not</em> (primarily) a link-budget problem — the packages were never included
+in the build at all. Each has a WebAssembly build on repo.r-wasm.org; they just
+weren&#39;t scanned. (heplots/ggord/mda genuinely have no wasm build and still fall
+back to string-indirection.)</li>
+</ul>
+</section><section class="rel" id="v0-7-0"><h2><a class="anchor" href="#v0-7-0">v0.7.0</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>Branded loading screen.</strong> The ~1-3 min first boot now shows an EasyAnalysis
+splash: what the app is, an elapsed timer, a &quot;first visit is slow, then instant&quot;
+note, rotating tips, a privacy line, and an auto-generated <strong>&quot;What&#39;s new&quot;</strong> from
+this changelog. Fades out when the app is actually ready (<code>ea-app-ready</code> signal).
+Injected by <code>webapp_export.R</code> from <code>splash_template.html</code>.</li>
+<li><strong>Random Forest &quot;unexpected input&quot; error fixed</strong> (see below) — RF itself works
+(randomForest attaches at boot).</li>
+<li><strong>Known limitation (browser build): some optional compiled ML/stats packages
+can&#39;t load</strong> — xgboost, glmnet, kernlab, mgcv, survival, rpart, car, klaR.
+Their screens show &quot;install package&quot;. Root cause: this webR build has a hard
+budget for how many compiled <code>.so</code> can dynamically link before a libc++ symbol
+becomes unavailable; the LiDAR stack already consumes most of it, and preloading
+these pushed past the budget and broke the whole app&#39;s boot. Making them work in
+the browser needs a slimmer-boot strategy (future) — for now they run in the
+server build. (Not a regression; they were never working in the browser.)</li>
+<li><strong>Fix: Random Forest &quot;unexpected input&quot; training error</strong> — column names weren&#39;t
+backtick-quoted in the formula, so names with digits/dots/spaces (VMI codes)
+broke parsing. Fixed in RF and the same bug in Decision Tree, SVM, Neural Net,
+and GAM.</li>
+<li><strong>Co-Pilot: no unsolicited advice, stricter grounding, accurate capabilities.</strong>
+The agent no longer volunteers &quot;best next step&quot; suggestions unless you ask for a
+recommendation; the prompt hardens the no-hallucination rule (only tool outputs
+/ context / image); and it&#39;s now given the app&#39;s real method list, so it stops
+claiming built-in methods (e.g. LLDA) are missing — it points you to the screen
+instead.</li>
+<li><strong>Fix: deleted-dataset name lingering</strong> in the file-upload widget — cleared on
+delete.</li>
+</ul>
+</section><section class="rel" id="v0-6-3"><h2><a class="anchor" href="#v0-6-3">v0.6.3</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>Browser tab title → &quot;EasyAnalysis&quot;</strong> (shinylive shipped &quot;Shiny App&quot;). Patched
+in <code>webapp_export.R</code>.</li>
+<li><strong>Clip LAS to a shapefile.</strong> New &quot;Clip LAS to this shapefile&quot; button in the LiDAR
+tools — clips the point cloud to the polygon selected in <em>Plot Shapefile</em> (from
+an uploaded vector), matching CRS then <code>lidR::clip_roi</code>. The manual 4-coordinate
+clip is kept as an alternative.</li>
+<li><strong>Auto-zoom to spatial data</strong>: already implemented (raster <code>.zoom_to</code> on load,
+LAS <code>fitBounds</code> on its location map) — the reason it appeared not to work was the
+raster <em>display</em> failing, which v0.6.2 fixes. No new code needed; noting it here.</li>
+</ul>
+</section><section class="rel" id="v0-6-2"><h2><a class="anchor" href="#v0-6-2">v0.6.2</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>LiDAR: access the full point cloud.</strong> Read cap raised 500k → 5M (full
+plot-level clouds now load; still a memory safety net for huge files), and the
+&quot;Max display points&quot; slider now reaches the <strong>full loaded cloud</strong> (its max is
+set to the actual point count on upload). Default display stays 60k for a
+responsive 3D viewer.</li>
+<li><strong>Fix &quot;Install the &#39;rstac&#39; package&quot;.</strong> rstac/exactextractr were bundled in
+v0.6.1 but their <code>requireNamespace()</code> guard runs on a button click = LATE, and
+exactextractr is compiled → same late-link ABI bug. Now <strong>preloaded at boot</strong>,
+so the guards pass. (If you still saw the message, you were on the pre-v0.6.1
+deploy.)</li>
+<li><strong>Raster/TIFF display fix.</strong> <code>leafem::addGeoRaster</code> (client-side JS renderer) is
+fragile in the wasm build; added a fallback to <code>leaflet::addRasterImage</code>
+(server-side PNG overlay via the now-working cairo device). Display errors,
+previously swallowed silently (&quot;feels like it doesn&#39;t load&quot;), are now shown.</li>
+</ul>
+</section><section class="rel" id="v0-6-1"><h2><a class="anchor" href="#v0-6-1">v0.6.1</a><span class="when">2026-07-18</span></h2>
+<ul>
+<li><strong>Fix: .laz / .tif uploads failed</strong> with <code>bad export type for &#39;_ZTINSt3__216__owns_one_stateIcEE&#39;</code>. Root cause: v0.5.0 made <code>lidR</code>/<code>stars</code>
+lazy-loaded; a heavy C++ .so that links LATE (on first <code>pkg::</code> use) fails in
+this webR build — the same failure as the cairo/LAPACK bug. <strong>Reverted:</strong>
+<code>lidR</code>, <code>sf</code>, <code>terra</code>, <code>stars</code> are attached at boot again. Heavy C++ packages
+cannot be lazy-loaded here; lazy-loading is off the table as a fast-start
+approach for the spatial stack. (The v0.5.0 change was &quot;verified&quot; in the Node
+harness, which does not reproduce the browser&#39;s linking limits — only the
+browser does.)</li>
+<li><strong>Fix: &quot;Install the &#39;rstac&#39; package to use satellite search&quot;.</strong> <code>rstac</code> and
+<code>exactextractr</code> (both behind <code>requireNamespace()</code> guards, so invisible to the
+shinylive scanner) are now force-bundled via <code>webapp/_deps.R</code>. Download Spatial
+Data and zonal stats work in the browser build.</li>
+<li><strong>About panel</strong>: added a short description of what EasyAnalysis is (runs in your
+browser, your data never leaves your machine).</li>
+<li><strong>Upload diagnostics</strong>: spatial-file load errors are now persistent and shown in
+full, plus an empty/unreadable-file guard — to pin down the .laz/.tif upload
+issue. (Verified in webR that terra/sf/lidR <em>can</em> read TIF/SHP/LAS; the
+remaining variable is the browser upload→filesystem step, so we need the exact
+on-screen error to finish the fix.)</li>
+</ul>
+</section><section class="rel" id="v0-6-0"><h2><a class="anchor" href="#v0-6-0">v0.6.0</a><span class="when">2026-07-17</span></h2>
+<ul>
+<li><strong>R Console</strong> (<code>mod_rconsole.R</code>) — new &quot;R Console&quot; screen. Run arbitrary R
+directly on your data: the active dataset is <code>df</code>, every loaded dataset is
+available by name, assignments persist between runs, and a single evaluation
+captures both printed output and any plot (base or ggplot — no double-eval, so
+RNG/side-effects behave correctly). Click-to-insert examples, Ctrl+Enter to run.<ul>
+<li>Safe in the browser build: each user runs their own sandboxed webR session in
+their own browser on their own data. (Would be arbitrary code execution on a
+shared server; the shipped product is the browser build.)</li>
+<li>Verified via testServer: text output, persistent state, base+ggplot capture,
+error handling, the lm/LAPACK path, and clear all work.</li>
+</ul>
+</li>
+</ul>
+</section><section class="rel" id="v0-5-0"><h2><a class="anchor" href="#v0-5-0">v0.5.0</a><span class="when">2026-07-17</span></h2>
+<ul>
+<li><strong>Lazy-load the heavy spatial stack.</strong> <code>lidR</code>, <code>stars</code> (and <code>rlas</code> via lidR) are
+no longer attached in <code>global.R</code>; they load on first use. Every call to them is
+<code>pkg::fn()</code> qualified (audited: zero unqualified call sites across all modules —
+the 13 apparent hits were all CSS/strings/labels), and <code>::</code> loads a namespace on
+demand, so this needed no code changes. Sessions that never open a LiDAR/Surface
+screen never fetch them.<ul>
+<li>Bonus: it <em>reinforces</em> the v0.2.2 cairo/LAPACK fix — those libs failed when
+linking after the spatial stack, which now isn&#39;t loaded at boot at all.</li>
+<li><strong>Ceiling:</strong> <code>sf</code>/<code>terra</code> still load at boot because <code>leaflet</code> (needed at UI
+build for 8 <code>leafletOutput()</code> calls) imports <code>sf</code>. Making those lazy too
+requires deferring the map screens&#39; UI behind <code>uiOutput()</code> placeholders.</li>
+<li><strong>Constraint:</strong> keep heavy-package calls <code>pkg::</code> qualified. An unqualified
+<code>rast()</code> would now fail at runtime.</li>
+</ul>
+</li>
+<li><strong>Build is now self-healing</strong> (<code>webapp_export.R</code>), after a careless
+<code>cp mod_*.R webapp/</code> broke two builds:<ul>
+<li>Prunes files <code>global.R</code> doesn&#39;t source. <code>mod_gee.R</code> (rgee/reticulate, no wasm
+build) had poisoned the bundle → &quot;fatal-missing: reticulate&quot;.</li>
+<li>Applies the no-wasm indirection (<code>ggord</code>/<code>heplots</code> → <code>.opt_pkg</code>/<code>.opt_fun</code>)
+itself, instead of relying on <code>webapp/mod_da.R</code> not being overwritten.</li>
+<li>Both hard-fail with an explanation if they can&#39;t be satisfied.</li>
+</ul>
+</li>
+</ul>
+</section><section class="rel" id="v0-4-0"><h2><a class="anchor" href="#v0-4-0">v0.4.0</a><span class="when">2026-07-17</span></h2>
+<ul>
+<li><strong>Renamed to EasyAnalysis</strong> in the UI: top-bar brand and About monogram
+(<code>SA</code> → <code>EA</code>). Status bar/About already used <code>APP_VERSION</code>.</li>
+<li><strong>Co-Pilot: fixed the 400 error.</strong> GPT-5 family models (incl. the configured
+<code>gpt-5.4-nano</code>) <strong>reject the <code>temperature</code> parameter</strong> —
+<em>&quot;Unsupported value: &#39;temperature&#39; does not support 0.1 with this model&quot;</em>.
+<code>temperature</code> is now only sent for models that accept it. (The model id itself
+was fine — verified against OpenAI&#39;s current model list.)</li>
+<li><strong>Co-Pilot send UX:</strong> animated typing indicator while the agent works (a turn
+with tool calls + vision can take 10–30s and the panel previously looked dead),
+send button disabled during a turn, double-sends ignored, auto-scroll to the
+newest message.</li>
+<li><strong>Co-Pilot capabilities:</strong> two new agent tools —<ul>
+<li><code>column_stats(dataset, column)</code> — full numeric summary (quartiles, sd,
+skewness, IQR outliers) or level frequencies, incl. a skew hint suggesting a
+transform.</li>
+<li><code>correlate(dataset, columns, method)</code> — Pearson/Spearman with the strongest
+pairs ranked first, for &quot;what relates to what&quot; questions.
+Both verified end-to-end, including error paths.</li>
+</ul>
+</li>
+</ul>
+</section><section class="rel" id="v0-3-0"><h2><a class="anchor" href="#v0-3-0">v0.3.0</a><span class="when">2026-07-17</span></h2>
+<ul>
+<li><strong>Run button on every model screen.</strong> All 18 model screens now fit only on an
+explicit click (ANOVA, Logistic, Clustering and Discriminant Analysis were
+still refitting reactively on every input change). This matters most in the
+browser build, where each fit runs on the user&#39;s own single-threaded machine —
+a stray dropdown click could previously freeze the tab on a random forest.
+Recorded as UX rule #8 in DESIGN.md. Cheap outputs (descriptive stats,
+distribution plots) stay live.</li>
+<li><strong>Removed 20 redundant plot-download buttons</strong> (+ their 20 handlers) across 14
+modules. The global hover overlay already injects a PNG button on every plot —
+verified working in the wasm build before removing anything. All 43 CSV /
+raster / GeoJSON downloads are untouched (the overlay can&#39;t handle those).</li>
+</ul>
+</section><section class="rel" id="v0-2-2"><h2><a class="anchor" href="#v0-2-2">v0.2.2</a><span class="when">2026-07-17</span></h2>
+<p><strong>Fix (the real one): blank plots AND &quot;LAPACK routines cannot be loaded&quot;.</strong></p>
+<ul>
+<li><strong>Root cause:</strong> R links some of its own shared libraries <em>lazily, on first use</em> —
+<code>cairo.so</code> on the first plot, <code>libRlapack.so</code> on the first linear-algebra call.
+In this app that first use happens <strong>after</strong> ~40 packages incl. the heavy C++
+side-modules (terra/sf/lidR/rgl) are loaded, and in the <strong>browser</strong> build that
+late link fails. Two symptoms, one bug: blank plots + dead model summaries.</li>
+<li><strong>Fix:</strong> <code>global.R</code> now touches both at startup — a throwaway PNG device and a
+2×2 <code>svd()</code>/<code>solve()</code> — <strong>before</strong> <code>library(lidR)/sf/terra/rgl</code>. Load order is
+the entire point; keep those probes above the spatial libraries.</li>
+<li>Verified in the browser: plot renders (real PNG), model summaries work, and the
+<code>cairo</code>/<code>bad export type</code>/<code>LAPACK</code> console errors are gone.</li>
+</ul>
+<blockquote>
+<p><strong>Correction to v0.2.1:</strong> that entry blamed the terra <code>R.js</code> patch. That was
+<strong>wrong</strong> — the patch is fine (Node runs terra + plots with it happily). The
+control experiment that &quot;proved&quot; it changed two variables at once (pristine
+R.js <em>and</em> a tiny package set), so it isolated nothing. The surgical patch in
+v0.2.1 is still worth keeping (it is narrower and safer), but it was never the
+cause. Node cannot reproduce this bug at all — only a real browser can.</p>
+</blockquote>
+</section><section class="rel" id="v0-2-1"><h2><a class="anchor" href="#v0-2-1">v0.2.1</a><span class="when">2026-07-17</span></h2>
+<p><strong>Fix: all plots rendered blank in the browser build.</strong></p>
+<ul>
+<li>Root cause: the <code>R.js</code> terra/PROJ patch introduced in v0.1.0 was far too broad.
+It rewrote the generic wasm stub factory and threw on <em>any</em> unresolved symbol,
+which broke side-module loading — <code>cairo.so</code> failed (<code>bad export type for &#39;_ZTINSt3__216__owns_one_stateIcEE&#39;</code>), R&#39;s PNG device never initialised, and
+every <code>renderPlot</code> silently produced nothing. It also surfaced as &quot;LAPACK
+routines cannot be loaded&quot; on screens doing linear algebra.</li>
+<li>Proven by a control app: pristine <code>R.js</code> + identical pins renders plots fine.</li>
+<li>Fix: patch <strong>only</strong> <code>resolveSymbol()</code>, supplying a no-op <strong>only</strong> for genuinely
+unresolved <code>internal_proj_*</code> symbols. No throw, nothing else touched.
+(R.js is now +83 bytes vs pristine, was +1969.)</li>
+<li><code>webapp_export.R</code> now writes patched files with <code>writeBin</code> — <code>writeLines</code> was
+silently converting every LF to CRLF on Windows.</li>
+<li>New <code>serve_local.R</code>: serves <code>webapp_site/</code> with COOP/COEP headers via
+<code>httpuv::staticPath</code>, so local testing is cross-origin isolated (webR uses the
+fast SharedArrayBuffer channel) <strong>and</strong> Range/HEAD still work for webR&#39;s lazy
+file loading. Use this instead of <code>httpuv::runStaticServer</code> for local testing.</li>
+</ul>
+</section><section class="rel" id="v0-2-0"><h2><a class="anchor" href="#v0-2-0">v0.2.0</a><span class="when">2026-07-16</span></h2>
+<ul>
+<li><strong>References screen</strong> — new &quot;References&quot; item in the menubar. Lists the
+published methods implemented in the app (currently Kalliovirta &amp; Tokola 2005),
+each with full citation, the named method(s) derived, where it&#39;s used, and a DOI
+link. Single-sourced in <code>references.R</code> (<code>APP_REFERENCES</code>), kept in sync with
+<code>papers/METHODS.md</code>.</li>
+<li><strong>About panel</strong> refreshed: name → EasyAnalysis, live <code>APP_VERSION</code>, tagline
+&quot;A universal scientific analysis platform&quot; (was stale &quot;v0.9.0&quot; / forestry-only).</li>
+<li><strong>Source now lives in the deploy repo</strong> — a curated <code>src/</code> copy of the app
+source was added to the EasyAnalysis repo (not just the compiled site), so it is
+a full project repo.</li>
+</ul>
+</section><section class="rel" id="v0-1-0"><h2><a class="anchor" href="#v0-1-0">v0.1.0</a><span class="when">2026-07-16</span></h2>
+<p>First versioned baseline. The app now exists in two builds from one codebase, with
+an AI agent and the first paper-derived methodology implemented.</p>
+<p><strong>Platform</strong></p>
+<ul>
+<li><strong>Browser build</strong> via Shinylive/WebAssembly — the whole app runs in each user&#39;s
+browser, no R server. Built by <code>webapp_export.R</code> (pins shinylive assets 0.10.10 /
+R 4.5 channel, patches the terra PROJ loader, bumps the SW cache, integrity-checks
+the bundle).</li>
+<li><strong>Deployment</strong>: static site + Vercel serverless AI proxy (<code>api/chat.js</code>); the
+OpenAI key lives only in Vercel env, never in the client. Cross-origin isolation
+headers set in <code>vercel.json</code>.</li>
+</ul>
+<p><strong>AI Co-Pilot → agent</strong></p>
+<ul>
+<li>The Co-Pilot now RUNS analyses via OpenAI tool-calling (<code>agent_tools.R</code>):
+<code>list_datasets</code>, <code>describe_dataset</code>, <code>run_analysis</code> (descriptive, lm, anova,
+ttest, lme, logistic, rf, clustering, pca), using the app&#39;s own fitting functions.</li>
+<li>Dual transport (httr on server, sync-XHR via webR in browser); user-supplied key
+overrides the shared proxy key.</li>
+</ul>
+<p><strong>Analysis features</strong></p>
+<ul>
+<li><strong>Dependent-variable transforms</strong> in Linear Regression (log / log1p / sqrt / 1/Y),
+in addition to predictor transforms. Options always visible (nothing hidden).</li>
+<li><strong>Bias-corrected back-transformation</strong> to the original Y scale — <em>Kalliovirta &amp;
+Tokola 2005</em> — with original-scale metrics. Verified numerically.</li>
+</ul>
+<p><strong>Docs</strong></p>
+<ul>
+<li>ARCHITECTURE.md, DESIGN.md, MEMORY.md, CLAUDE.md rewritten around the
+&quot;universal scientific analysis platform&quot; vision.</li>
+<li><code>papers/</code> folder + <code>papers/METHODS.md</code> catalog (paper → named method → status).</li>
+</ul>
+<p><strong>Cataloged papers</strong></p>
+<ul>
+<li>Kalliovirta &amp; Tokola 2005 — stem diameter &amp; tree age models (bias-corrected
+transformed-Y regression). core methodology implemented.</li>
+</ul>
+</section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a href="index.html">Home</a>
+      <a href="how-to-use.html">How to use</a>
+      <a href="documentation.html">Documentation</a>
+      <span style="margin-left:auto">Local-first · your data never leaves your machine.</span>
+    </div>
+  </footer>
+</body>
+
+</html>

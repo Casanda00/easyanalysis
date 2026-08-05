@@ -2006,6 +2006,44 @@ still has **no `.github/workflows` directory at all**, so this would be its firs
 `landing/vercel.json` is a pure static deploy (`buildCommand: null`), which approach C
 deliberately preserves.
 
+#### BUILT 2026-08-05 — approach C, as decided
+
+**The blocking condition is met.** The decision recorded above was "do it, but only if
+`CHANGELOG.md` will actually be kept current" — publishing a stale source would put the gap on
+the front page. It has been current for every version since: **v0.8.2 → v0.10.3, eleven
+releases, each written as part of finishing the work rather than batched afterwards.**
+
+**Four pieces:**
+
+| piece | what it is |
+|---|---|
+| `landing/build-release-notes.mjs` | Node generator: `CHANGELOG.md` → `landing/release-notes.html`, using `marked`. Copies the site's own colour tokens rather than linking a stylesheet, because the site's CSP blocks every external host. |
+| `.github/workflows/release-notes.yml` | **The repo's first workflow.** Regenerates and commits the page on any push to `main` that touches the changelog or the generator. |
+| `landing/release-notes.html` | The committed output — **45 releases**, newest first, one anchor per version so a support answer can link to `#v0-10-3`. |
+| Links | Landing nav + footer on all three pages, and a **"What's new in this version"** link beside the version in the app's About panel — the piece item 17 wanted, since a user who never visits the site otherwise cannot find them. |
+
+**Why the output is committed rather than built at deploy time.** `landing/` is a pure static
+Vercel deploy, and that is what makes the installer one-liners work (item 16). Adding a
+`buildCommand` would trade that away. Generating in CI and committing the result keeps the
+site static and the page always current — the whole point of choosing C over A.
+
+**No infinite loop, by construction:** the workflow triggers only on `CHANGELOG.md` and its own
+generator, and writes only `release-notes.html` — a path it does not watch. So its own commit
+cannot re-trigger it. (GitHub also suppresses runs for pushes made with the default
+`GITHUB_TOKEN`; the path filter is the guard being relied on, not that.)
+
+**Verified locally** (the generator runs the same way CI runs it): 45 sections, balanced tags,
+no external script/stylesheet/font/image, both colour schemes declared, an anchor id per
+release, newest first, the changelog's editing preamble dropped in favour of a real
+introduction.
+
+**Not verified:** the workflow has never executed — it runs on the next push that touches
+`CHANGELOG.md`, which is this one. Table and code-fence rendering is also untested because the
+changelog currently contains neither; the handling is in place for when an entry uses them.
+
+**A regression this caught in passing:** the earlier Co-Analyst rename had turned
+"an AI Co-Pilot" into "an Co-Analyst" in the About panel. Fixed.
+
 **Also worth doing once the page exists:**
 
 - Link it from the app — a "What's new" entry near the version already shown in the status

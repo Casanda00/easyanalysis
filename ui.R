@@ -2831,13 +2831,22 @@ page_fillable(
           tags$span(class = "about-name", "EasyAnalysis"),
           tags$span(class = "about-version", paste0("v", APP_VERSION))
         ),
+        # The version is the natural place to ask "what changed?", so it links
+        # to the release notes the CI job generates from CHANGELOG.md — a user
+        # who never visits the website otherwise has no way to find them
+        # (backlog item 24).
+        tags$p(style = "margin:2px 0 8px;",
+          tags$a(href = "https://easyanalysis.dev/release-notes.html",
+                 target = "_blank", rel = "noopener",
+                 style = "font-size:12.5px; color: var(--canopy);",
+                 "What's new in this version")),
         tags$p(class = "about-tagline",
           "A universal scientific analysis platform"),
         tags$p(style = "font-size:12.5px; color: var(--bark); margin:6px 0 4px; line-height:1.5;",
           "EasyAnalysis is a platform for conducting analyses without writing complex ",
           "code — upload your data and run rigorous statistical, machine-learning, ",
           "spatial/remote-sensing and time-series methods point-and-click, with ",
-          "plain-English results and an Co-Analyst that can run them for you. It runs ",
+          "plain-English results and a Co-Analyst that can run them for you. It runs ",
           "entirely in your browser: your data never leaves your machine."),
         tags$div(class = "about-tech",
           tags$span("R 4.5.3"),

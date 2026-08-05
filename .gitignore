@@ -27,3 +27,9 @@ papers/*.pdf
 # notes. To include it in THIS repo, delete the next line.
 webapp_site/
 
+
+# Node deps for the release-notes generator. `marked` is installed on demand
+# (locally and in CI with --no-save), never vendored: landing/ is deployed
+# as-is, so node_modules must not end up in the repo.
+node_modules/
+package-lock.json
