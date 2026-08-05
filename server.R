@@ -1000,8 +1000,14 @@ server <- function(input, output, session) {
   # surfaceServer — DTM/DSM/CHM/nDSM are four of these entries now.
   .algo_pools <- list(las = las_pool, raster = raster_pool,
                       vector = vector_pool, table = dataset_pool)
+  # `.on_tool` reports each tool-panel render and which tool it was. It reads
+  # workspace_ctx lazily -- the reactive body runs at flush time, long after
+  # workspace_ctx is bound below, so this is not the forward-reference trap of
+  # gotcha 27 (that was an observeEvent evaluating its eventExpr immediately).
+  .on_tool <- reactive(list(n    = workspace_ctx$tool_open(),
+                            tool = workspace_ctx$plot_ctx()))
   algo_ctx <- lapply(ea_algorithms(), function(a)
-    algoServer(paste0("algo_", a$id), a, .algo_pools))
+    algoServer(paste0("algo_", a$id), a, .algo_pools, tool_open = .on_tool))
   # One statServer per registry entry, namespaced "stat_<id>" to match the tool
   # key the workspace registers. Adding an analysis needs no change here.
   stat_ctx <- lapply(ea_statistics(), function(s)

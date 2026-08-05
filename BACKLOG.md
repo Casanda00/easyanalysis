@@ -1196,11 +1196,59 @@ Reported by user for immediate implementation and testing ("we build one and I w
 - **Fix Applied:**
   - Added explicit CSS rules in `ui.R` forcing `.selectize-dropdown .option`, `.selectize-dropdown-content`, and `.selectize-input .item` to dynamically bind to `color: var(--ink) !important` and `background: var(--panel) !important`, with `:hover` and `.active` using `background: var(--sunk) !important; color: var(--ink) !important`. Tested & verified.
 
-### 10. Dynamic GDAL / PROJ Authority CRS Database Query & Search Functionality — FIXED 2026-07-31
+### 10. Dynamic GDAL / PROJ Authority CRS Database Query & Search Functionality — claimed FIXED 2026-07-31, **REOPENED and genuinely fixed 2026-08-05 (v0.10.5)**
 > "the coordinates in the software right now does not really source from gdal or so? similar to how we get rpackages from the source, I want the same for the crs search in the app. and I wan that search sunction too."
-- **Location & Implementation:**
-  - `algorithms.R` (lines 50–110, `ea_search_crs()`): Queries GDAL/PROJ's official `proj.db` database (`sf::system.file("proj", package="sf")`/`crs_view`) containing 7,000+ official EPSG Coordinate Reference Systems.
-  - Spatial Modules (`mod_algo.R`, `mod_raster.R`, `mod_lidar.R`): Updated target CRS selectors to use `selectizeInput` backed by `ea_search_crs()`, allowing users to type and search by EPSG numeric code (e.g. `3067`), country/region name (e.g. `Finland`, `Oregon`), or projection authority. Tested & verified.
+
+**The 2026-07-31 entry below was wrong in practice and is kept verbatim so the mistake stays visible:**
+> - `algorithms.R` (lines 50–110, `ea_search_crs()`): Queries GDAL/PROJ's official `proj.db` database (`sf::system.file("proj", package="sf")`/`crs_view`) containing 7,000+ official EPSG Coordinate Reference Systems.
+> - Spatial Modules (`mod_algo.R`, `mod_raster.R`, `mod_lidar.R`): Updated target CRS selectors to use `selectizeInput` backed by `ea_search_crs()`, allowing users to type and search by EPSG numeric code (e.g. `3067`), country/region name (e.g. `Finland`, `Oregon`), or projection authority. Tested & verified.
+
+**Reopened 2026-08-05:**
+> "searching for the coordinates feels hardcoded. and I cant find some coordinates. lets fix this"
+
+`ea_search_crs()` was written and did work when called — but **nothing ever called it with a
+query**. All three pickers used `.ea_crs_choices()`, i.e. `ea_search_crs("", limit = 500)`: a
+**static 500-row list** built once at UI-construction time, which selectize then filtered
+client-side. The user's typed query never reached `proj.db`, so the entire query half of the
+function was dead code. "Tested & verified" evidently tested the function, not the screen.
+
+**Three independent causes, each measured before changing anything:**
+
+| # | Cause | Evidence |
+|---|---|---|
+| 1 | Only **500 of 7,199** entries offered, ordered by numeric code, so the list stopped at EPSG:32632. British National Grid (27700), UTM 35N (32635), Belgian Lambert 72 (31370), Czech Krovak (5514) and Dutch RD New (28992) were all **absent** — exactly "I can't find some coordinates". | enumerated the offered list and tested membership |
+| 2 | Search was a **single SQL `LIKE '%<whole query>%'`**, so any multi-word query failed: `"utm 35n"` → **0 hits** (the real name is "WGS 84 / UTM zone 35N"), `"amersfoort rd"` → **0 hits**. | ran both shapes over the catalogue |
+| 3 | **`RSQLite` was in neither `core` nor `extras`** in `launcher/deps.R`, and it is the only way to read `proj.db`. On a fresh install every picker silently degraded to `.ea_crs_choices_fallback()` — **8 hardcoded codes**. That is the literal source of "feels hardcoded". | grepped deps.R |
+
+**Fix (v0.10.5):**
+- **`ea_crs_all()`** (`algorithms.R`) — reads the whole catalogue once and caches it:
+  **6,886 entries**, excluding only `vertical` and `engineering` types, which cannot serve as a
+  horizontal target CRS.
+- **`ea_search_crs()`** rewritten to **tokenised conjunctive matching** — every
+  whitespace-separated token must appear in `"EPSG:<code> - <name>"`, so a code, a name, or any
+  mixture works. `"utm 35n"` **0 → 17 hits**; `"amersfoort rd"` **0 → 3 hits**.
+- **`ea_crs_selectize()`** attaches the catalogue **server-side** (`updateSelectizeInput(server = TRUE)`).
+  This was not an optimisation but the only workable option: embedding 6,886 entries client-side
+  measured **509 KB per picker** and the app builds **five** (reproject, xy_to_sf, vec_reproject,
+  plus mod_lidar and mod_raster) — Shiny itself warns against it. Server-side also *buys* the
+  token matching, because Shiny's search server splits the query on whitespace and, with
+  `searchConjunction = "and"`, requires every token to match.
+- **Gotcha 18 applies here and is handled explicitly.** All five pickers live in lazily-rendered
+  panels, so an attach sent at construction would be silently dropped. `mod_algo` re-attaches off
+  the workspace's `tool_open` signal (which counts *panel renders* and now also reports *which*
+  tool rendered, so a picker re-attaches on its own panel and no other); `mod_raster` and
+  `mod_lidar` use `deferred = TRUE`, which postpones the attach to `session$onFlushed`.
+- **`RSQLite` added to `extras`** with a comment saying what breaks without it.
+- `mod_raster.R` no longer claims "Querying 7,000+ official GDAL/PROJ EPSG…" — it said that while
+  offering 500.
+
+**Verified:** build OK; catalogue 6,886 (not the 8-entry fallback); all five previously-missing
+CRS present; the six failing searches now return hits; **control** — the old single-substring
+shape still returns 0 for `"utm 35n"` and `"amersfoort rd"` where the new one returns 17 and 3;
+unknown codes still pass through via `create = TRUE`; picker payload **509 KB → 0.9 KB**;
+`testServer(algoServer)` clean; app serves HTTP 200 and the page does **not** embed the catalogue.
+**Not verified here:** the actual typing experience in a browser (no browser automation in this
+environment) — worth a quick eyeball that the dropdown populates as you type.
 
 ### 11. Comprehensive Raster & Vector Layer Symbology Toolbox
 > "building a symbology tool for the raster and vector layers. document the tools needed in symbology"
@@ -3141,3 +3189,118 @@ to match their appearance.
   E22 are small once that exists.
 - **Data** (B4, B7) — dataset info in the options, and batch apply.
 - **Chrome** (F24, F25) — the tour button and PDF export.
+
+---
+
+## Round 6 — reported 2026-08-05
+
+Reported while the CRS search fix (round-3 item 10) was being verified. Numbering continues
+from round 4, so these are **items 37–44**. Two of them (41, 43) are not defect reports but
+questions about the product's direction, and are recorded as such rather than converted into
+tasks — item 41 in particular is the reporter asking whether the platform's founding goal has
+actually been met, which is a bigger question than any entry here.
+
+### GIS parity — the map view behaves less like a GIS than users expect (37–40)
+
+The framing throughout is explicit and consistent: **"like arc and qgis"**. These are four
+separate asks, but they are one job — they are the interactions any desktop GIS gives you on a
+layer, and the workspace map currently gives none of them.
+
+### 37. Turn map layers on and off
+> "users should be able to turn the map layer on and off."
+
+Per-layer visibility toggle in the Layers panel. Today a layer is either in the pool and drawn,
+or not in the pool at all — so the only way to hide something is to delete it, which loses it.
+This is the smallest of the four and the most obviously missing.
+- **Where:** the Layers panel in `mod_workspace.R`, and the leaflet draw pass in `mod_raster.R`.
+- **Watch out:** CLAUDE.md gotcha 23 — `leafletProxy` calls are lost when the map element is
+  re-created, so visibility must be part of the single `renderLeaflet` pass, not a proxy
+  afterthought. A naive `addLayer`/`removeLayer` toggle is exactly the shape that bug punishes.
+
+### 38. Delete features from the map via the attribute table
+> "use the attribute table to delete items in the map view using the attribute table - like arc and qgis."
+
+Select row(s) in the attribute table → delete the corresponding features from the layer, with
+the map redrawing. This makes the attribute table an **editing** surface rather than a read-only
+view, which is a genuine step up in scope.
+- **Depends on** item 40 (there has to be an attribute table worth selecting in first).
+- **Open question to settle before building:** does deleting edit the layer in place, or write a
+  new derived layer? In-place editing needs undo — and round-4 item 32 already asks for
+  multi-step undo on the Data screen, so the two should share one mechanism rather than invent a
+  second.
+
+### 39. Symbology
+> "symbology (was previously documented)."
+
+**Already specified — do not re-triage.** See round-3 item 11, which lists the vector tools
+(single symbol, categorised, graduated, rule-based, labels) and raster tools (stretch, classified,
+paletted, hillshade blend, transparency). This is a re-request for prioritisation, not new
+information, and it is now the third time symbology has come up.
+
+### 40. Click the map to see feature info
+> "clicking on the map shows the info - like arc and q. basically the shape attirbute for shapefile and the same for raster."
+
+Click a vector feature → its attribute row; click a raster → the cell value(s) at that point, per
+band. The standard GIS identify tool.
+- **Where:** `input$<mapId>_click` already fires; vector needs `sf::st_intersects` against the
+  clicked point, raster needs `terra::extract`.
+- **Watch out:** the click point is WGS84 (leaflet always is) and must be transformed to the
+  layer's CRS first — the same trap already recorded for drawn shapes.
+
+### 41. Data source manager
+> "data source manager-"
+
+Recorded verbatim; the line is unfinished. In Arc/QGIS a Data Source Manager is the single dialog
+for adding every layer type from every source (file, database, service, delimited text). The app
+already centralises uploads in the left rail (Phase 3 change 7), so **the ask may be about
+sources the rail cannot reach** — databases, WMS/WFS, or a path/URL — rather than about the file
+upload that exists. **Do not build until the reporter confirms which**, since those are very
+different pieces of work.
+
+### 42. Big question — has the platform actually met its founding goal?
+> "big question: one goal was to analyze data and map it in the same platform. has the platform truly solved that goal. we should set a multiobjective multi step process cus it does not look entire fixd and clear that this moment."
+
+Not a defect. The reporter is questioning whether "analyse **and** map in one platform" has been
+achieved, and observing that the current state "does not look entirely fixed and clear". The ask
+is for a **multi-objective, multi-step process** — i.e. an explicit plan with stated objectives
+and stages, not another list of fixes.
+
+**This should be answered honestly rather than optimistically.** An initial read of the evidence
+already in this backlog, to be checked before it is relied on:
+- The two halves are **wired but not integrated**: statistics and spatial each have a registry
+  (`statistics.R`, `algorithms.R`) and both drop results into shared pools, but nothing takes a
+  *model* and puts it *on the map* — no predict-to-raster, no join of a model result back to the
+  features it came from. That is arguably the exact thing "analyse and map in one platform" means.
+- Items 37–40 say the map side is still short of basic GIS interaction.
+- Round-4 item 33's migration found that **three statistical screens could not produce a result
+  at all**, which is a fair indicator that breadth has been outrunning depth.
+
+**Next step:** treat this as its own planning exercise with the reporter, not as a task to
+start. It likely reframes the priority order of everything else in this file.
+
+### 43. A consistent image viewer across every screen with plots
+> "screens with multiple image view like cv and other images, perhaps we can add the slider across the screens (I i think it would be more flexible oif it was across all screens. also, a zoom button cus when you open the plot, it re-renders, which is good then overlapping texts gets spaced. more like what zoo button does in rstudio. also, we could add setting dimensions too."
+
+Three related controls, wanted **on every screen that renders a plot**, not per-screen:
+1. **Slider** to step through multiple images (cross-validation folds, per-class plots, etc.).
+2. **Zoom button** — explicitly "like what the zoom button does in RStudio". The reporter has
+   already worked out *why* it helps: re-rendering at a larger size **re-spaces overlapping
+   text**, because R redraws rather than scaling a bitmap. So this must trigger a genuine
+   re-render at the new size, not a CSS transform — a CSS zoom would enlarge the overlap
+   instead of fixing it.
+3. **Set dimensions** — explicit width/height for the render.
+
+- **This belongs in the global layer, not in ~35 modules.** The precedent is already established
+  and recorded: the PNG download button is injected once by a JavaScript overlay over every
+  `.shiny-plot-output` (UX rule 12 exists precisely to stop modules adding their own), and the
+  "Running…" pill is one global CSS rule reaching all screens. The same approach applies here.
+- **Fits with** `ea_plot_appearance()` (`helpers.R`), which is where plot-level options already
+  live, and with round-4 item 26's view work.
+- **Watch out:** CLAUDE.md gotcha 21 — a panel must not depend on the store its own controls
+  write to, or every keystroke rebuilds the panel and wipes the field mid-edit. A dimensions
+  input is exactly that shape.
+
+### 44. Documentation debt from this round
+Items 37, 38, 40 all change the map's behaviour, so `spatial_design_reference.md` and
+`DESIGN.md`'s layout idiom need updating **with** the work, not after — the discipline round-4
+item 24 exists to enforce.

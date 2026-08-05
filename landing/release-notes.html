@@ -103,14 +103,79 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.4</b> · 46 releases ·
+      <p class="meta">Latest: <b>v0.10.5</b> · 47 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-4"><h2><a class="anchor" href="#v0-10-4">v0.10.4</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-5"><h2><a class="anchor" href="#v0-10-5">v0.10.5</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed — CRS search really does query GDAL/PROJ now</h3>
+<blockquote>
+<p>&quot;searching for the coordinates feels hardcoded. and I cant find some coordinates.&quot;</p>
+</blockquote>
+<p>Both halves of that report were right, and for three separate reasons. The search function
+queried PROJ&#39;s <code>proj.db</code> correctly — but <strong>nothing ever called it with a query.</strong> Every picker
+was built from a <strong>static 500-entry list</strong>, which selectize then filtered in the browser, so
+what you typed never reached the database.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRS you can pick</td>
+<td>500</td>
+<td><strong>6,886</strong></td>
+</tr>
+<tr>
+<td><code>&quot;utm 35n&quot;</code></td>
+<td>0 hits</td>
+<td><strong>17 hits</strong></td>
+</tr>
+<tr>
+<td><code>&quot;amersfoort rd&quot;</code></td>
+<td>0 hits</td>
+<td><strong>3 hits</strong></td>
+</tr>
+<tr>
+<td>Without <code>RSQLite</code> installed</td>
+<td>8 hardcoded codes</td>
+<td>listed as a dependency</td>
+</tr>
+<tr>
+<td>Page weight per picker</td>
+<td>509 KB if built client-side</td>
+<td><strong>0.9 KB</strong></td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>The list stopped at EPSG:32632.</strong> It was ordered by numeric code and cut at 500, so British
+National Grid (27700), UTM 35N (32635), Belgian Lambert 72 (31370), Czech Krovak (5514) and
+Dutch RD New (28992) simply were not in it.</li>
+<li><strong>Search was one <code>LIKE &#39;%whole query%&#39;</code></strong>, so multi-word searches always failed — the real
+name is &quot;WGS 84 / UTM zone 35N&quot;, which <code>%utm 35n%</code> cannot match. Matching is now tokenised:
+every word you type must appear somewhere in the entry, so a code, a name, or a mix all work.</li>
+<li><strong><code>RSQLite</code> was in neither dependency list</strong>, and it is the only way to read <code>proj.db</code>. On a
+fresh install every picker silently degraded to 8 hardcoded codes — the literal source of
+&quot;feels hardcoded&quot;. It is now an <code>extras</code> dependency.</li>
+<li>The catalogue is attached <strong>server-side</strong>, which is what makes 6,886 entries practical at all:
+embedding them measured 509 KB per picker and the app builds five of them.</li>
+<li><code>mod_raster.R</code> stopped claiming it was &quot;Querying 7,000+ official GDAL/PROJ EPSG…&quot; while
+offering 500.</li>
+</ul>
+<p>Only <code>vertical</code> and <code>engineering</code> systems are withheld, because neither can serve as a
+horizontal target CRS. Anything not in the catalogue can still be typed in by hand.</p>
+<h3>Changed</h3>
+<ul>
+<li>The workspace&#39;s tool-render signal now reports <strong>which</strong> tool rendered, not just that one did,
+so a panel can re-arm its own controls without every other panel re-arming too.</li>
+</ul>
+</section><section class="rel" id="v0-10-4"><h2><a class="anchor" href="#v0-10-4">v0.10.4</a><span class="when">2026-08-05</span></h2>
 <h3>Added</h3>
 <ul>
 <li><strong>Release notes on the website, kept up to date automatically.</strong> Every version&#39;s entry is

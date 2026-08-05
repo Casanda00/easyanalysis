@@ -701,6 +701,16 @@ rasterServer <- function(id, dataset_pool, active_dataset,
 
     # ---- Raster operation params UI -----------------------------------------
 
+    # Attach the PROJ catalogue whenever the reproject params are (re)built.
+    # deferred = TRUE because this fires while op_params is still being
+    # rendered — the element reaches the browser at the end of this flush.
+    observeEvent(input$operation, {
+      if (identical(input$operation, "reproject"))
+        ea_crs_selectize(session, "target_crs",
+                         selected = isolate(input$target_crs) %||% "EPSG:4326",
+                         deferred = TRUE)
+    })
+
     output$op_params <- renderUI({
       req(input$operation)
       nms_r <- names(Filter(function(ly) ly$type == "raster", rv$layers))
@@ -724,11 +734,14 @@ rasterServer <- function(id, dataset_pool, active_dataset,
             choices = nms_r, selected = nms_r),
 
         reproject = tagList(
+          # Seeded small on purpose; ea_crs_selectize() attaches the real
+          # catalogue server-side once this renderUI has reached the client.
           selectizeInput(ns("target_crs"), "Target CRS",
-            choices = .ea_crs_choices(), selected = "EPSG:4326",
+            choices = .ea_crs_choices("EPSG:4326"), selected = "EPSG:4326",
             options = list(create = TRUE, createOnBlur = TRUE,
                            placeholder = "Search EPSG code or CRS name...")),
-          tags$p(class = "small text-muted", "Querying 7,000+ official GDAL/PROJ EPSG coordinate reference systems.")
+          tags$p(class = "small text-muted",
+                 "Type a code or a name — every non-deprecated EPSG system is searchable.")
         ),
 
         resample = tagList(

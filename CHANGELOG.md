@@ -8,6 +8,46 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.5 — 2026-08-05
+
+### Fixed — CRS search really does query GDAL/PROJ now
+
+> "searching for the coordinates feels hardcoded. and I cant find some coordinates."
+
+Both halves of that report were right, and for three separate reasons. The search function
+queried PROJ's `proj.db` correctly — but **nothing ever called it with a query.** Every picker
+was built from a **static 500-entry list**, which selectize then filtered in the browser, so
+what you typed never reached the database.
+
+| | Before | After |
+|---|---|---|
+| CRS you can pick | 500 | **6,886** |
+| `"utm 35n"` | 0 hits | **17 hits** |
+| `"amersfoort rd"` | 0 hits | **3 hits** |
+| Without `RSQLite` installed | 8 hardcoded codes | listed as a dependency |
+| Page weight per picker | 509 KB if built client-side | **0.9 KB** |
+
+- **The list stopped at EPSG:32632.** It was ordered by numeric code and cut at 500, so British
+  National Grid (27700), UTM 35N (32635), Belgian Lambert 72 (31370), Czech Krovak (5514) and
+  Dutch RD New (28992) simply were not in it.
+- **Search was one `LIKE '%whole query%'`**, so multi-word searches always failed — the real
+  name is "WGS 84 / UTM zone 35N", which `%utm 35n%` cannot match. Matching is now tokenised:
+  every word you type must appear somewhere in the entry, so a code, a name, or a mix all work.
+- **`RSQLite` was in neither dependency list**, and it is the only way to read `proj.db`. On a
+  fresh install every picker silently degraded to 8 hardcoded codes — the literal source of
+  "feels hardcoded". It is now an `extras` dependency.
+- The catalogue is attached **server-side**, which is what makes 6,886 entries practical at all:
+  embedding them measured 509 KB per picker and the app builds five of them.
+- `mod_raster.R` stopped claiming it was "Querying 7,000+ official GDAL/PROJ EPSG…" while
+  offering 500.
+
+Only `vertical` and `engineering` systems are withheld, because neither can serve as a
+horizontal target CRS. Anything not in the catalogue can still be typed in by hand.
+
+### Changed
+- The workspace's tool-render signal now reports **which** tool rendered, not just that one did,
+  so a panel can re-arm its own controls without every other panel re-arming too.
+
 ## v0.10.4 — 2026-08-05
 
 ### Added

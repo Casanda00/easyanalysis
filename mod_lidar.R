@@ -264,6 +264,17 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
       }, error = function(e) NULL)
     })
 
+    # Same dependencies as manual_coords_ui below, so this runs in the flush that
+    # builds the picker; deferred = TRUE holds the attach until that flush is out
+    # and the element actually exists (gotcha 18).
+    observe({
+      if (!is.null(las_bbox_wgs84())) return()
+      if (is.null(rv_lidar$las)) return()
+      ea_crs_selectize(session, "epsg_code",
+                       selected = isolate(input$epsg_code) %||% "EPSG:3067",
+                       deferred = TRUE)
+    })
+
     output$manual_coords_ui <- renderUI({
       if (!is.null(las_bbox_wgs84())) return(NULL)
       if (is.null(rv_lidar$las)) return(NULL)
@@ -272,8 +283,10 @@ lidarServer <- function(id, dataset_pool, las_pool = NULL, vector_pool = NULL) {
           tags$p(class = "text-muted small mb-1",
             "CRS not embedded. Option 1: assign an EPSG code to geolocate automatically."),
           div(class = "d-flex gap-2 align-items-end mb-2",
+            # Seeded small; ea_crs_selectize() attaches the full PROJ catalogue
+            # server-side once this renderUI has reached the browser.
             selectizeInput(ns("epsg_code"), "EPSG Code:",
-              choices = .ea_crs_choices(), selected = "EPSG:3067",
+              choices = .ea_crs_choices("EPSG:3067"), selected = "EPSG:3067",
               options = list(create = TRUE, createOnBlur = TRUE,
                              placeholder = "Search EPSG code or name..."), width = "260px"),
             div(style = "margin-bottom: 1px;",

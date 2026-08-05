@@ -24,8 +24,10 @@ algoToolsUI <- function(id, spec) {
             else textInput(ns(paste0("p_", p$key)), p$label, value = p$value),
       sel = selectInput(ns(paste0("p_", p$key)), p$label, choices = p$choices,
                         selected = p$value),
+      # Seeded small; the full PROJ catalogue is attached server-side by
+      # ea_crs_selectize() in algoServer (see algorithms.R).
       crs = selectizeInput(ns(paste0("p_", p$key)), p$label,
-                           choices = .ea_crs_choices(),
+                           choices = .ea_crs_choices(p$value),
                            selected = p$value,
                            options = list(create = TRUE,
                                           createOnBlur = TRUE,
@@ -51,9 +53,25 @@ algoToolsUI <- function(id, spec) {
   )
 }
 
-algoServer <- function(id, spec, pools) {
+algoServer <- function(id, spec, pools, tool_open = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # The full PROJ catalogue (~6,900 entries) is attached SERVER-SIDE rather
+    # than built into the picker -- see ea_crs_selectize() in algorithms.R for
+    # why. The attach has to wait for the panel: this tool's UI only exists once
+    # the tool is opened, so a message sent at construction would be dropped
+    # (gotcha 18). `tool_open` counts PANEL RENDERS and reports which tool
+    # rendered, so we re-attach on every render of OUR panel and no other.
+    .crs_ps <- Filter(function(p) identical(p$kind, "crs"), spec$params)
+    if (length(.crs_ps) && !is.null(tool_open)) {
+      observeEvent(tool_open(), {
+        if (!identical(tool_open()$tool, id)) return()
+        for (p in .crs_ps)
+          ea_crs_selectize(session, paste0("p_", p$key),
+                           selected = isolate(input[[paste0("p_", p$key)]]) %||% p$value)
+      })
+    }
 
     .pool <- function(nm) pools[[nm]]
     .names <- function(nm) {

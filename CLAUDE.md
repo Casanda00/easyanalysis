@@ -149,6 +149,28 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+32. **A function that accepts a query proves nothing if no CALL SITE passes one.**
+    `ea_search_crs(query, limit)` genuinely queried PROJ's `proj.db` and was signed off as
+    "Tested & verified" — but all three CRS pickers called `.ea_crs_choices()`, i.e.
+    `ea_search_crs("", limit = 500)`. So the entire query half was **dead code**, the user
+    typed into a **static 500-row list** filtered in the browser, and any CRS outside the
+    first 500 by numeric code was unreachable. Verifying the helper is not verifying the
+    screen: **grep the call sites and check what they actually pass.** Two things follow.
+    (a) **A large choice set must be server-side.** 6,886 entries measured **509 KB per
+    picker** and the app builds five; `updateSelectizeInput(..., server = TRUE)` sends the
+    URL instead of the data. (b) **Server-side selectize also fixes multi-word search for
+    free** — Shiny's search server splits the query on whitespace and, with
+    `searchConjunction = "and"`, requires every token to match, so `"utm 35n"` finds
+    `"WGS 84 / UTM zone 35N"`. A single SQL `LIKE '%utm 35n%'` matches **nothing**; never
+    substring-match a whole multi-word query against a name.
+    **Combines with gotcha 18:** every CRS picker lives in a lazily-rendered panel, so an
+    attach sent at construction is silently dropped. Use the workspace's `tool_open` signal
+    (which now reports *which* tool rendered) for panel-based pickers, and
+    `session$onFlushed()` for `renderUI` ones — see `ea_crs_selectize(deferred=)`.
+    **Also:** anything reached only through `requireNamespace()` must be in `launcher/deps.R`,
+    or it degrades silently. `RSQLite` was in neither list, so on a fresh install the whole
+    catalogue collapsed to **8 hardcoded codes** — which is precisely what "feels hardcoded"
+    meant.
 30. **Bootstrap reads `--bs-*-rgb` TRIPLETS, not the colour variables you overrode.**
     `ui.R` sets `--bs-emphasis-color: var(--ink)`, but bootstrap colours `<pre>`, `code`,
     `.well`, `.navbar` and `.link-body-emphasis` from **`--bs-emphasis-color-rgb`**, a

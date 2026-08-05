@@ -36,7 +36,12 @@ core <- c(
 extras <- c(
   "BayesFactor", "mgcv", "klaR", "kernlab", "heplots", "rpart", "Hmisc",
   "trend", "car", "glmnet", "exactextractr", "rstac", "survival", "tseries",
-  "e1071", "xgboost", "whitebox", "lavaan", "writexl", "plotly", "lme4"
+  "e1071", "xgboost", "whitebox", "lavaan", "writexl", "plotly", "lme4",
+  # RSQLite reads GDAL/PROJ's proj.db, which is the ONLY source of the CRS
+  # catalogue. Without it every CRS picker silently falls back to 8 hardcoded
+  # codes instead of ~6,900 — the app still runs, so it is an extra, but any
+  # reprojection outside those 8 becomes impossible to pick from the list.
+  "RSQLite"
 )
 # NOTE: ggord (DA biplot) is GitHub-only (fawda123/ggord) and optional — not
 # installed here; its screen path is requireNamespace()-guarded.

@@ -53,62 +53,105 @@ ea_sel <- function(key, label, choices, value = NULL, hint = NULL, show_if = NUL
 ea_crs <- function(key, label = "Target CRS (EPSG / PROJ / WKT)", value = "EPSG:4326", hint = NULL)
   list(kind = "crs", key = key, label = label, value = value, hint = hint)
 
-# Query GDAL / PROJ proj.db database directly for 7,000+ official EPSG / CRS entries.
-ea_search_crs <- function(query = "", limit = 100) {
+# --- The CRS catalogue, read once from GDAL/PROJ's own proj.db -------------
+#
+# Every usable EPSG entry, not a curated shortlist. `vertical` and `engineering`
+# are excluded because they cannot serve as a horizontal target CRS; everything
+# else (projected, geographic 2D/3D, geocentric, compound) is offered -- 6,886
+# entries against the 8 the built-in fallback can name.
+#
+# Cached for the life of the process: the query costs one SQLite read, and the
+# app builds five CRS pickers.
+.ea_crs_cache <- new.env(parent = emptyenv())
+
+ea_crs_all <- function() {
+  if (!is.null(.ea_crs_cache$all)) return(.ea_crs_cache$all)
+
   db_path <- tryCatch(
     file.path(system.file("proj", package = "sf"), "proj.db"),
     error = function(e) ""
   )
-  if (!file.exists(db_path) || !requireNamespace("RSQLite", quietly = TRUE)) {
+  if (!file.exists(db_path) || !requireNamespace("RSQLite", quietly = TRUE))
     return(.ea_crs_choices_fallback())
-  }
 
   con <- tryCatch(RSQLite::dbConnect(RSQLite::SQLite(), db_path), error = function(e) NULL)
   if (is.null(con)) return(.ea_crs_choices_fallback())
   on.exit(try(RSQLite::dbDisconnect(con), silent = TRUE), add = TRUE)
 
-  q_str <- trimws(query %||% "")
-  if (!nzchar(q_str)) {
-    sql <- sprintf(
-      "SELECT code, name FROM crs_view 
-       WHERE auth_name = 'EPSG' AND deprecated = 0 AND type IN ('projected', 'geographic 2D')
-       ORDER BY CASE WHEN code IN ('4326', '3857', '3067', '4269', '4258', '25832', '25833', '32632') THEN 0 ELSE 1 END,
-                CAST(code AS INTEGER) ASC LIMIT %d", limit
-    )
-  } else {
-    clean_q <- gsub("['\"\\]", "", q_str)
-    clean_num <- gsub("[^0-9]", "", clean_q)
-    if (nzchar(clean_num) && (startsWith(clean_q, "EPSG") || startsWith(clean_q, clean_num))) {
-      sql <- sprintf(
-        "SELECT code, name FROM crs_view 
-         WHERE auth_name = 'EPSG' AND deprecated = 0 AND code LIKE '%s%%' 
-         ORDER BY LENGTH(code) ASC, CAST(code AS INTEGER) ASC LIMIT %d", clean_num, limit
-      )
-    } else {
-      sql <- sprintf(
-        "SELECT code, name FROM crs_view 
-         WHERE auth_name = 'EPSG' AND deprecated = 0 AND name LIKE '%%%s%%' 
-         ORDER BY LENGTH(name) ASC LIMIT %d", clean_q, limit
-      )
-    }
-  }
+  df <- tryCatch(RSQLite::dbGetQuery(con,
+    "SELECT code, name FROM crs_view
+     WHERE auth_name = 'EPSG' AND deprecated = 0
+       AND type IN ('projected','geographic 2D','geographic 3D','geocentric','compound')
+     ORDER BY CASE WHEN code IN ('4326','3857','3067','4269','4258','25832','25833','32632')
+                   THEN 0 ELSE 1 END,
+              CAST(code AS INTEGER) ASC"), error = function(e) NULL)
+  if (is.null(df) || nrow(df) == 0) return(.ea_crs_choices_fallback())
 
-  df <- tryCatch(RSQLite::dbGetQuery(con, sql), error = function(e) NULL)
-  if (is.null(df) || nrow(df) == 0) {
-    if (nzchar(q_str)) {
-      val <- if (grepl("^[0-9]+$", q_str)) paste0("EPSG:", q_str) else q_str
-      return(stats::setNames(val, paste("Custom CRS:", q_str)))
-    }
-    return(.ea_crs_choices_fallback())
-  }
-
-  labels <- sprintf("EPSG:%s - %s", df$code, df$name)
-  values <- sprintf("EPSG:%s", df$code)
-  stats::setNames(values, labels)
+  out <- stats::setNames(sprintf("EPSG:%s", df$code),
+                         sprintf("EPSG:%s - %s", df$code, df$name))
+  .ea_crs_cache$all <- out
+  out
 }
 
-.ea_crs_choices <- function() {
-  ea_search_crs("", limit = 500)
+# Programmatic search over the catalogue (the Co-Analyst and any non-UI caller).
+# Matching is TOKENISED and conjunctive: every whitespace-separated token must
+# appear somewhere in "EPSG:<code> - <name>". A single substring test cannot do
+# this -- LIKE '%utm 35n%' matches nothing, because the real name is
+# "WGS 84 / UTM zone 35N". Tokenising finds it, and the same rule covers a bare
+# code, a name, or any mixture of the two.
+ea_search_crs <- function(query = "", limit = 100) {
+  all <- ea_crs_all()
+  q <- trimws(query %||% "")
+  if (!nzchar(q)) return(utils::head(all, limit))
+
+  key <- unique(strsplit(tolower(q), "\\s+")[[1]])
+  key <- key[nzchar(key)]
+  lab <- tolower(names(all))
+  hit <- Reduce(`&`, lapply(key, function(k) grepl(k, lab, fixed = TRUE)))
+
+  if (!any(hit)) {
+    # Not in the catalogue -- let the user's own entry through rather than
+    # silently offering nothing (selectize's create = TRUE accepts it).
+    val <- if (grepl("^[0-9]+$", q)) paste0("EPSG:", q) else q
+    return(stats::setNames(val, paste("Custom CRS:", q)))
+  }
+  utils::head(all[hit], limit)
+}
+
+# Attach the catalogue to a selectize picker as a SERVER-SIDE data source.
+#
+# Server-side is not a micro-optimisation here, it is the only workable option:
+# embedding 6,886 entries client-side costs ~509 KB PER picker and the app builds
+# five of them, which Shiny itself warns against. It also buys the tokenised AND
+# matching described above -- Shiny's search server splits the typed query on
+# whitespace and requires every token to match.
+#
+# `deferred = TRUE` is for a picker created inside renderUI: an update aimed at
+# an element that does not exist yet is silently DROPPED (CLAUDE.md gotcha 18),
+# so the attach is postponed to onFlushed, which runs after outputs have reached
+# the client and the element is really there.
+ea_crs_selectize <- function(session, input_id, selected = "EPSG:4326",
+                             deferred = FALSE) {
+  attach <- function() {
+    updateSelectizeInput(
+      session, input_id, choices = ea_crs_all(), selected = selected,
+      server = TRUE,
+      options = list(create = TRUE, createOnBlur = TRUE,
+                     searchConjunction = "and", maxOptions = 200,
+                     placeholder = "Search EPSG code or CRS name...")
+    )
+  }
+  if (deferred) session$onFlushed(attach, once = TRUE) else attach()
+}
+
+# The choices a CRS picker is BUILT with. Deliberately tiny: the real catalogue
+# arrives from ea_crs_selectize() over the server-side channel. Seeding it with
+# the current value keeps the picker showing its selection before that lands.
+.ea_crs_choices <- function(selected = NULL) {
+  seed <- .ea_crs_choices_fallback()
+  if (!is.null(selected) && nzchar(selected) && !selected %in% seed)
+    seed <- c(stats::setNames(selected, selected), seed)
+  seed
 }
 
 .ea_crs_choices_fallback <- function() {
