@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.11.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.12.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,25 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.11</b> · 53 releases ·
+      <p class="meta">Latest: <b>v0.10.12</b> · 54 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-11"><h2><a class="anchor" href="#v0-10-11">v0.10.11</a><span class="when">2026-08-05</span></h2>
+<section class="rel" id="v0-10-12"><h2><a class="anchor" href="#v0-10-12">v0.10.12</a><span class="when">2026-08-05</span></h2>
+<h3>Fixed — the documentation still described the old way in</h3>
+<p>The walkthrough told you to <em>&quot;keep the terminal window open while you work&quot;</em> and to re-run the
+install command every time you wanted to start the app. Neither is true any more: there is a
+<strong>Quit</strong> button, and on Windows there is a Desktop shortcut. The reference page never mentioned
+either, and the project&#39;s README offered no install instructions at all.</p>
+<p>All four now describe the same thing: download and double-click on Windows, or use the one-line
+command on any platform; restart from the Desktop shortcut; close with <strong>Quit</strong>. The security
+prompt Windows shows for downloaded installers is explained rather than left as a surprise.</p>
+<p>The terminal remains a fully supported way to install and run EasyAnalysis — it is the route on
+macOS and Linux, and nothing about it has changed.</p>
+</section><section class="rel" id="v0-10-11"><h2><a class="anchor" href="#v0-10-11">v0.10.11</a><span class="when">2026-08-05</span></h2>
 <h3>Added — EasyAnalysis now has its icon, everywhere</h3>
 <p>The Desktop shortcut added in the previous version used a generic PowerShell icon. It now uses
 the EasyAnalysis mark, built at seven sizes so it stays sharp from the taskbar to large-icon

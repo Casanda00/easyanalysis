@@ -82,8 +82,16 @@
 
       <section id="start">
         <h2>1 · Start the app</h2>
-        <p>One line in a terminal installs and starts everything — R, the app and its
-          packages. No admin rights, no Docker, nothing to configure.</p>
+        <p>Everything is installed for you — R, the app and its packages. No admin rights, no
+          Docker, nothing to configure.</p>
+
+        <p><strong>On Windows, the simplest way:</strong>
+          <a href="/EasyAnalysis-Setup.bat" download>download the installer</a> and double-click
+          it. Windows may warn that the file came from the internet — choose
+          <strong>More info → Run anyway</strong>. That warning appears for any installer without
+          a paid signing certificate and does not mean anything is wrong.</p>
+
+        <p>Or install from a terminal, which works on every platform:</p>
         <div class="code">
           <div class="top">Windows · PowerShell <button class="copy" data-copy="a">Copy</button></div>
           <pre id="cmd-a">iwr -useb https://easyanalysis.dev/install.ps1 | iex</pre>
@@ -95,8 +103,11 @@
         <p>The first run downloads what it needs and can take a few minutes. Every run after that
           starts in seconds, because everything is cached. When it's ready the app opens in your
           browser at <code>http://127.0.0.1:7788</code>.</p>
-        <p><strong>Keep the terminal window open</strong> while you work — closing it stops the app.
-          To start it again later, run the same line.</p>
+        <p><strong>Starting it again later:</strong> on Windows the installer puts an
+          <strong>EasyAnalysis</strong> shortcut on your Desktop and in the Start Menu — just
+          double-click it, no terminal needed. On macOS and Linux, run the same line again.</p>
+        <p><strong>Closing it:</strong> use the <strong>Quit</strong> button at the top right of
+          the app. That stops the app properly. Closing the terminal or launcher window also works.</p>
         <div class="callout"><strong>First run takes a moment.</strong> The spatial libraries load
           once at startup; you'll see a short "Starting up…" screen.</div>
       </section>

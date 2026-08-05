@@ -18,6 +18,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.12 — 2026-08-05
+
+### Fixed — the documentation still described the old way in
+
+The walkthrough told you to *"keep the terminal window open while you work"* and to re-run the
+install command every time you wanted to start the app. Neither is true any more: there is a
+**Quit** button, and on Windows there is a Desktop shortcut. The reference page never mentioned
+either, and the project's README offered no install instructions at all.
+
+All four now describe the same thing: download and double-click on Windows, or use the one-line
+command on any platform; restart from the Desktop shortcut; close with **Quit**. The security
+prompt Windows shows for downloaded installers is explained rather than left as a surprise.
+
+The terminal remains a fully supported way to install and run EasyAnalysis — it is the route on
+macOS and Linux, and nothing about it has changed.
+
 ## v0.10.11 — 2026-08-05
 
 ### Added — EasyAnalysis now has its icon, everywhere

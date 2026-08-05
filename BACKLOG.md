@@ -3791,3 +3791,34 @@ browser/shell automation. Worth an eyeball after installing.
 
 **Note:** `easyanalysis-favicon.png` (the uncropped 677x369 original) is kept at the repo root as
 the source artwork. It is **not** served and should not be linked.
+
+### 46 (docs) — **DONE (v0.10.12)**: both install routes documented everywhere
+> "we keep terminal runs for now and add that shortcut. if its done. keep the documentation"
+
+**Decision recorded: the terminal route STAYS.** The download and the shortcut are additions, not
+replacements — the one-liner is the only route on macOS and Linux, and it is what CI, developers
+and anyone scripting an install will use. Nothing was removed from any page.
+
+**The gap this closed.** v0.10.10 updated `landing/index.html` only. The two pages users are
+actually *sent to* were left describing the old world:
+- `how-to-use.html` still said **"Keep the terminal window open while you work — closing it stops
+  the app. To start it again later, run the same line."** Both halves were untrue by then: Quit
+  (v0.10.7) closes the app properly, and the Desktop shortcut (v0.10.10) is how you restart it.
+- `documentation.html`'s Installation section never mentioned the shortcut or the download.
+- `README.md` — what a GitHub visitor sees first — had **no install path at all**, only
+  `shiny::runApp()`. A non-technical reader arriving from the repo had nowhere to go.
+
+**Now, on all four:** the double-click download first (Windows), the terminal one-liner kept
+below it for every platform, the shortcut explained for restarting, and Quit for closing. The
+SmartScreen prompt is spelled out with the remedy (**More info → Run anyway**) and the reason —
+an unsigned installer always triggers it, and an unwarned user reads it as malware. Each page
+states plainly that Desktop shortcuts are **Windows-only for now**.
+
+**Verified:** no "keep the terminal open" text survives anywhere; all four docs reference the
+installer, the `.bat` and the shortcut; the `install.sh` route is still present on all four
+(the "keep terminal runs" instruction); page and icon checks still pass.
+
+**Lesson worth keeping:** the landing page is not the documentation. A change to how the app is
+installed or closed has **four** places to update — `index.html`, `documentation.html`,
+`how-to-use.html`, `README.md` — and the two most likely to be read are the ones easiest to
+forget.

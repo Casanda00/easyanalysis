@@ -78,8 +78,16 @@
 
       <section id="install">
         <h2>Installation</h2>
-        <p>One line installs and launches everything — R (if you don't have it), the app, and its
-          R packages, into your user folder. No admin rights, no Docker.</p>
+        <p>Everything is installed for you — R (if you don't have it), the app, and its R
+          packages, into your user folder. No admin rights, no Docker.</p>
+
+        <p><strong>Windows, without a terminal:</strong>
+          <a href="/EasyAnalysis-Setup.bat" download>download the installer</a> and double-click
+          it. Windows may warn that the file came from the internet — choose
+          <strong>More info → Run anyway</strong>. Any installer that has not been signed with a
+          paid certificate triggers that prompt; it is not a sign of a problem.</p>
+
+        <p>Or run one line in a terminal (works on every platform):</p>
         <div class="code">
           <div class="top">Windows · PowerShell <button class="copy" data-copy="i">Copy</button></div>
           <pre id="cmd-i">iwr -useb https://easyanalysis.dev/install.ps1 | iex</pre>
@@ -92,6 +100,13 @@
           installs missing packages into a private library → starts the app and opens your browser.
           The first run can take several minutes; later runs start in seconds because each step is
           cached.</p>
+        <p>On <strong>Windows</strong> it also creates an <strong>EasyAnalysis</strong> shortcut on
+          your Desktop and in the Start Menu, so afterwards you can start the app by double-clicking
+          it — no terminal at all. The shortcut opens minimised rather than hidden, so there is
+          still a window to check if anything goes wrong. Desktop shortcuts are Windows-only for
+          now; on macOS and Linux, re-run the install line to start the app again.</p>
+        <p>To close the app, use the <strong>Quit</strong> button at the top right. It stops the R
+          session properly; closing the launcher window also works.</p>
         <p>On <strong>Windows</strong> R is downloaded automatically if you don't have it. On
           <strong>macOS/Linux</strong> an existing R is used; if there is none the script installs it
           with Homebrew where available, or tells you the single command for your system. Spatial

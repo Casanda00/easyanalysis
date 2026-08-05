@@ -47,7 +47,35 @@ Core required packages:
 
 *Note: Some algorithms require optional packages (`klaR`, `kernlab`, `heplots`, `ggord`) which are prompted internally by the application when requested.*
 
-## Launching the App
+## Installing (users)
+
+You do **not** need to clone this repo or know R to use EasyAnalysis. The installer fetches R
+if you don't have it, installs the packages into a private library, and starts the app. No
+admin rights and no Docker.
+
+**Windows — no terminal:** download
+**[EasyAnalysis-Setup.bat](https://easyanalysis.dev/EasyAnalysis-Setup.bat)** and double-click it.
+Windows may warn that the file came from the internet — choose **More info → Run anyway**. That
+prompt appears for any installer without a paid signing certificate.
+
+**Or from a terminal:**
+
+```sh
+# Windows (PowerShell)
+iwr -useb https://easyanalysis.dev/install.ps1 | iex
+
+# macOS / Linux
+curl -fsSL https://easyanalysis.dev/install.sh | sh
+```
+
+The first run downloads what it needs and takes a few minutes; after that it starts in seconds
+and opens at `http://127.0.0.1:7788`.
+
+On Windows the installer also creates an **EasyAnalysis** shortcut on the Desktop and in the
+Start Menu, so you never need the terminal again. (Desktop shortcuts are Windows-only for now.)
+Close the app with the **Quit** button at the top right.
+
+## Launching the App (development)
 
 Ensure all dependencies are installed. You can verify the build without launching by running:
 ```sh
