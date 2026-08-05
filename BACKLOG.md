@@ -3570,3 +3570,68 @@ working stop beats a tidy launch with no way out. Revisit once the app has its o
 **Also worth fixing while in there:** the landing page and `README.md` document only the paste-a-
 command route, so even after A and B exist, a first-time visitor would still be sent to the
 terminal. The docs are part of this item, not a follow-up.
+
+### 47. A Quit button and a Stop button — and why they unblock the shortcut (item 46)
+> "maybe another button to end or close the app. we also dont have a button to stop analyses.
+> so maybe we create the shortcut? with buttons in the app?"
+
+**Both observations are correct, and pairing them with item 46 is the right instinct** — the Quit
+button is precisely what *unblocks* a clean desktop shortcut. Item 46 recommended keeping the
+console window visible because it is the only way to stop the app; a Quit button removes that
+constraint, so the shortcut can then launch with the console hidden. **Do 47 before 46's
+shortcut, not after.**
+
+**Grounded facts, checked 2026-08-05:**
+
+| Control | State |
+|---|---|
+| Quit / close the app | **Does not exist.** No `stopApp()` anywhere in the codebase |
+| Stop a running job | Exists in **exactly one module** — `mod_algo.R`, via `compute_worker.R` |
+| …and only sometimes | `mod_algo.R:233` routes to the worker only when `cells > 2e6` (`ea.worker_min_cells`) and the input is not LAS. Below that it runs in-process and **cannot be stopped** |
+| Stop a statistical analysis | **None at all.** `mod_stat.R` never touches the worker, so all **9 migrated screens** plus every hand-written model module run uninterruptibly |
+
+**These are two very different jobs — do not estimate them together.**
+
+#### Quit — genuinely small
+`stopApp()` ends the process. Three things it must get right:
+1. **Kill the worker too.** `compute_worker.R` holds a `callr` R session. Quitting without
+   calling `ea_worker_shutdown()` **leaks an orphan R process** that keeps running with no UI
+   attached. This is the one real trap in an otherwise easy change.
+2. **Be honest about the browser tab.** The server cannot close it; `window.close()` only works
+   for script-opened windows and the launcher opens the browser itself, so it will most likely be
+   refused. Show a plain "EasyAnalysis has closed — you can close this tab" state instead of
+   pretending.
+3. **Confirm first.** Projects autosave, so the risk is low, but quitting mid-fit should still ask.
+
+#### Stop — harder, and the reason is structural
+**A Stop button on an in-process fit can never be clicked.** Shiny is single-threaded
+(CLAUDE.md gotcha 29): while a fit is running the server cannot receive input, so the click never
+arrives. That is *why* `compute_worker.R` exists and why `mod_algo.R` routes heavy work out.
+So "add a Stop button" to the analyses is **not a UI change** — it means routing fits through the
+worker.
+
+**The good news: statistics are a better fit for the worker than rasters were.** A fit is
+essentially a pure function of a data frame, so there is nothing like the "never hand the worker
+a raster's `sources()` path" trap. And `ea_worker_run(app_dir, id, inputs, params, ...)` already
+takes an **id**, not a closure — so the worker re-sources the registry and looks the spec up,
+which is exactly what a `statistics.R` entry needs. The existing design already anticipated this.
+
+**One change in `mod_stat.R` covers all 9 migrated screens at once** — the registry paying off
+again, in the same way cancellation was one change instead of 33 for algorithms (item G29).
+
+**Recommended sequencing:**
+1. **Quit button** — small, and unblocks the shortcut.
+2. **Shortcut with hidden console** (item 46 part A), now safe to do.
+3. **Stop for statistical analyses** — route `mod_stat.R` fits through the worker; 9 screens in
+   one change.
+4. **Hand-written model modules** — leave them. They are being migrated onto the registry
+   anyway, and each gains Stop for free when it arrives.
+
+**Design suggestion worth considering — one GLOBAL Stop, not one per screen.** The `#ea-busy`
+"Running…" pill already tells the user something is running, app-wide, from a single CSS rule.
+Putting Stop **there** gives one control for the whole app instead of a button on ~40 screens,
+and it matches how the pill was already solved.
+**But it needs one hard rule:** the Stop must appear **only when the running job is actually
+cancellable** (i.e. it is in the worker). An always-visible Stop that silently does nothing
+during in-process work is worse than no Stop — it reads as broken, and it would be the second
+time a control looked dead because Shiny was busy.
