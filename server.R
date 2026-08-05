@@ -969,7 +969,7 @@ server <- function(input, output, session) {
                           view_request = reactive(input$data_op_request))
   lm_ctx    <- lmServer("lm", dataset_pool, active_dataset)
   lme_ctx   <- lmeServer("lme", dataset_pool, active_dataset)
-  anova_ctx <- anovaServer("anova", dataset_pool, active_dataset)
+  # anovaServer is NOT bound: it is a statistics.R entry now (stat_anova).
   log_ctx   <- logisticServer("logistic", dataset_pool, active_dataset)
   # rfServer is NOT bound: it is a statistics.R entry now (stat_rf).
   clust_ctx <- clusteringServer("clustering", dataset_pool, active_dataset)
@@ -1130,7 +1130,7 @@ server <- function(input, output, session) {
   module_ctx <- list(
     data = data_ctx,
     descriptive = desc_ctx, tests = test_ctx,
-    lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
+    lm = lm_ctx, lme = lme_ctx, logistic = log_ctx,
     sem = sem_ctx, bayesian = bayes_ctx,
 
 

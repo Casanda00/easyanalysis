@@ -1604,6 +1604,126 @@ ea_statistics <- function() {
         })
     ),
 
+    # ---- ANOVA -- MIGRATION 9 of 9 (the last) ------------------------------
+    # Ported from mod_anova.R: same aov(), same TukeyHSD, same eta-squared and
+    # Cohen's f, same LOOCV via the hat-matrix shortcut (.loocv_lm), same
+    # plain-English interpretation sentence.
+    #
+    # FACTS about the source, checked rather than predicted: mod_anova.R has NO
+    # silent tryCatch -- every handler reports (returns a message or cats it),
+    # and its "return a string instead of a model" sentinel is checked by every
+    # consumer, including plot_aov_diagnostics(). No latent bug found.
+    list(
+      id = "anova", label = "ANOVA (one-way)", group = "Statistics",
+      summary = paste("Compares the mean of a numeric variable across groups,",
+                      "then Tukey HSD tells you which groups actually differ."),
+      roles = list(
+        ea_role("y", "Numeric variable", "numeric",
+                hint = "The measurement being compared."),
+        ea_role("x", "Grouping variable", "categorical",
+                hint = "Needs at least 2 groups.")),
+      params = list(
+        ea_sel("diag_mode", "Diagnostic plots",
+               c("Both side by side" = "grid", "One at a time" = "single"), "grid"),
+        ea_sel("diag_which", "Which plot",
+               c("Residuals vs fitted" = "resid", "Normal Q-Q" = "qq"), "resid",
+               show_if = "input.p_diag_mode == 'single'")),
+      views = c(results = "Results", tukey = "Tukey HSD",
+                diagnostics = "Diagnostics", effect = "Effect size & LOOCV"),
+      views_plot = c("diagnostics"),
+      fit = function(df, r, p) {
+        dm <- df[, c(r$y, r$x), drop = FALSE]
+        dm <- dm[stats::complete.cases(dm), , drop = FALSE]
+        if (nrow(dm) < 10)
+          stop("Need at least 10 complete rows; this has ", nrow(dm), ".")
+        dm[[r$x]] <- droplevels(as.factor(dm[[r$x]]))
+        nl <- nlevels(dm[[r$x]])
+        if (nl < 2)
+          stop("The grouping variable needs at least 2 levels with data; it has ", nl, ".")
+        if (!is.numeric(dm[[r$y]]))
+          stop("The measured variable must be numeric.")
+        m <- stats::aov(stats::as.formula(paste0("`", r$y, "` ~ `", r$x, "`")),
+                        data = dm)
+        sm <- summary(m)[[1]]
+        ssb <- sm[["Sum Sq"]][[1]]; sse <- sm[["Sum Sq"]][[2]]
+        eta2 <- ssb / (ssb + sse)
+        list(model = m, data = dm, y = r$y, x = r$x, nlev = nl,
+             sm = sm, eta2 = eta2, f_cohen = sqrt(eta2 / (1 - eta2)),
+             tukey = tryCatch(stats::TukeyHSD(m), error = function(e) NULL),
+             loocv = tryCatch(.loocv_lm(m), error = function(e) NULL),
+             means = tapply(dm[[r$y]], dm[[r$x]], mean, na.rm = TRUE))
+      },
+      plots = list(
+        # 3 args so the Grid/Single toggle redraws without refitting, exactly
+        # as the module's radio button did.
+        diag = function(fit, f, p) {
+          mode <- if (identical(p$diag_mode, "single")) "Single Plot" else "Grid View"
+          tgt  <- if (identical(p$diag_which, "qq")) "Normal Q-Q" else "Residuals vs Fitted"
+          plot_aov_diagnostics(fit$model, mode, tgt)
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        results = {
+          fv <- fit$sm[["F value"]][[1]]; pv <- fit$sm[["Pr(>F)"]][[1]]
+          sig <- !is.na(pv) && pv < 0.05
+          nsig <- if (!is.null(fit$tukey))
+                    sum(fit$tukey[[fit$x]][, "p adj"] < 0.05, na.rm = TRUE) else NA
+          sz <- if (fit$eta2 >= .14) "large" else if (fit$eta2 >= .06) "medium"
+                else if (fit$eta2 >= .01) "small" else "negligible"
+          tagList(
+            div(class = if (sig) "ea-subpanel" else "ea-subpanel ea-subpanel-warn",
+              tags$p(HTML(sprintf(
+                "One-way ANOVA found a <b>%s</b> effect of <b>%s</b> on <b>%s</b> (F = %.3f, p = %s). The effect size is <b>%s</b> (eta-squared = %.3f).%s",
+                if (sig) "significant" else "non-significant", fit$x, fit$y, fv,
+                format.pval(pv, digits = 3), sz, fit$eta2,
+                if (!is.na(nsig)) sprintf(" Tukey HSD finds %d group pair%s differing significantly.",
+                                          nsig, if (nsig == 1) "" else "s") else "")))),
+            card(card_header("ANOVA table"),
+                 tags$pre(paste(utils::capture.output(summary(fit$model)),
+                                collapse = "\n"))),
+            card(card_header("Group means"),
+                 DT::datatable(data.frame(Group = names(fit$means),
+                                          Mean = signif(as.numeric(fit$means), 5),
+                                          check.names = FALSE),
+                               rownames = FALSE,
+                               options = list(dom = "t", pageLength = 25))))
+        },
+        tukey = if (is.null(fit$tukey))
+          div(class = "ea-subpanel", tags$p("Tukey HSD is unavailable for this fit."))
+        else tagList(
+          tags$p(class = "text-muted small",
+                 "Each row compares two groups. 'p adj' below 0.05 means that pair differs."),
+          {
+            d <- as.data.frame(fit$tukey[[fit$x]])
+            d <- cbind(Comparison = rownames(d), signif(d, 4))
+            DT::datatable(d, rownames = FALSE,
+                          options = list(pageLength = 25, scrollX = TRUE))
+          }),
+        diagnostics = ea_stat_plot(ns, "diag", if (solo) "500px" else "100%"),
+        effect = layout_columns(col_widths = c(6, 6),
+          card(card_header("Effect size"), tags$pre(paste(c(
+            sprintf("eta-squared     : %.4f", fit$eta2),
+            sprintf("Cohen's f       : %.4f", fit$f_cohen),
+            "",
+            "Conventional thresholds:",
+            "  small  eta-squared >= 0.01",
+            "  medium eta-squared >= 0.06",
+            "  large  eta-squared >= 0.14",
+            "",
+            sprintf("Groups          : %d", fit$nlev),
+            sprintf("Rows            : %d", nrow(fit$data))),
+            collapse = "\n"))),
+          card(card_header("Leave-one-out cross-validation"),
+               if (is.null(fit$loocv))
+                 tags$p(class = "text-muted small", "LOOCV unavailable for this fit.")
+               else tags$pre(paste(c(
+                 sprintf("LOOCV RMSE : %.4f", fit$loocv$LOOCV_RMSE),
+                 sprintf("LOOCV MAE  : %.4f", fit$loocv$LOOCV_MAE),
+                 sprintf("LOOCV R2   : %.4f", fit$loocv$LOOCV_R2),
+                 "",
+                 "(Exact hat-matrix shortcut - no model refits.)"),
+                 collapse = "\n")))))
+    ),
+
     # ---- GLMM (backlog item 34) --------------------------------------------
     # The existing Mixed effects screen is nlme::lme, which fits GAUSSIAN
     # responses only -- it has no `family` argument at all, so a binary or count

@@ -2408,10 +2408,22 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**8 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
-**pca ✅** · **gam ✅** · **rf ✅** · **survival ✅** · anova.
+**9 of 9 DONE.** **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** · **pca ✅** ·
+**gam ✅** · **rf ✅** · **survival ✅** · **anova ✅**
 
-**Running score: 8 screens migrated, 9 latent bugs.**
+**Final score: 9 screens migrated, 10 latent bugs in 7 of them.** Every port was verified
+bit-for-bit against the underlying function before the old module was retired. **ANOVA was
+clean** — checked, not predicted: it has no silent `tryCatch`, and its unusual
+"return a string instead of a model" sentinel is honoured by every consumer including
+`plot_aov_diagnostics()`.
+
+**The three screens that could not produce a result at all:** XGBoost (package API moved
+underneath it), GAM (smooth terms unparseable), Survival (Cox formula unparseable). **Five
+validated a different model than the one displayed:** SVM, Decision tree, Neural network, GAM,
+Random forest. **Two were clean:** PCA, ANOVA.
+
+**Not one of these was ever reported by a user**, which is the point: each either failed
+silently or produced plausible-looking numbers.
 
 **My prediction for survival was WRONG, and the correction matters.** I predicted it would be
 clean because it has no validation path — the thing that had explained every previous bug. It
@@ -2446,6 +2458,7 @@ not being exercised, and porting is what exercises them.
 | GAM | **could never fit a model at all** (`mgcv::s()` unparseable), plus CV dropped basis AND method | yes |
 | Random forest | `rfcv()` ignored `ntree` and used the classification `mtry` rule on regression models | not hand-rolled — a package call, and it still lost the settings |
 | Survival | **the Cox model never fitted** — its formula was unparseable (`__t__`) | no validation path at all; a silent `tryCatch` hid it |
+| **ANOVA** | **none — clean** | no silent `tryCatch`; every handler reports |
 
 **The per-fold-refit pattern is confirmed in every screen that has one** — three for three —
 and should be the default suspicion rather than a surprise. SVM's refits ignored cost, gamma
@@ -2702,6 +2715,53 @@ was broken.
 offending values (previously it produced a meaningless model), and the Cox and log-rank views
 say what to choose when covariates or a grouping variable have not been selected instead of
 rendering an empty panel.
+
+##### Migration 9 — ANOVA (2026-08-05) — MIGRATION COMPLETE
+
+**Clean. No bug found — and this time it was checked before being claimed**, on the reporter's
+explicit instruction after the survival prediction proved wrong. The facts:
+`mod_anova.R` has **no silent `tryCatch`** — every handler returns or `cat`s a message — and
+its unusual sentinel (return a *string* where a model is expected) is honoured by every
+consumer, including `plot_aov_diagnostics()` in helpers.R, which checks `is.character(model)`
+before plotting. Nothing was hiding.
+
+**Parity verified against `aov()` / `TukeyHSD()` directly:** identical ANOVA table, identical
+Tukey comparisons, identical eta-squared, Cohen's f and LOOCV (via the same `.loocv_lm()`
+hat-matrix shortcut). The plain-English interpretation sentence is preserved and now also
+reports how many group pairs Tukey found to differ. The Grid/Single diagnostic toggle became
+a live display parameter, so it redraws without refitting.
+
+**One test artifact worth recording** (it is not a code fault, and I nearly logged it as one):
+calling a `plots` function directly in a test fails without an open graphics device, because
+`renderPlot` normally supplies one. Open a device in the test — the failure is the test's.
+
+---
+
+#### MIGRATION COMPLETE — what it cost and what it bought
+
+**Cost:** 9 ports, each verified bit-for-bit against the underlying function before the old
+module was retired. No screen lost a feature; two gained capabilities the registry did not
+have when the migration started (`plots`, `actions`, live display parameters, conditional
+roles and parameters).
+
+**Bought:**
+
+1. **Ten pre-existing faults found and fixed**, none of which had ever been reported — three
+   screens could not produce a result at all.
+2. **E19/E20 solved structurally** for every migrated screen: one variable picker, generated
+   from declared roles.
+3. **Gotchas 18/26 made impossible** for anything the registry hosts.
+4. **Adding an analysis is now a list entry.** The registry holds **14 methods** — the 5 it
+   launched with plus these 9.
+
+**The finding to carry forward, in priority order:**
+
+- **`tryCatch(..., error = function(e) NULL)` is where broken features hide.** It explains
+  SVM, GAM and Survival directly. **This has not been swept app-wide yet** — the remaining
+  ~25 modules were not examined, and that is the obvious next investigation.
+- **Any validation path that does not inherit the fitted model's parameters is wrong.** Five
+  of nine screens had one. It is not specific to hand-written loops: Random forest's went
+  through `randomForest::rfcv()` and lost the settings just the same.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

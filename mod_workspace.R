@@ -1522,7 +1522,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # (mod_chat.R "Recommend" tab), so its UI exists in exactly one place.
       # --- Statistics ---
       tests          = list(nm = "Statistical tests",   grp = "Statistics", tools = testsToolsUI,   canvas = testsCanvasUI),
-      anova          = list(nm = "ANOVA",               grp = "Statistics", tools = anovaToolsUI,   canvas = anovaCanvasUI),
+      # anova RETIRED 2026-08-05: it is a statistics.R entry now (stat_anova).
       lm             = list(nm = "Linear regression",   grp = "Statistics", tools = lmToolsUI,      canvas = lmCanvasUI),
       logistic       = list(nm = "Logistic regression", grp = "Statistics", tools = logisticToolsUI,canvas = logisticCanvasUI),
       lme            = list(nm = "Linear mixed effects",grp = "Statistics", tools = lmeToolsUI,     canvas = lmeCanvasUI),

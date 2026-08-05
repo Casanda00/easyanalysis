@@ -8,6 +8,31 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.0 — 2026-08-05
+
+### Changed
+- **ANOVA is now a registry entry** — the last of the nine screens migrated. Verified against
+  `aov()` and `TukeyHSD()` directly: identical ANOVA table, identical Tukey comparisons,
+  identical eta-squared, Cohen's f and leave-one-out cross-validation. **No bug was found in
+  this screen.**
+- **All nine screens are migrated.** XGBoost, SVM, Decision Tree, Neural Network, PCA/FA/MDS,
+  GAM, Random Forest, Survival and ANOVA now share one variable picker, one result layout and
+  one place to add the next analysis. Adding one is a list entry rather than a new screen.
+
+### Fixed across the migration (v0.9.1 – v0.10.0)
+Nine screens were ported; **ten faults were found in seven of them**, every one pre-existing
+and none reported by a user — because each failed silently or produced plausible-looking
+numbers:
+
+- **Three screens could not produce a result at all.** XGBoost errored the moment you pressed
+  Train (a package API had moved underneath it); GAM never fitted a model, ever; Survival's
+  Cox proportional-hazards model never fitted.
+- **Five screens validated a different model than the one on display** — SVM, Decision Tree,
+  Neural Network, GAM and Random Forest all refitted their folds with settings you had not
+  chosen, so the accuracy figures described a model you were not looking at. In SVM's case the
+  cross-validation had never produced any result at all.
+- **PCA and ANOVA were clean.**
+
 ## v0.9.8 — 2026-08-05
 
 ### Fixed
