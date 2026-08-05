@@ -2408,15 +2408,29 @@ the survey notes above.
 
 #### MIGRATION STARTED 2026-08-04 — one screen at a time
 
-**7 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
-**pca ✅** · **gam ✅** · **rf ✅** · survival · anova.
+**8 of 9 done.** Progress: **xgboost ✅** · **svm ✅** · **dtree ✅** · **nnet_ml ✅** ·
+**pca ✅** · **gam ✅** · **rf ✅** · **survival ✅** · anova.
 
-**Running score: 7 screens migrated, 8 latent bugs.** RF forced a **refinement to the
-pattern**: its validation is not a hand-rolled loop at all — it calls `randomForest::rfcv()` —
-and it *still* lost the model's settings. So the rule is not "hand-written loops are risky";
-it is **any validation path that does not inherit the fitted model's parameters**, whether you
-wrote the loop or a package did. Only `survival` and `anova` remain, and neither has a
-validation path of its own.
+**Running score: 8 screens migrated, 9 latent bugs.**
+
+**My prediction for survival was WRONG, and the correction matters.** I predicted it would be
+clean because it has no validation path — the thing that had explained every previous bug. It
+had no validation bug. It had a **worse** one: the Cox proportional-hazards model never fitted
+at all, because the formula could not be parsed.
+
+**So the real common thread is not cross-validation — it is
+`tryCatch(..., error = function(e) NULL)`.** Look at where the bugs actually hid:
+
+| screen | what swallowed the failure |
+|---|---|
+| SVM | per-fold `tryCatch(… , error = function(e) NULL)` → empty CV forever |
+| GAM | `tryCatch(…, error = showNotification)` around the only fit |
+| Survival | `tryCatch(…, error = function(e) NULL)` around `coxph` |
+
+In each case the code *did* fail, loudly, and the failure was discarded. **That is the pattern
+to carry forward**, and it is a stronger predictor than "has a CV loop": a silent `NULL`
+fallback is where a permanently-broken feature can live indefinitely without anyone noticing.
+Cross-validation loops were simply where that idiom happened to cluster.
 
 Every port has been bit-for-bit faithful, and four of the five turned up something broken
 that nobody had noticed. That remains the strongest argument for finishing: these screens are
@@ -2431,6 +2445,7 @@ not being exercised, and porting is what exercises them.
 | **PCA** | **none — clean** | **no** |
 | GAM | **could never fit a model at all** (`mgcv::s()` unparseable), plus CV dropped basis AND method | yes |
 | Random forest | `rfcv()` ignored `ntree` and used the classification `mtry` rule on regression models | not hand-rolled — a package call, and it still lost the settings |
+| Survival | **the Cox model never fitted** — its formula was unparseable (`__t__`) | no validation path at all; a silent `tryCatch` hid it |
 
 **The per-fold-refit pattern is confirmed in every screen that has one** — three for three —
 and should be the default suspicion rather than a surprise. SVM's refits ignored cost, gamma
@@ -2652,6 +2667,41 @@ against `randomForest::randomForest()` directly, for both regression (`mtry = p/
 classification (`mtry = sqrt(p)`), with `ntree` honoured. The PDP view shows guidance before
 the button is pressed rather than erroring, and reports clearly when the chosen variable is
 not one of the model's predictors.
+
+##### Migration 8 — Survival (2026-08-05)
+
+**Bug 10, and it disproved my own prediction — which is the useful part.** Survival has no
+validation path, and on the pattern established through seven screens I expected it to be
+clean like PCA. It was not. It had a **worse** bug than any validation issue:
+
+**The Cox proportional-hazards model never fitted.** `mod_survival.R:152` built
+
+```r
+as.formula("survival::Surv(__t__, __e__) ~ age + dose")
+```
+
+and `__t__` is not a parseable R symbol — an identifier cannot begin with an underscore. So
+`as.formula()` threw *before* `coxph()` was ever called, `tryCatch(error = function(e) NULL)`
+at `:155` discarded the error, and `cox_fit` was `NULL` every single time. Adding covariates
+produced an empty Cox view and no message. Verified directly: the string fails to `parse()`,
+while the same model with valid names fits fine.
+
+**The corrected pattern, which is the finding worth keeping:** the common thread across these
+screens is **not** cross-validation. It is `tryCatch(..., error = function(e) NULL)`. SVM's
+folds, GAM's only fit and survival's Cox model each failed loudly and had the failure thrown
+away. CV loops were merely where that idiom clustered. A silent `NULL` fallback is where a
+permanently-broken feature can live for months without anyone noticing — that is what to grep
+for, and it is worth doing across the whole app rather than only in the screens migrated here.
+
+**Parity verified against `survival::` directly:** identical KM survival curve, identical risk
+sets, identical log-rank chi-square, and identical Cox coefficients under both Efron and
+Breslow tie handling. Kaplan-Meier and the log-rank test were always fine — only the Cox half
+was broken.
+
+**Also improved:** an event indicator that is not 0/1 is refused with a message naming the
+offending values (previously it produced a meaningless model), and the Cox and log-rank views
+say what to choose when covariates or a grouping variable have not been selected instead of
+rendering an empty panel.
 
 **"More inside each one" is cheaper and can start immediately** — two concrete items are
 already recorded and unbuilt:

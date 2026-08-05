@@ -8,6 +8,26 @@ breaking changes. Newest first.
 
 ---
 
+## v0.9.8 — 2026-08-05
+
+### Fixed
+- **The Cox proportional-hazards model never fitted.** Adding covariates produced nothing at
+  all, with no error shown. The formula it built used internal column names starting with
+  underscores, which R cannot parse as variable names — so the formula failed before the model
+  was ever attempted, and the failure was silently discarded. Cox models now fit, with the
+  proportional-hazards check alongside them.
+- Kaplan-Meier and the log-rank test were unaffected and always worked; only the Cox half was
+  broken.
+
+### Changed
+- **Survival analysis is now a registry entry** (migration 8 of 9), verified against the
+  `survival` package directly: identical survival curves, risk sets, log-rank chi-square and
+  Cox coefficients, under both tie-handling methods.
+- An event indicator that is not 0/1 is now refused with a message naming the offending
+  values, instead of producing a meaningless model.
+- The Cox and log-rank views explain what to choose when you have not selected covariates or
+  a grouping variable, rather than showing an empty panel.
+
 ## v0.9.7 — 2026-08-05
 
 ### Fixed

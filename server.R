@@ -980,7 +980,7 @@ server <- function(input, output, session) {
   test_ctx  <- testsServer("tests", dataset_pool, active_dataset)
   # pcaServer is NOT bound: it is a statistics.R entry now (stat_pca).
   ts_ctx    <- timeseriesServer("timeseries", dataset_pool, active_dataset)
-  surv_ctx  <- survivalServer("survival", dataset_pool, active_dataset)
+  # survivalServer is NOT bound: it is a statistics.R entry now (stat_survival).
   sem_ctx   <- semServer("sem", dataset_pool, active_dataset)
   bayes_ctx <- bayesianServer("bayesian", dataset_pool, active_dataset)
   # New ML modules
@@ -1131,7 +1131,7 @@ server <- function(input, output, session) {
     data = data_ctx,
     descriptive = desc_ctx, tests = test_ctx,
     lm = lm_ctx, lme = lme_ctx, anova = anova_ctx, logistic = log_ctx,
-    survival = surv_ctx, sem = sem_ctx, bayesian = bayes_ctx,
+    sem = sem_ctx, bayesian = bayes_ctx,
 
 
     clustering = clust_ctx, classification = clf_ctx, da = da_ctx,

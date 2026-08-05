@@ -1527,7 +1527,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       logistic       = list(nm = "Logistic regression", grp = "Statistics", tools = logisticToolsUI,canvas = logisticCanvasUI),
       lme            = list(nm = "Linear mixed effects",grp = "Statistics", tools = lmeToolsUI,     canvas = lmeCanvasUI),
       # gam RETIRED 2026-08-05: it is a statistics.R entry now (stat_gam).
-      survival       = list(nm = "Survival analysis",   grp = "Statistics", tools = survivalToolsUI,canvas = survivalCanvasUI),
+      # survival RETIRED 2026-08-05: it is a statistics.R entry now (stat_survival).
       sem            = list(nm = "SEM & mediation",     grp = "Statistics", tools = semToolsUI,     canvas = semCanvasUI),
       bayesian       = list(nm = "Bayesian analysis",   grp = "Statistics", tools = bayesianToolsUI,canvas = bayesianCanvasUI),
       timeseries     = list(nm = "Time series",         grp = "Statistics", tools = timeseriesToolsUI, canvas = timeseriesCanvasUI),

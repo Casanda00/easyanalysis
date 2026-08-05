@@ -1454,6 +1454,156 @@ ea_statistics <- function() {
         pdp = ea_stat_plot(ns, "pdp", if (solo) "480px" else "100%"))
     ),
 
+    # ---- Survival -- MIGRATION 8 of 9 --------------------------------------
+    # Four roles (time + event + optional group + optional covariates), the
+    # widest role set in the registry.
+    #
+    # Bug 10, and NOT the validation pattern -- survival has no validation path.
+    # mod_survival.R:152 built the Cox formula as
+    #   "survival::Surv(__t__, __e__) ~ ..."
+    # and `__t__` is not a parseable R symbol (an identifier cannot start with
+    # an underscore), so as.formula() threw before coxph() was ever reached.
+    # tryCatch(error = function(e) NULL) at :155 swallowed it, leaving cox_fit
+    # NULL every time: the Cox PH model NEVER fitted. Fixed with syntactically
+    # valid names.
+    list(
+      id = "survival", label = "Survival analysis", group = "Statistics",
+      summary = paste("Time-to-event data: Kaplan-Meier curves, a log-rank test",
+                      "between groups, and Cox proportional hazards."),
+      roles = list(
+        ea_role("time", "Time to event", "numeric",
+                hint = "How long until the event, or until the subject was last seen."),
+        ea_role("event", "Event indicator", "any",
+                hint = "1 = the event happened, 0 = censored (lost/still alive)."),
+        ea_role("group", "Compare groups by", "categorical", required = FALSE,
+                hint = "Optional - splits the curves and enables the log-rank test."),
+        ea_role("covars", "Cox covariates", "any", multiple = TRUE, required = FALSE,
+                hint = "Optional - fits a Cox proportional-hazards model.")),
+      params = list(
+        ea_chk("cox_ties", "Efron method for tied times", TRUE),
+        ea_num("conf_level", "Confidence level", 0.95, 0.8, 0.999, 0.005),
+        ea_chk("km_conf", "Show confidence bands", TRUE),
+        ea_chk("km_censor", "Mark censored observations", TRUE)),
+      views = c(kaplan_meier = "Kaplan-Meier", cox_ph_model = "Cox PH model",
+                log_rank_test = "Log-rank test", survival_table = "Survival table"),
+      views_plot = c("kaplan_meier", "cox_ph_model"),
+      fit = function(df, r, p) {
+        if (!requireNamespace("survival", quietly = TRUE))
+          stop("Survival analysis needs the 'survival' package.")
+        tv <- as.numeric(df[[r$time]])
+        ev <- suppressWarnings(as.integer(df[[r$event]]))
+        if (all(is.na(ev)))
+          stop("The event indicator must be numeric 0/1 (0 = censored, 1 = event).")
+        keep <- !is.na(tv) & !is.na(ev) & tv > 0
+        if (sum(keep) < 4)
+          stop("Need at least 4 rows with a positive time and a known event status; ",
+               "this has ", sum(keep), ".")
+        bad <- setdiff(unique(stats::na.omit(ev[keep])), c(0L, 1L))
+        if (length(bad))
+          stop("The event indicator must be 0 or 1; found ",
+               paste(utils::head(bad, 3), collapse = ", "), ".")
+        tv <- tv[keep]; ev <- ev[keep]
+        sv <- survival::Surv(tv, ev)
+        cl <- as.numeric(p$conf_level %||% 0.95)
+
+        g <- if (isTruthy(r$group) && r$group %in% names(df))
+               as.factor(df[[r$group]][keep]) else NULL
+        km <- if (!is.null(g)) survival::survfit(sv ~ g, conf.int = cl)
+              else survival::survfit(sv ~ 1, conf.int = cl)
+        lr <- if (!is.null(g) && nlevels(g) > 1)
+                tryCatch(survival::survdiff(sv ~ g), error = function(e) NULL) else NULL
+
+        cox <- NULL; ph <- NULL; cox_err <- NULL
+        cv <- r$covars
+        if (length(cv)) {
+          # Syntactically VALID names. The module used `__t__`/`__e__`, which R
+          # cannot parse, so its Cox model never fitted.
+          sub <- data.frame(.ea_time = tv, .ea_event = ev,
+                            df[keep, cv, drop = FALSE], check.names = FALSE)
+          fml <- stats::as.formula(paste0(
+            "survival::Surv(.ea_time, .ea_event) ~ ",
+            paste0("`", cv, "`", collapse = " + ")))
+          cox <- tryCatch(survival::coxph(fml, data = sub,
+                            ties = if (isTRUE(p$cox_ties)) "efron" else "breslow"),
+                          error = function(e) { cox_err <<- conditionMessage(e); NULL })
+          if (!is.null(cox))
+            ph <- tryCatch(survival::cox.zph(cox), error = function(e) NULL)
+        }
+        list(km = km, logrank = lr, cox = cox, ph = ph, cox_err = cox_err,
+             surv = sv, g = g, time = tv, event = ev, n = sum(keep),
+             time_var = r$time, covars = cv, conf = cl)
+      },
+      plots = list(
+        # 3 args: the confidence-band and censor-mark toggles are DISPLAY
+        # options and should redraw without refitting.
+        km = function(fit, f, p) {
+          ng <- length(fit$km$strata) %||% 1L; if (!ng) ng <- 1L
+          cols <- grDevices::palette.colors(max(ng, 1), palette = "Set2")
+          graphics::plot(fit$km, col = cols, lwd = 2,
+                         conf.int = isTRUE(p$km_conf),
+                         mark.time = isTRUE(p$km_censor),
+                         xlab = fit$time_var, ylab = "Survival probability",
+                         main = "Kaplan-Meier survival curves", ylim = c(0, 1))
+          graphics::abline(h = .5, col = "grey60", lty = 2)
+          if (!is.null(fit$km$strata))
+            graphics::legend("topright", legend = sub("^g=", "", names(fit$km$strata)),
+                             col = cols, lwd = 2, bty = "n", cex = .85)
+        },
+        ph = function(fit, f) {
+          if (is.null(fit$cox))
+            return(show_placeholder(
+              "Choose one or more Cox covariates in the tool panel, then press Run."))
+          if (is.null(fit$ph))
+            return(show_placeholder("Proportional-hazards test unavailable for this fit."))
+          graphics::par(mfrow = c(1, min(3, length(fit$covars))))
+          graphics::plot(fit$ph)
+        }),
+      render = function(fit, key, solo, ns) switch(key,
+        kaplan_meier = ea_stat_plot(ns, "km", if (solo) "500px" else "100%"),
+        cox_ph_model = if (is.null(fit$cox)) {
+          card(card_header("Cox proportional hazards"),
+            div(class = "ea-subpanel",
+              if (!is.null(fit$cox_err))
+                tagList(tags$p(tags$b("The Cox model could not be fitted.")),
+                        tags$p(fit$cox_err))
+              else tags$p(paste("Choose one or more Cox covariates in the tool panel,",
+                                "then press Run. Kaplan-Meier and the log-rank test do",
+                                "not need them."))))
+        } else layout_columns(col_widths = c(6, 6),
+          card(card_header("Cox model"),
+               tags$pre(paste(utils::capture.output(summary(fit$cox)), collapse = "\n"))),
+          card(card_header("Proportional-hazards check"),
+               ea_stat_plot(ns, "ph", "340px"),
+               tags$pre(paste(utils::capture.output(fit$ph), collapse = "\n")))),
+        log_rank_test = card(card_header("Log-rank test"),
+          div(class = "ea-subpanel",
+            if (is.null(fit$logrank))
+              tags$p(paste("Choose a grouping variable with at least 2 levels to",
+                           "compare survival between groups."))
+            else tagList(
+              tags$pre(paste(utils::capture.output(fit$logrank), collapse = "\n")),
+              {
+                pv <- tryCatch(stats::pchisq(fit$logrank$chisq,
+                        length(fit$logrank$n) - 1, lower.tail = FALSE),
+                        error = function(e) NA_real_)
+                tags$p(if (is.na(pv)) "" else if (pv < 0.05)
+                  sprintf("Survival differs between groups (p = %s).",
+                          format.pval(pv, digits = 3))
+                  else sprintf("No significant difference between groups (p = %s).",
+                               format.pval(pv, digits = 3)))
+              }))),
+        survival_table = {
+          s <- summary(fit$km)
+          d <- data.frame(Time = s$time, `At risk` = s$n.risk, Events = s$n.event,
+                          Survival = signif(s$surv, 4),
+                          `Lower CI` = signif(s$lower, 4),
+                          `Upper CI` = signif(s$upper, 4), check.names = FALSE)
+          if (!is.null(s$strata)) d$Group <- sub("^g=", "", as.character(s$strata))
+          DT::datatable(d, rownames = FALSE,
+                        options = list(pageLength = 20, scrollX = TRUE))
+        })
+    ),
+
     # ---- GLMM (backlog item 34) --------------------------------------------
     # The existing Mixed effects screen is nlme::lme, which fits GAUSSIAN
     # responses only -- it has no `family` argument at all, so a binary or count
