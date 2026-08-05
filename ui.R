@@ -2615,7 +2615,10 @@ page_fillable(
         # so the running project is never navigated away from.
         tags$a(
           class = "topbar-action-btn",
-          href = "https://easyanalysis.dev/documentation.html",
+          # Clean URL, no .html: landing/vercel.json sets cleanUrls, so the .html
+          # form 308-redirects. Harmless in a browser, but a needless hop -- and
+          # 308s have bitten this project before (backlog item 16).
+          href = "https://easyanalysis.dev/documentation",
           target = "_blank", rel = "noopener",
           title = "Documentation — guides and a reference for every screen",
           `data-tour` = "docs",
@@ -2836,7 +2839,7 @@ page_fillable(
         # who never visits the website otherwise has no way to find them
         # (backlog item 24).
         tags$p(style = "margin:2px 0 8px;",
-          tags$a(href = "https://easyanalysis.dev/release-notes.html",
+          tags$a(href = "https://easyanalysis.dev/release-notes",
                  target = "_blank", rel = "noopener",
                  style = "font-size:12.5px; color: var(--canopy);",
                  "What's new in this version")),
