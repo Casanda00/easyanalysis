@@ -18,6 +18,29 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.18 — 2026-08-06
+
+### Added — click the map to identify a feature
+
+Clicking a feature on the map now selects it: the feature is outlined in red, its row is
+highlighted in the attribute table, and a panel shows its attributes at the point you clicked.
+Clicking empty space clears the selection.
+
+It works both ways round now — click a row to find it on the map, or click the map to find it in
+the table.
+
+Clicking a raster shows the value of every band at that point instead, with empty cells shown as
+"no data".
+
+Points and lines are matched to whatever is nearest within a few pixels of where you clicked, and
+that allowance scales with how far you are zoomed in, so it stays usable at every scale.
+
+### Added — Zoom to selected
+
+A **Zoom to** button next to the selection count fits the map to the features you have selected.
+Selecting a single point zooms to a sensible scale around it rather than as far in as the map can
+go.
+
 ## v0.10.17 — 2026-08-06
 
 ### Fixed — selecting a row now actually highlights the feature

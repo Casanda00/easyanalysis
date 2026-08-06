@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.17.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.18.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,29 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.17</b> · 59 releases ·
+      <p class="meta">Latest: <b>v0.10.18</b> · 60 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-17"><h2><a class="anchor" href="#v0-10-17">v0.10.17</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-18"><h2><a class="anchor" href="#v0-10-18">v0.10.18</a><span class="when">2026-08-06</span></h2>
+<h3>Added — click the map to identify a feature</h3>
+<p>Clicking a feature on the map now selects it: the feature is outlined in red, its row is
+highlighted in the attribute table, and a panel shows its attributes at the point you clicked.
+Clicking empty space clears the selection.</p>
+<p>It works both ways round now — click a row to find it on the map, or click the map to find it in
+the table.</p>
+<p>Clicking a raster shows the value of every band at that point instead, with empty cells shown as
+&quot;no data&quot;.</p>
+<p>Points and lines are matched to whatever is nearest within a few pixels of where you clicked, and
+that allowance scales with how far you are zoomed in, so it stays usable at every scale.</p>
+<h3>Added — Zoom to selected</h3>
+<p>A <strong>Zoom to</strong> button next to the selection count fits the map to the features you have selected.
+Selecting a single point zooms to a sensible scale around it rather than as far in as the map can
+go.</p>
+</section><section class="rel" id="v0-10-17"><h2><a class="anchor" href="#v0-10-17">v0.10.17</a><span class="when">2026-08-06</span></h2>
 <h3>Fixed — selecting a row now actually highlights the feature</h3>
 <p>The feature added in the previous version did not work: selecting rows in the attribute table
 changed nothing on the map. The right features were being found; they were simply never drawn.

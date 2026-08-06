@@ -4189,3 +4189,52 @@ with item 38, so all three land on one mechanism.
 
 **Note:** the layers panel already has a right-click menu (`eaLayerMenu`), so there is an existing
 pattern and CSS to reuse rather than a new one to invent.
+
+### GIS parity Step 3 + item 54's "Zoom to selected" — **DONE (v0.10.18)**
+
+**Step 3 — click the map to identify a feature.** The other direction of the same selection model
+built in Steps 1-2, so there is still **one** mechanism with two entry points: clicking a row
+highlights the feature, and clicking the feature highlights the row.
+
+- **Vector.** The click arrives in WGS84 (leaflet always does) and is transformed into the
+  **layer's own CRS** before any test — the trap recorded for drawn shapes, and it matters:
+  a real shapefile is usually projected, not 4326.
+  - **Polygons** use `st_intersects` — a click is either inside a feature or it is not.
+  - **Points and lines** cannot work that way: an exact intersection essentially never happens.
+    They use `st_nearest_feature` plus a distance test, and the tolerance is **derived from the
+    zoom level** (`156543.03 * cos(lat) / 2^zoom`, about 12 pixels of slack). A fixed metre
+    tolerance would be uselessly coarse zoomed out and impossible to hit zoomed in — verified
+    both ways: a ~1 km miss **hits** at zoom 8 and **misses** at zoom 18.
+- **Raster.** `terra::extract` at the clicked point, showing every band's value, with `NA`
+  rendered as "no data". No selection is written — a raster cell is not a feature.
+- **Clicking empty space clears the selection**, which is what a GIS does.
+- The hit is pushed **back into the table** via `DT::selectRows`, so a map click highlights and
+  scrolls to the matching row.
+- The popup is drawn **in the render pass**, not by proxy — same reason as the highlight
+  (gotcha 23). A stale popup is dropped when a row is picked or the layer changes.
+
+**Zoom to selected** (item 54's cheapest action, shipped here as recommended). Reuses the
+**existing one-shot `fit_req`** that "Zoom to layer" already uses, so there is no second way to
+move the map, and the zoom does not fight the user panning afterwards. A **single point is padded**
+before fitting — `fitBounds` on a zero-extent box zooms to maximum, which looks broken. With
+nothing selected it says so and does nothing.
+
+**Verified:** clicking inside polygon 2 selects feature 2 and produces a popup naming the layer and
+its attributes at the click point; empty space clears both; a point layer selects the clicked
+point; the zoom tolerance genuinely scales with zoom (both directions tested); Zoom to selected
+requests the **selection's** bbox, tighter than the whole layer's; a single point yields a
+non-degenerate box; zooming with nothing selected returns FALSE rather than erroring; a table click
+drops a stale popup. Step 2's behaviour re-checked for regressions. `check_ui_js` PASS, HTTP 200.
+
+**A testing note worth keeping.** The first version of this test asserted that `fit_req` still held
+a value after the input fired, and reported a failure that did not exist: `fit_req` is a
+**one-shot** the render pass consumes and clears. The fix was to test the two halves separately —
+the *wiring* through `map_rebuild`, and the *bbox* by calling the function directly before the
+render eats it. **Asserting on state the system legitimately consumes produces false failures**;
+this is the third time in this session a check has measured the wrong thing (the others matched
+comment prose rather than code).
+
+**Still open on item 54:** *edit attribute* and *add attribute*, deliberately held until the
+write/undo model is settled with item 38 so all three land on one mechanism. Also still to do:
+move these actions onto a **right-click menu** on the table (the layers panel's `eaLayerMenu` is
+the pattern to reuse) — they are currently buttons in the dock header.

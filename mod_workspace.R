@@ -1229,6 +1229,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         tags$span(class = "ea-wsx-selcount",
                   sprintf("%d selected", n)),
         tags$button(class = "ea-wsx-selclear", type = "button",
+                    title = "Zoom the map to the selected features",
+                    onclick = .fire("ws_zoom_sel", "1"), "Zoom to"),
+        tags$button(class = "ea-wsx-selclear", type = "button",
                     title = "Clear the selection",
                     onclick = .fire("ws_sel_clear", "1"), "Clear"))
     })
@@ -1307,6 +1310,134 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             opacity = 1, fillColor = .SEL_COL, fillOpacity = .18,
             group = "ws_sel")
       }, error = function(e) m)
+    }
+
+    # ---- Zoom to selected (backlog item 54) --------------------------------
+    # Reuses the existing one-shot fit: fit_req() is consumed and cleared by the
+    # render pass, so the zoom applies once and does not fight the user panning
+    # afterwards. Same mechanism as "Zoom to layer" -- no second way to move the
+    # map.
+    .zoom_to_selection <- function() {
+      g <- .sel_sf()
+      if (is.null(g)) {
+        showNotification("Select one or more rows in the attribute table first.",
+                         type = "message", duration = 4)
+        return(invisible(FALSE))
+      }
+      bb <- tryCatch(as.numeric(sf::st_bbox(g)), error = function(e) NULL)
+      if (is.null(bb) || any(!is.finite(bb))) return(invisible(FALSE))
+      # A single point has zero extent, and fitBounds on a degenerate box zooms
+      # to maximum. Pad it so one selected point lands at a usable scale.
+      if (isTRUE(all.equal(bb[1], bb[3])) && isTRUE(all.equal(bb[2], bb[4]))) {
+        pad <- 0.002                     # ~200 m in degrees
+        bb <- c(bb[1] - pad, bb[2] - pad, bb[3] + pad, bb[4] + pad)
+      }
+      fit_req(bb); map_rebuild(map_rebuild() + 1); invisible(TRUE)
+    }
+    observeEvent(input$ws_zoom_sel, { .zoom_to_selection() })
+
+    # ---- Step 3: click the map to identify a feature -----------------------
+    # The other direction of the same selection model. Writes into sel_feat, so
+    # the map highlight and the attribute table both follow a map click exactly
+    # as they follow a table click -- one mechanism, two entry points.
+    identify_at <- reactiveVal(NULL)   # list(lng, lat, html) for the popup
+
+    observeEvent(input$map_click, {
+      cl <- input$map_click; req(cl$lng, cl$lat)
+      act <- activeLayer()
+      if (is.null(act)) return()
+
+      # RASTER: read the cell value(s) under the click. No selection model here
+      # -- a raster cell is not a feature -- just a readout.
+      if (act %in% .names(raster_pool)) {
+        r <- raster_pool[[act]]
+        vals <- tryCatch({
+          p <- sf::st_transform(sf::st_sfc(sf::st_point(c(cl$lng, cl$lat)), crs = 4326),
+                                terra::crs(r))
+          terra::extract(r, terra::vect(p))
+        }, error = function(e) NULL)
+        if (is.null(vals) || !nrow(vals)) return()
+        v <- vals[1, setdiff(names(vals), "ID"), drop = FALSE]
+        rows <- paste0(
+          vapply(names(v), function(k) {
+            x <- v[[k]]
+            sprintf("<tr><td style='padding-right:8px;opacity:.7'>%s</td><td><b>%s</b></td></tr>",
+                    htmltools::htmlEscape(k),
+                    if (is.na(x)) "no data"
+                    else htmltools::htmlEscape(format(x, digits = 6)))
+          }, character(1)), collapse = "")
+        identify_at(list(lng = cl$lng, lat = cl$lat,
+                         html = paste0("<b>", htmltools::htmlEscape(act),
+                                       "</b><table>", rows, "</table>")))
+        return()
+      }
+
+      if (!act %in% .names(vector_pool)) return()
+      v <- vector_pool[[act]]
+      if (is.null(v) || !nrow(v)) return()
+
+      hit <- tryCatch({
+        pt <- sf::st_transform(sf::st_sfc(sf::st_point(c(cl$lng, cl$lat)), crs = 4326),
+                               sf::st_crs(v))
+        gt <- as.character(sf::st_geometry_type(v, by_geometry = FALSE))
+        if (grepl("POLYGON", gt)) {
+          # Polygons: a click is either inside a feature or it is not.
+          idx <- sf::st_intersects(pt, v)[[1]]
+          if (length(idx)) idx[1] else integer(0)
+        } else {
+          # Points and lines: an exact intersection essentially never happens, so
+          # take the nearest feature and require it to be within a few pixels.
+          # The tolerance MUST scale with zoom -- a fixed metre value is far too
+          # coarse when zoomed out and unusably strict when zoomed in.
+          zm  <- suppressWarnings(as.numeric(input$map_zoom %||% 12))
+          if (!is.finite(zm)) zm <- 12
+          mpp <- 156543.03392 * cos(cl$lat * pi / 180) / (2^zm)   # metres per pixel
+          tol <- max(mpp * 12, 1)                                  # ~12 px of slack
+          near <- sf::st_nearest_feature(pt, v)
+          d <- suppressWarnings(as.numeric(sf::st_distance(pt, v[near, ])))
+          if (length(d) && is.finite(d) && d <= tol) near else integer(0)
+        }
+      }, error = function(e) integer(0))
+
+      if (!length(hit)) {          # clicked empty space -> clear, like a GIS
+        sel_feat(list(layer = act, rows = integer(0)))
+        DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
+        identify_at(NULL)
+        return()
+      }
+
+      sel_feat(list(layer = act, rows = as.integer(hit)))
+      # Push the selection back INTO the table, so clicking the map scrolls the
+      # attribute table to that row and highlights it -- the mirror of clicking
+      # a row and seeing the feature.
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), as.integer(hit))
+
+      att <- tryCatch(as.data.frame(sf::st_drop_geometry(v))[hit, , drop = FALSE],
+                      error = function(e) NULL)
+      body <- if (is.null(att) || !ncol(att))
+        "<i>no attribute columns</i>"
+      else paste0("<table>", paste0(vapply(names(att), function(k)
+        sprintf("<tr><td style='padding-right:8px;opacity:.7'>%s</td><td><b>%s</b></td></tr>",
+                htmltools::htmlEscape(k),
+                htmltools::htmlEscape(format(att[[k]][1]))), character(1)),
+        collapse = ""), "</table>")
+      identify_at(list(lng = cl$lng, lat = cl$lat,
+                       html = paste0("<b>", htmltools::htmlEscape(act),
+                                     "</b> &middot; feature ", hit, body)))
+    })
+
+    # Clicking a row in the TABLE should drop a stale map popup -- otherwise the
+    # popup keeps describing the previously identified feature.
+    observeEvent(input$attr_dt_rows_selected, { identify_at(NULL) }, ignoreNULL = FALSE)
+    observeEvent(activeLayer(), { identify_at(NULL) })
+
+    # Drawn in the render pass for the same reason the highlight is: a proxy
+    # popup would be lost whenever the map is re-created (gotcha 23).
+    .draw_identify <- function(m) {
+      p <- identify_at()
+      if (is.null(p)) return(m)
+      tryCatch(leaflet::addPopups(m, lng = p$lng, lat = p$lat, popup = p$html,
+                                  group = "ws_sel"), error = function(e) m)
     }
 
     # NO leafletProxy here, deliberately -- see the note on .draw_layers() below
@@ -1454,7 +1585,8 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # NOT isolated: this is the ONLY path that draws the highlight, so it has
       # to be a real reactive dependency or picking a row changes nothing.
       m <- .draw_layers(m)
-      .draw_selection(m)
+      m <- .draw_selection(m)
+      .draw_identify(m)
     })
     # Opening another project clears the pools first; re-arm the first-fit so
     # the incoming project frames itself instead of inheriting the old view.
