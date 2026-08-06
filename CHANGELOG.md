@@ -18,6 +18,20 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.19 — 2026-08-06
+
+### Fixed — the identify panel stayed only for a moment
+
+Clicking a feature showed its attributes, but the panel closed again as soon as you clicked
+anywhere on the map. It now stays open until you close it with the X, so you can read it, compare
+it with the table, and pan around without losing it. Closing it leaves the feature selected.
+
+### Fixed — the identify panel ignored the theme
+
+It was drawn on a white background with dark text whatever theme was in use, which made it hard
+to read on any of the dark themes. It now uses the theme's own colours, including a clearly
+visible close button.
+
 ## v0.10.18 — 2026-08-06
 
 ### Added — click the map to identify a feature

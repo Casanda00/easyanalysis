@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.18.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.19.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.18</b> · 60 releases ·
+      <p class="meta">Latest: <b>v0.10.19</b> · 61 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-18"><h2><a class="anchor" href="#v0-10-18">v0.10.18</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-19"><h2><a class="anchor" href="#v0-10-19">v0.10.19</a><span class="when">2026-08-06</span></h2>
+<h3>Fixed — the identify panel stayed only for a moment</h3>
+<p>Clicking a feature showed its attributes, but the panel closed again as soon as you clicked
+anywhere on the map. It now stays open until you close it with the X, so you can read it, compare
+it with the table, and pan around without losing it. Closing it leaves the feature selected.</p>
+<h3>Fixed — the identify panel ignored the theme</h3>
+<p>It was drawn on a white background with dark text whatever theme was in use, which made it hard
+to read on any of the dark themes. It now uses the theme&#39;s own colours, including a clearly
+visible close button.</p>
+</section><section class="rel" id="v0-10-18"><h2><a class="anchor" href="#v0-10-18">v0.10.18</a><span class="when">2026-08-06</span></h2>
 <h3>Added — click the map to identify a feature</h3>
 <p>Clicking a feature on the map now selects it: the feature is outlined in red, its row is
 highlighted in the attribute table, and a panel shows its attributes at the point you clicked.

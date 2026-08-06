@@ -1436,9 +1436,36 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     .draw_identify <- function(m) {
       p <- identify_at()
       if (is.null(p)) return(m)
+      # STICKY. Leaflet's defaults close a popup on the next map click and when
+      # any other popup opens, so the attributes vanished the moment the user
+      # looked away -- they have to stay until deliberately dismissed. The close
+      # button becomes the way out, which is why it is styled up in ui.R.
       tryCatch(leaflet::addPopups(m, lng = p$lng, lat = p$lat, popup = p$html,
-                                  group = "ws_sel"), error = function(e) m)
+                 group = "ws_sel",
+                 options = leaflet::popupOptions(closeOnClick = FALSE,
+                                                 autoClose = FALSE,
+                                                 closeButton = TRUE,
+                                                 maxWidth = 320)),
+               error = function(e) m)
     }
+
+    # Closing the popup has to clear the STATE, not just the bubble. The popup is
+    # drawn from identify_at() on every render, so without this it would come
+    # back the next time anything rebuilt the map -- press Zoom to, and the
+    # popup you just dismissed reappears.
+    # Single quotes throughout: this is an R string, and a stray double quote or
+    # a bare \n would break it (gotcha 1 / 1b).
+    .POPUP_JS <- paste(
+      "function(el, x) {",
+      "  var self = this;",
+      "  if (self._eaPopupBound) return;",
+      "  self._eaPopupBound = true;",
+      "  self.on('popupclose', function() {",
+      "    if (window.Shiny) Shiny.setInputValue(",
+      "      el.id + '_ea_popup_closed', Date.now(), {priority: 'event'});",
+      "  });",
+      "}", sep = "\n")
+    observeEvent(input$map_ea_popup_closed, { identify_at(NULL) })
 
     # NO leafletProxy here, deliberately -- see the note on .draw_layers() below
     # and gotcha 23. The first version of this DID use a proxy for speed and
@@ -1586,7 +1613,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # to be a real reactive dependency or picking a row changes nothing.
       m <- .draw_layers(m)
       m <- .draw_selection(m)
-      .draw_identify(m)
+      m <- .draw_identify(m)
+      # Bind the popup-close listener once per map instance (the guard is inside
+      # the JS, since this runs again on every rebuild).
+      htmlwidgets::onRender(m, .POPUP_JS)
     })
     # Opening another project clears the pools first; re-arm the first-fit so
     # the incoming project frames itself instead of inheriting the old view.

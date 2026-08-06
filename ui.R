@@ -1038,6 +1038,38 @@ page_fillable(
                   flex-direction: column; overflow: auto; }
     /* Map view: the leaflet map takes the free space, attribute dock sits under it. */
     .ea-wsx-canvas .leaflet, .ea-wsx-canvas .leaflet-container { flex: 1 1 auto; min-height: 240px; }
+    /* Identify popup. Leaflet ships its own white bubble with dark text, which
+       is a fixed light panel in exactly the sense gotcha 31 warns about -- it
+       looked fine in light mode and unreadable on every dark set. Leaflet's CSS
+       is loaded as a dependency, so these have to restate the component's own
+       classes (gotcha 22) rather than rely on a token higher up. */
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      background: var(--panel) !important; color: var(--ink) !important;
+      box-shadow: 0 6px 22px rgba(0,0,0,.32);
+    }
+    .leaflet-popup-content-wrapper {
+      border: 1px solid var(--line); border-radius: 10px;
+    }
+    .leaflet-popup-content {
+      margin: 10px 12px; font: 400 12px var(--ui); color: var(--ink);
+      max-height: 260px; overflow: auto;
+    }
+    .leaflet-popup-content b { color: var(--ink); }
+    .leaflet-popup-content table { border-collapse: collapse; margin-top: 6px; }
+    .leaflet-popup-content td { padding: 2px 0; vertical-align: top; }
+    .leaflet-popup-content td:first-child {
+      color: var(--bark); padding-right: 10px; white-space: nowrap;
+    }
+    /* The close button is the ONLY way out now that the popup is sticky, so it
+       must be clearly visible rather than leaflet's faint grey on our panels. */
+    .leaflet-container a.leaflet-popup-close-button {
+      color: var(--bark) !important; font-size: 18px; padding: 6px 8px 0 0;
+    }
+    .leaflet-container a.leaflet-popup-close-button:hover {
+      color: var(--ink) !important;
+      background: color-mix(in srgb, var(--ink) 10%, transparent);
+      border-radius: 0 10px 0 6px;
+    }
     .ea-wsx-canvas .shiny-plot-output { flex: 0 0 auto; }
     /* Step 4: results dock + resizable pop-out mini-screens */
     .ea-wsx-dock { background: var(--sunk); border-left: 1px solid var(--line); padding: 11px 6px;

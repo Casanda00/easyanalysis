@@ -4238,3 +4238,59 @@ comment prose rather than code).
 write/undo model is settled with item 38 so all three land on one mechanism. Also still to do:
 move these actions onto a **right-click menu** on the table (the layers panel's `eaLayerMenu` is
 the pattern to reuse) — they are currently buttons in the dock header.
+
+### Step 3 FOLLOW-UP — the identify popup vanished, and ignored the theme (v0.10.19)
+> "the data attributes comes as a pop up and disappears. it should remain until the user closes it.
+> also, the background is white. it should follow the theme cus the texts colors does not match
+> well too."
+>
+> Confirmed working in the same session: *"clicks on the map selected layer does show the attribute
+> precisely in the attribute table and the pop up"* — so identify itself was right; these are two
+> defects in how the popup behaved.
+
+**1. It disappeared.** Leaflet's popup defaults are `closeOnClick` (inherited from the map) and
+`autoClose` — so the attributes vanished on the next map click and whenever another popup opened.
+For a *readout you are meant to study* that is the wrong default. Now
+`closeOnClick = FALSE, autoClose = FALSE, closeButton = TRUE`: it stays until dismissed.
+
+**And closing it has to clear the STATE, not just the bubble.** The popup is drawn from
+`identify_at()` on **every** render, so without this it would come back the moment anything
+rebuilt the map — press *Zoom to* and the popup you just dismissed reappears. A `popupclose`
+listener (bound once per map, guarded in the JS) sets a Shiny input that clears `identify_at`.
+Closing a popup does **not** deselect the feature — the red highlight and the table row stay, which
+is the GIS behaviour.
+
+**2. It was a fixed white panel** — leaflet ships its own bubble with a white background and dark
+text, so it looked right in light mode and was unreadable on every dark set. **This is gotcha 31
+exactly** (a fixed *light* panel is as broken as a fixed dark one), and it needed gotcha 22's
+remedy: restate the component's own classes (`.leaflet-popup-content-wrapper`, `.leaflet-popup-tip`,
+`.leaflet-popup-content`, `.leaflet-popup-close-button`) with tokens, because leaflet's CSS is a
+loaded dependency that no `:root` override can reach. The close button is restyled deliberately —
+now that the popup is sticky it is the only way out, so it must be visible rather than leaflet's
+faint grey on a dark panel.
+
+**A gap in the tooling this exposed.** `.POPUP_JS` goes into the **widget payload**, not a
+`<script>` tag, so **`check_ui_js.R` never sees it** — the guard built after v0.10.7 does not cover
+JS delivered this way. The verification parses it with `node --check` directly. Worth remembering:
+`check_ui_js` covers inline scripts in the UI, *not* JS handed to `htmlwidgets::onRender()`.
+
+**Verified:** sticky options present; `popupclose` wired and clearing state; listener bound once;
+`onRender` applied in the render pass; the JS parses under `node --check` with no split string
+literals and no double quotes; popup CSS uses `--panel`/`--ink`/`--bark` with **no hardcoded hex**;
+and a regression run still identifies feature 2, clears the popup state on close, and **keeps the
+selection**. `check_ui_js` PASS, HTTP 200.
+**Not verified here:** how it looks — worth confirming the popup is readable on a dark theme and
+that the close button dismisses it for good.
+
+---
+
+### Working agreement (2026-08-06)
+> "we will close the existing ones before opening new ones. just document new ones because I am
+> receiving feedback along the way"
+
+**Close open items before starting new ones. New feedback gets DOCUMENTED, not built**, unless it
+is a defect in something just shipped (which is closing, not opening).
+
+Open, in the recommended order — symbology, multi-step undo, delete features, then edit/add
+attribute + the right-click menu, then the dockable table. Item 42 (analysis ↔ mapping) waits for
+the GIS side, per the reporter's earlier ruling.
