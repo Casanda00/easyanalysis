@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.15.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.16.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,30 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.15</b> · 57 releases ·
+      <p class="meta">Latest: <b>v0.10.16</b> · 58 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-15"><h2><a class="anchor" href="#v0-10-15">v0.10.15</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-16"><h2><a class="anchor" href="#v0-10-16">v0.10.16</a><span class="when">2026-08-06</span></h2>
+<h3>Added — select a feature in the attribute table and see it on the map</h3>
+<p>Selecting rows in a layer&#39;s attribute table now highlights those features on the map in amber.
+Select several and they all highlight; the header shows how many are selected and offers
+<strong>Clear</strong>, which matters because selections build up as you sort and page through a large table.</p>
+<p>Selecting a row no longer redraws the map, so it stays quick even with a large raster underneath,
+and the highlight survives anything that rebuilds the map. Switching to a different layer clears
+the selection, since row numbers only mean something for the layer they came from.</p>
+<p>This is the first half of working with features directly; clicking the map to identify a feature
+comes next.</p>
+<h3>Added — how to cite EasyAnalysis</h3>
+<p>The documentation had a placeholder where the citation should be. There is now a full citation in
+APA and BibTeX on the documentation page, and a <code>CITATION.cff</code> in the repository, so GitHub&#39;s
+<strong>Cite this repository</strong> button produces it for you.</p>
+<p>If you used a published method through EasyAnalysis, please cite that method as well — its paper
+is listed on the app&#39;s <strong>References</strong> screen. Citing the tool does not replace citing the method.</p>
+</section><section class="rel" id="v0-10-15"><h2><a class="anchor" href="#v0-10-15">v0.10.15</a><span class="when">2026-08-06</span></h2>
 <h3>Fixed — tables of your own data were limited to 100 rows a page</h3>
 <p>Whatever the size of your dataset, the largest page a table would show was 100 rows, and there
 was no way to ask for more — so a table of thousands of rows looked like it held 100.</p>

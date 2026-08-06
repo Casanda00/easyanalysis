@@ -1,0 +1,42 @@
+# Citation File Format — https://citation-file-format.github.io
+#
+# GitHub reads this and shows a "Cite this repository" button on the repo page,
+# offering APA and BibTeX. Zenodo and several reference managers read it too.
+#
+# NOTE ON THE NAME: CFF has no separate middle-name field. The spec puts ALL
+# given names in `given-names`, so "Tim Casanda" is correct and renders as
+# "Gibson, T. C." — the conventional form. Do not move Casanda to a particle
+# field; `name-particle` is for things like "van" or "de".
+#
+# `version` and `date-released` should be bumped alongside APP_VERSION in
+# global.R when a release is worth citing.
+
+cff-version: 1.2.0
+message: "If you use EasyAnalysis in your work, please cite it as below."
+title: "EasyAnalysis: point-and-click statistical, machine-learning and spatial analysis"
+abstract: >-
+  EasyAnalysis is a free, local-first platform for running statistical,
+  machine-learning and spatial/geospatial analysis without writing code. It
+  installs on the user's own computer and runs there, so data being analysed
+  never leaves the machine. It covers statistical modelling, machine learning,
+  and spatial, raster, terrain, hydrology and LiDAR workflows, and includes an
+  AI assistant that runs the application's own analyses and explains results.
+type: software
+authors:
+  - given-names: "Tim Casanda"
+    family-names: Gibson
+repository-code: "https://github.com/Casanda00/easyanalysis"
+url: "https://easyanalysis.dev"
+version: 0.10.16
+date-released: "2026-08-06"
+keywords:
+  - statistics
+  - machine learning
+  - spatial analysis
+  - geospatial
+  - remote sensing
+  - LiDAR
+  - GIS
+  - R
+  - Shiny
+  - reproducible research

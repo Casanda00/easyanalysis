@@ -18,6 +18,30 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.16 — 2026-08-06
+
+### Added — select a feature in the attribute table and see it on the map
+
+Selecting rows in a layer's attribute table now highlights those features on the map in amber.
+Select several and they all highlight; the header shows how many are selected and offers
+**Clear**, which matters because selections build up as you sort and page through a large table.
+
+Selecting a row no longer redraws the map, so it stays quick even with a large raster underneath,
+and the highlight survives anything that rebuilds the map. Switching to a different layer clears
+the selection, since row numbers only mean something for the layer they came from.
+
+This is the first half of working with features directly; clicking the map to identify a feature
+comes next.
+
+### Added — how to cite EasyAnalysis
+
+The documentation had a placeholder where the citation should be. There is now a full citation in
+APA and BibTeX on the documentation page, and a `CITATION.cff` in the repository, so GitHub's
+**Cite this repository** button produces it for you.
+
+If you used a published method through EasyAnalysis, please cite that method as well — its paper
+is listed on the app's **References** screen. Citing the tool does not replace citing the method.
+
 ## v0.10.15 — 2026-08-06
 
 ### Fixed — tables of your own data were limited to 100 rows a page

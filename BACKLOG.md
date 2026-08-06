@@ -4034,3 +4034,98 @@ cramped, which is what prompted this.
 - **State belongs in the project**, alongside the last view, or the layout resets on every reopen.
 - **Sequencing:** this is UI polish over the same panel Steps 2-4 are about to change. Doing it
   *after* Step 2 avoids rewriting the panel twice — but Maximize alone could land at any time.
+
+### GIS parity Steps 1 + 2 — **DONE (v0.10.16)**: select a row, see it on the map
+> "you know how we can click on a attribute in the attribute table and it gets highlighted in the map.."
+
+**Step 1 — the selection model.** One `reactiveVal(list(layer=, rows=))`, read by the map's render
+pass, the highlight proxy and the toolbar. Items 38 and 40 are two directions of this same link,
+so it exists once; building them separately would produce two mechanisms that disagree about what
+is selected.
+
+**Step 2 — row → map highlight**, and it really is pure indexing. The reporter's own test
+established that DT reports **original-data indices**, not screen positions (a selected row
+survives a re-sort and moves with its data), and Step 0 established that row *i* is feature *i*.
+So the layer is subscripted directly — `vector_pool[[layer]][rows, ]` — with **no lookup table and
+no spatial hit-testing**. Points, lines and polygons each get an appropriate highlight.
+
+**The design tension, resolved as planned.** The highlight is applied **twice, from one source**:
+- by **`leafletProxy`** when the selection changes, so picking a row does **not** rebuild the map
+  (slow with a large raster underneath);
+- inside **`renderLeaflet`**, `isolate()`d, so a map rebuilt for any other reason comes back with
+  the highlight still on it — proxy calls are lost when the element is re-created (gotcha 23).
+
+Both read the same `.sel_sf()`, so they cannot drift, and the highlight has its own `ws_sel`
+leaflet group so clearing it never disturbs the data layers.
+
+**Three failure modes handled deliberately:**
+- **Deselecting the last row clears the map** — `ignoreNULL = FALSE`, or the highlight would
+  stick after the table was emptied.
+- **Switching layer drops the selection.** Row numbers belong to one layer; carried across, they
+  would highlight arbitrary features of the next one.
+- **Stale/out-of-range rows are clamped**, so a selection held while a layer is edited or replaced
+  cannot subscript out of bounds and blank the map.
+
+**Selected count + Clear**, in the dock header, shown only while something is selected. Not
+cosmetic: selections **accumulate across sorts and pages**, so without a count a user can hold a
+selection they cannot see all of at once. Clear works by clearing the *table*, which then drives
+the model through the same observer — so the two can never disagree.
+
+**Verified** (`testServer`): selecting rows 3/17/250 highlights **features 3, 17 and 250** —
+confirmed by id, including one past the old 200-row cap; output is WGS84 for leaflet; deselecting
+empties it; switching layers clears it; out-of-range rows `(1, 99, -4)` on a 3-feature layer yield
+exactly feature 1; polygons keep polygon geometry; Clear empties the model; the chip is absent
+with nothing selected and shows "2 selected" with Clear when two are. Source checks confirm the
+proxy path, the isolated render path, one shared `.sel_sf()`, and the dedicated group.
+`check_ui_js` PASS, serves HTTP 200.
+**Not verified here:** the highlight's appearance on a real map — worth an eyeball that the amber
+reads clearly over both light and satellite basemaps.
+
+**Next:** Step 3 — map click → identify (the direction that needs geometry: transform the click
+out of WGS84 into the layer CRS, then `st_intersects` / `terra::extract`), writing into this same
+selection model so the table highlights in response.
+
+---
+
+### 53. Citation — **DONE (v0.10.16)**
+> "document the citation… my name: first: Tim, Middle: Casanda, Surname: Gibson. So to fix the
+> citation properly."
+
+The documentation's *How to cite* section was a **placeholder** — "A formal citation file is being
+prepared" — and there was **no `CITATION.cff`** anywhere.
+
+**Added `CITATION.cff`** at the repo root, so GitHub shows a **Cite this repository** button
+offering APA and BibTeX, and Zenodo/reference managers can read it.
+
+**Name handling, recorded because it is easy to get wrong:** CFF has **no middle-name field**. The
+spec puts *all* given names in `given-names`, so `given-names: "Tim Casanda"` /
+`family-names: Gibson` is correct and renders as **Gibson, T. C.** `name-particle` is for
+particles like "van"/"de" and must **not** be used for a middle name.
+
+**Also added:** full APA + BibTeX blocks on the documentation page (with copy buttons), the same
+citation in `llms.txt` so assistants quote it correctly, and a *How to cite* section in
+`README.md`.
+
+Every citation block says to **substitute the version actually used** rather than hardcoding one
+silently — the version is in Help ▸ About and the status bar.
+
+**Also states, in all three places, that citing the tool does not replace citing the method** —
+several screens implement published methods that are listed on the app's References screen.
+
+**Fixed while here:** `README.md` still called the product **SimpleAnalysis** (3 places) and the
+assistant **AI Co-Pilot** — both renamed long ago. A README titled SimpleAnalysis directly
+undermines a citation for EasyAnalysis, so it was corrected.
+
+**Open, not invented:**
+- **There is no `LICENSE` file** in the repository and no licence stated anywhere. That is an
+  owner's decision, not one to guess, so `CITATION.cff` deliberately omits the `license` field.
+  Worth settling — without a licence, others technically have no right to use or redistribute the
+  code, which sits awkwardly with "free" on the landing page.
+- **No DOI or ORCID.** Neither was invented. A Zenodo release would mint a DOI and make the
+  citation permanent.
+- **The stale name persists in internal docs** (ARCHITECTURE.md, DESIGN.md, MEMORY.md,
+  spatial_design_reference.md, SPATIAL_TOOLS_REFERENCE.md, R_COMMANDS_REFERENCE.md,
+  shinylive_poc/app.R). Not swept here: some occurrences are historical records where a rename
+  would falsify the log.
+- **`CITATION.cff`'s `version`/`date-released` are manual** and need bumping with `APP_VERSION`
+  when a release is worth citing.

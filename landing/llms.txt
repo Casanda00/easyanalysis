@@ -89,11 +89,20 @@ Co-Analyst sends only what you ask about, plus the current screen's context, to 
 model — and only when you send a message. If you do not use the Co-Analyst, the app makes no
 network requests with your data at all.
 
+## How to cite
+
+Gibson, T. C. (2026). EasyAnalysis: point-and-click statistical, machine-learning and spatial
+analysis (Version 0.10.16) [Computer software]. https://easyanalysis.dev
+
+Machine-readable citation metadata is in `CITATION.cff` in the repository. Where a screen
+implements a published method, that method's own paper is listed on the app's References screen
+and should be cited as well — citing the tool does not replace citing the method.
+
 ## Notes
 
 - EasyAnalysis is an independent project. The University of Eastern Finland is acknowledged for
   code contributions and for data used in analyses and testing.
-- Author: Tim Casanda Gibson.
+- Author: Tim Casanda Gibson (given names Tim Casanda; family name Gibson).
 
 ## Links
 

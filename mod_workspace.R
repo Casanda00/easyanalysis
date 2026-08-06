@@ -870,6 +870,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         div(class = "ea-wsx-attrdock",
           div(class = "ea-wsx-attrhead",
             tags$span("Attributes · ", tags$b(act %||% "—")),
+            # Selections accumulate across sorts and pages, so the count is not
+            # cosmetic: without it a user can hold a selection they cannot see
+            # all of at once, and have no way to tell.
+            uiOutput(ns("sel_info"), inline = TRUE),
             tags$button(class = "ea-wsx-attrmin", type = "button",
               onclick = paste0("var d=this.closest('.ea-wsx-attrdock');d.classList.toggle('collapsed');",
                                "this.textContent=d.classList.contains('collapsed')?'▴':'▾';"), "▾")),
@@ -1215,6 +1219,102 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     }
 
     # Draw the VISIBLE spatial layers straight ONTO THE MAP OBJECT.
+    # Count + Clear, shown in the attribute dock header only while something is
+    # selected, so the header stays quiet the rest of the time.
+    output$sel_info <- renderUI({
+      s <- sel_feat()
+      n <- length(s$rows)
+      if (!n) return(NULL)
+      tags$span(class = "ea-wsx-selinfo",
+        tags$span(class = "ea-wsx-selcount",
+                  sprintf("%d selected", n)),
+        tags$button(class = "ea-wsx-selclear", type = "button",
+                    title = "Clear the selection",
+                    onclick = .fire("ws_sel_clear", "1"), "Clear"))
+    })
+
+    # ---- FEATURE SELECTION (backlog items 38/40) ---------------------------
+    # ONE source of truth, read by the map's render pass, the highlight proxy and
+    # the toolbar. Items 38 and 40 are two directions of this same link -- build
+    # it once, or two mechanisms end up disagreeing about what is selected.
+    sel_feat <- reactiveVal(list(layer = NULL, rows = integer(0)))
+
+    # The attribute table is the source of selections for now. DT reports
+    # ORIGINAL-DATA indices, not screen positions -- verified by hand: a selected
+    # row survives a re-sort and moves with its data. Combined with row i being
+    # feature i (attr_dt renders st_drop_geometry of the layer, which preserves
+    # count and order), this means the sf can be indexed DIRECTLY. No lookup
+    # table, no spatial hit-testing.
+    # ignoreNULL = FALSE so that clearing the last row clears the map too.
+    observeEvent(input$attr_dt_rows_selected, {
+      sel_feat(list(layer = activeLayer(),
+                    rows  = as.integer(input$attr_dt_rows_selected %||% integer(0))))
+    }, ignoreNULL = FALSE)
+
+    # A selection belongs to ONE layer. Switching layers must drop it, or row
+    # numbers from the old layer would be applied to the new one and highlight
+    # arbitrary features.
+    observeEvent(activeLayer(), {
+      if (!identical(sel_feat()$layer, activeLayer()))
+        sel_feat(list(layer = activeLayer(), rows = integer(0)))
+    })
+
+    # Clear from the toolbar. Clearing the TABLE is what clears the model -- the
+    # observer above then fires -- so the two can never disagree.
+    observeEvent(input$ws_sel_clear, {
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
+      sel_feat(list(layer = activeLayer(), rows = integer(0)))
+    })
+
+    # The selected features as WGS84 geometry, ready to draw. Row indices are
+    # clamped to the layer's size: a stale selection (layer edited or replaced)
+    # must not subscript out of bounds.
+    .sel_sf <- reactive({
+      s <- sel_feat()
+      if (is.null(s$layer) || !length(s$rows)) return(NULL)
+      v <- tryCatch(vector_pool[[s$layer]], error = function(e) NULL)
+      if (is.null(v) || !nrow(v)) return(NULL)
+      rows <- s$rows[s$rows >= 1L & s$rows <= nrow(v)]
+      if (!length(rows)) return(NULL)
+      tryCatch(sf::st_transform(sf::st_zm(v[rows, ]), 4326), error = function(e) NULL)
+    })
+
+    # Highlight styling. Literal colours on purpose: leaflet cannot read CSS
+    # tokens, and this is the same legitimate exception as colours inside a plot
+    # (gotcha 31). Amber over the green layer palette, which is the GIS
+    # convention and stays legible on both light and satellite basemaps.
+    .SEL_COL <- "#FFC400"; .SEL_HALO <- "#3A2E00"
+    .draw_selection <- function(m) {
+      sel <- .sel_sf()
+      if (is.null(sel)) return(m)
+      gt <- tryCatch(as.character(sf::st_geometry_type(sel, by_geometry = FALSE)),
+                     error = function(e) "")
+      tryCatch({
+        if (grepl("POINT", gt))
+          leaflet::addCircleMarkers(m, data = sel, radius = 8, color = .SEL_HALO,
+            weight = 2, opacity = 1, fillColor = .SEL_COL, fillOpacity = .9,
+            group = "ws_sel")
+        else if (grepl("LINE", gt))
+          leaflet::addPolylines(m, data = sel, color = .SEL_COL, weight = 5,
+            opacity = 1, group = "ws_sel")
+        else
+          leaflet::addPolygons(m, data = sel, color = .SEL_COL, weight = 3,
+            opacity = 1, fillColor = .SEL_COL, fillOpacity = .35, group = "ws_sel")
+      }, error = function(e) m)
+    }
+
+    # Selection changes must NOT rebuild the whole map -- that is slow with a big
+    # raster underneath. So the highlight is applied by PROXY here, and drawn
+    # again inside renderLeaflet below. Both read .sel_sf(), so they cannot
+    # drift; the render pass exists because proxy calls are lost when the map
+    # element is re-created (gotcha 23), and the proxy exists so that selecting
+    # a row does not trigger that re-creation in the first place.
+    observe({
+      sel <- .sel_sf()
+      px <- leaflet::clearGroup(leaflet::leafletProxy("map", session), "ws_sel")
+      if (!is.null(sel)) .draw_selection(px)
+    })
+
     # Deliberately NOT a leafletProxy: the map element is re-created whenever the
     # canvas re-renders or the basemap changes, and a proxy message that arrives
     # around that moment is silently dropped. That is why the raster stayed
@@ -1346,7 +1446,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # the bottom layer is what guarantees a raster can never hide under it.
       if (nzchar(bm)) m <- leaflet::addProviderTiles(m, bm, layerId = "ws_base",
                              options = leaflet::providerTileOptions(zIndex = 0))
-      .draw_layers(m)
+      # Selection is drawn LAST so it sits on top of the layer it belongs to.
+      # isolate(): the map must not re-render every time a row is picked -- the
+      # proxy above handles that. This call only exists so a map that is rebuilt
+      # for some other reason comes back with the highlight still on it.
+      m <- .draw_layers(m)
+      isolate(.draw_selection(m))
     })
     # Opening another project clears the pools first; re-arm the first-fit so
     # the incoming project frames itself instead of inheriting the old view.

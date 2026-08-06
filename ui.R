@@ -1168,6 +1168,23 @@ page_fillable(
                   border-bottom: 1px solid var(--line); font-size: 12px; cursor: ns-resize; background: var(--sunk); }
     .ea-wsx-attrmin { margin-left: auto; border: none; background: transparent; color: var(--bark);
                   cursor: pointer; font: 600 12px var(--mono); }
+    /* Selection readout in the attribute dock header. The swatch is the same
+       amber the map draws the highlight in, so the count and the shapes on the
+       map are visibly the same thing. Literal hex on purpose: it has to match a
+       leaflet colour, which cannot read a CSS token (same exception as gotcha
+       31's in-plot colours). */
+    .ea-wsx-selinfo { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; }
+    .ea-wsx-selcount {
+      font: 600 11px var(--ui); color: var(--ink);
+      background: color-mix(in srgb, #FFC400 26%, transparent);
+      border: 1px solid color-mix(in srgb, #FFC400 55%, transparent);
+      border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+    }
+    .ea-wsx-selclear {
+      border: 1px solid var(--line); background: var(--panel); color: var(--bark);
+      border-radius: 5px; padding: 1px 7px; font: 500 11px var(--ui); cursor: pointer;
+    }
+    .ea-wsx-selclear:hover { border-color: var(--canopy); color: var(--forest); }
     .ea-wsx-attrbody { max-height: 220px; overflow: auto; padding: 4px 8px; }
     .ea-wsx-attrdock.collapsed .ea-wsx-attrbody { display: none; }
     .ea-wsx-attrinfo { padding: 10px 4px; font: 400 12px var(--mono); color: var(--bark); }

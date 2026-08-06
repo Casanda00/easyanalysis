@@ -1,12 +1,12 @@
-# SimpleAnalysis (R Shiny Application)
+# EasyAnalysis (R Shiny Application)
 
-SimpleAnalysis is an integrated, modular R Shiny application designed as a comprehensive analytics, modeling, and spatial data processing platform. Developed to support environmental and forestry research—such as tree growth, trafficability modeling, and National Forest Inventory (NFI) analysis—it provides a powerful "GeoLibre-inspired" graphical interface. 
+EasyAnalysis is an integrated, modular R Shiny application designed as a comprehensive analytics, modeling, and spatial data processing platform. Developed to support environmental and forestry research—such as tree growth, trafficability modeling, and National Forest Inventory (NFI) analysis—it provides a powerful "GeoLibre-inspired" graphical interface. 
 
 Users can upload diverse datasets, perform rich data engineering and exploratory data analysis (EDA), and seamlessly flow into statistical modeling, machine learning, and specialized LiDAR/Spatial analyses—all within a single, persistent workspace.
 
 ## Key Features & Architecture
 
-SimpleAnalysis operates on a persistent, single-frame shell. Instead of entirely separate full-screen tabs, the interface utilizes a top menubar, a unified left-rail dataset manager, a dynamic center canvas, and a contextual right-side tools panel that update in lockstep based on the active module.
+EasyAnalysis operates on a persistent, single-frame shell. Instead of entirely separate full-screen tabs, the interface utilizes a top menubar, a unified left-rail dataset manager, a dynamic center canvas, and a contextual right-side tools panel that update in lockstep based on the active module.
 
 ### 1. Data Engineering & EDA (`mod_data.R`)
 * **Global Dataset Pool:** Upload standard files (.csv, .xlsx, .txt) which are loaded into a shared memory pool accessible by all modules.
@@ -34,8 +34,8 @@ SimpleAnalysis operates on a persistent, single-frame shell. Instead of entirely
 * **CHM & Individual Tree Detection (ITD):** Process Canopy Height Models and delineate individual tree crowns dynamically.
 * **Metric Extraction:** Extract complex spatial and structural metrics from spatial geometries.
 
-### 5. AI Co-Pilot (`mod_chat.R`)
-* The application features a floating AI Co-Pilot widget that retains context of the current active dataset, the active mathematical model outputs, confusion matrices, and the specific plots being shown on the user's screen to provide robust analytical support.
+### 5. AI Co-Analyst (`mod_chat.R`)
+* The application features a floating AI Co-Analyst widget that retains context of the current active dataset, the active mathematical model outputs, confusion matrices, and the specific plots being shown on the user's screen to provide robust analytical support.
 
 ## Dependencies
 
@@ -80,3 +80,29 @@ To run the app, set your working directory to the `Shiny_app` folder and run:
 ```R
 shiny::runApp()
 ```
+
+## How to cite
+
+If EasyAnalysis contributed to your work, please cite it. Replace the version with the one you
+used — it is shown in **Help ▸ About** and in the app's status bar.
+
+> Gibson, T. C. (2026). *EasyAnalysis: point-and-click statistical, machine-learning and spatial
+> analysis* (Version 0.10.16) [Computer software]. https://easyanalysis.dev
+
+```bibtex
+@software{gibson_easyanalysis,
+  author  = {Gibson, Tim Casanda},
+  title   = {{EasyAnalysis: point-and-click statistical, machine-learning and spatial analysis}},
+  year    = {2026},
+  version = {0.10.16},
+  url     = {https://easyanalysis.dev},
+  note    = {Computer software}
+}
+```
+
+[`CITATION.cff`](CITATION.cff) carries the same details in machine-readable form, so GitHub's
+**Cite this repository** button offers APA and BibTeX directly.
+
+Where a screen implements a published method, that method's own paper is listed on the app's
+**References** screen and should be cited alongside this one — citing the tool does not replace
+citing the method.
