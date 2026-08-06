@@ -3822,3 +3822,80 @@ installer, the `.bat` and the shortcut; the `install.sh` route is still present 
 installed or closed has **four** places to update — `index.html`, `documentation.html`,
 `how-to-use.html`, `README.md` — and the two most likely to be read are the ones easiest to
 forget.
+
+### 46 (part B) — **REVERTED (v0.10.13)**: the downloadable `.bat` is removed
+> "remove the bat from the website. windows blocks it and it makes ithe tool look like scam"
+> — with https://support.microsoft.com/en-US/Windows/Security/Threat-Malware-Protection/smart-app-control-has-blocked-an-app-with-a-dangerous-file-extension
+
+**My recommendation in item 46 was wrong, and this is the correction.** I costed option B
+(a double-click `.bat`) as cheap and safe, and I explicitly flagged **SmartScreen** — the
+"Windows protected your PC" prompt that a user can click through via *More info → Run anyway*.
+
+**I missed Smart App Control**, which is a different and stricter mechanism: on Windows 11 it
+blocks `.bat` **by file extension**, as a category. There is often **no "run anyway" path at
+all**. So the option sold as *"the way to avoid scaring non-technical users"* produced a harder
+block than the terminal it replaced, and — worse — one that reads as a malware warning about the
+tool itself. Reputational harm, not just friction.
+
+**The lesson, which generalises past this file:** "unsigned installers show a warning the user can
+dismiss" was the wrong mental model. Windows has **several** independent gatekeepers
+(SmartScreen, Smart App Control, Attachment Manager / Mark-of-the-Web, antivirus), and they differ
+in whether they can be overridden at all. Checking one and generalising was the error. **Anything
+users download to run must be checked against Smart App Control, not just SmartScreen.**
+
+**Decision, confirmed by the reporter: exactly two supported routes.**
+1. **The terminal one-liner** — installs everything; the only route on macOS and Linux.
+2. **The Desktop / Start Menu shortcut** — *created by that install*, so it is never downloaded
+   and never crosses a security boundary. This is what removes the terminal from daily use, which
+   was always the larger half of the problem (the terminal was needed on **every** launch).
+
+Note the shortcut survives this revert untouched: a `.lnk` written locally by a script the user
+already chose to run is not subject to download blocking.
+
+**Removed:** `landing/EasyAnalysis-Setup.bat`, its `vercel.json` header rule, and every reference
+across `index.html`, `documentation.html`, `how-to-use.html` and `README.md`. All four now lead
+with the one-liner and explain the shortcut for restarting.
+
+**Item 46's option C is unaffected and remains the real long-term answer** — a signed `.exe`/
+`.msi`. Note this revert *raises* its value: signing is what satisfies these gatekeepers, and it
+is now clearer that no unsigned downloadable artefact avoids them.
+
+**Verified:** no `.bat` reference remains in any shipped file; `landing/` contains no `.bat`; all
+four docs carry both `install.ps1` and `install.sh` and describe the shortcut; the SmartScreen
+"Run anyway" wording is gone (it described a prompt that no longer applies to anything we ship).
+
+### GIS parity Step 0 — **DONE (v0.10.13)**: the attribute table shows every feature
+
+First step of the 37-40 sequence. Small, but a hard prerequisite for items 38 and 40.
+
+**`attr_dt` was capped at `utils::head(df, 200)`** (`mod_workspace.R`). Two problems:
+1. **Invisible truncation.** The table simply ended at row 200 with nothing saying more existed,
+   so a 5,000-feature shapefile silently looked like a 200-feature one.
+2. **It would have broken selection.** Row *i* of this table is feature *i* of the layer, so with
+   the cap in place **feature 201 onward could never be selected, highlighted or deleted** — the
+   delete in item 38 would have been quietly unable to reach most of a real layer.
+
+The cap was also unnecessary: the table is already `server = TRUE`, so DT pages, sorts and
+filters **on the server** and ships only the visible page. The cap was limiting the *data*, not
+the *transfer*.
+
+**Changed:** full data frame instead of `head(df, 200)`, and `selection = "multiple"` enabled now
+— items 38/40 need it and it costs nothing at this point.
+
+**Verified, including the assumption everything downstream rests on:**
+- The cap is gone from the *code* (checked with comments stripped — the new comment mentions
+  `head(df, 200)` while explaining the change, and a naive grep matched the prose).
+- A 250-feature layer keeps all 250 rows, with a **control** proving the old shape really did drop
+  50 and that feature 250 was previously unreachable.
+- **Row i IS feature i**: `st_drop_geometry()` preserves both row count and row order, and
+  indexing the `sf` object by table positions `1, 7, 199, 200, 201, 250` returns exactly the
+  matching features — including the two past the old cap. This is what makes Step 2
+  (row → map highlight) pure indexing with no spatial hit-testing.
+- `testServer(workspaceServer)` runs with a 250-feature layer bound; build OK; app serves HTTP 200.
+
+**Not verified here:** that DT returns *original-data* indices in `input$attr_dt_rows_selected`
+when the table is sorted or filtered. It is DT's documented behaviour and Step 2 depends on it, so
+**confirm it with a live click before building the delete** — sorting the table and selecting a
+row is the one-minute check.
+
+**Next:** Step 1, the selection model (`reactiveVal(list(layer=, rows=))`), then Step 2.

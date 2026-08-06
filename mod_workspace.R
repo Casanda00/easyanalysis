@@ -1473,7 +1473,19 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       df <- tryCatch(as.data.frame(sf::st_drop_geometry(vector_pool[[act]])),
                      error = function(e) NULL)
       req(is.data.frame(df))
-      DT::datatable(utils::head(df, 200), options = list(pageLength = 6, scrollX = TRUE), rownames = FALSE)
+      # The WHOLE table, not head(df, 200). The cap was invisible -- the table
+      # simply ended at row 200 with no hint there was more -- and it is also
+      # unnecessary, because `server = TRUE` means DT pages, sorts and filters
+      # on the SERVER and only ever ships the visible page to the browser. The
+      # cap was capping the data, not the transfer.
+      #
+      # This is a prerequisite for selecting features from the table (backlog
+      # items 38/40): row i of this table is feature i of the layer, so with a
+      # cap in place feature 201 onward could never be selected, highlighted or
+      # deleted. `selection = "multiple"` is enabled here for the same reason --
+      # it costs nothing now and is what those items need.
+      DT::datatable(df, selection = "multiple", rownames = FALSE,
+                    options = list(pageLength = 6, scrollX = TRUE))
     }, server = TRUE)
 
     output$dt <- DT::renderDataTable({

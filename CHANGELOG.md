@@ -18,6 +18,27 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.13 — 2026-08-06
+
+### Fixed — the attribute table stopped at 200 features
+
+A layer's attribute table only ever showed its first 200 features, with nothing to indicate there
+were more — so a shapefile with thousands of features looked like it had 200. It now shows every
+feature, and you can select rows in it.
+
+### Changed — two ways to run EasyAnalysis, and only two
+
+Installing is done once, from the terminal. On Windows that install then creates an
+**EasyAnalysis** shortcut on your Desktop and in the Start Menu, and from then on you just
+double-click it — no terminal in day-to-day use.
+
+The downloadable Windows setup file offered briefly in the previous version has been withdrawn.
+Windows security features restrict downloaded files of that type, so it was not a dependable way
+to install. The one-line command remains the supported route on every platform, and is unchanged.
+
+A properly signed Windows installer is still planned; that is the version that will work without
+any of these restrictions.
+
 ## v0.10.12 — 2026-08-05
 
 ### Fixed — the documentation still described the old way in

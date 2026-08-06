@@ -53,12 +53,7 @@ You do **not** need to clone this repo or know R to use EasyAnalysis. The instal
 if you don't have it, installs the packages into a private library, and starts the app. No
 admin rights and no Docker.
 
-**Windows — no terminal:** download
-**[EasyAnalysis-Setup.bat](https://easyanalysis.dev/EasyAnalysis-Setup.bat)** and double-click it.
-Windows may warn that the file came from the internet — choose **More info → Run anyway**. That
-prompt appears for any installer without a paid signing certificate.
-
-**Or from a terminal:**
+Run this once:
 
 ```sh
 # Windows (PowerShell)

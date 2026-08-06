@@ -671,26 +671,15 @@
   <section id="get">
     <div class="wrap">
       <div class="eyebrow">Get it</div>
-      <h2>Download and double-click.</h2>
-      <p class="sub">Everything is installed for you — R, the app and its packages.
-        No admin rights, no Docker, no setup.</p>
-
-      <!-- The download comes FIRST: the terminal was the single biggest barrier
-           for non-technical users, and it was needed on every launch, not just
-           the first. The installer now also creates a Desktop shortcut. -->
-      <p style="margin:0 0 18px;">
-        <a class="btn" href="/EasyAnalysis-Setup.bat" download
-          style="display:inline-block;padding:12px 20px;border-radius:10px;background:var(--forest);color:var(--onbrand);font-weight:600;text-decoration:none;">
-          Download for Windows
-        </a>
-        <span class="note" style="display:block;margin-top:8px;font-size:13.5px;">
-          Double-click the downloaded file. Windows may warn that it is from the internet —
-          choose <b>More info → Run anyway</b>. Afterwards there is an <b>EasyAnalysis</b>
-          shortcut on your Desktop, and you never need this again.
-        </span>
-      </p>
-
-      <p class="sub" style="margin:0 0 10px;font-size:14px;">Prefer the command line?</p>
+      <h2>Run it in one line.</h2>
+      <p class="sub">One line installs everything — R, the app and its packages.
+        No admin rights, no Docker, no setup. You only do this once:
+        it then adds a Desktop shortcut you can use from then on.</p>
+      <!-- A downloadable .bat was tried here and REMOVED: Windows Smart App
+           Control blocks .bat outright as a dangerous file extension, so it
+           often could not be run at all and made the tool look untrustworthy.
+           The one-liner is the install route; the Desktop shortcut the
+           installer creates is what removes the terminal from daily use. -->
       <div class="code">
         <div class="top">Windows · PowerShell
           <button class="copy" data-copy="win">Copy</button>
@@ -707,6 +696,10 @@
         First run downloads what it needs; after that it starts in seconds and opens at
         <code style="font-family:var(--mono)">http://127.0.0.1:7788</code>. Close it with the
         <b>Quit</b> button in the app.
+      </p>
+      <p class="sub" style="margin:10px 0 0;font-size:14px;">
+        On Windows this also puts an <b>EasyAnalysis</b> shortcut on your Desktop and in the
+        Start Menu — after the first install, just double-click that. No terminal needed again.
       </p>
       <p class="sub" style="margin:10px 0 0;font-size:13.5px;">
         On macOS and Linux, R is used if you already have it — otherwise the script tells you the
