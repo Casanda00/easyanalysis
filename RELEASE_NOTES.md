@@ -20,6 +20,27 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.10.26 — 2026-08-06
+
+### Added — delete features from a layer
+
+You can now remove features from a vector layer. Select the rows you want in the attribute table,
+turn on **Edit** in the attribute panel, and press **Delete**.
+
+Editing is off by default and has to be switched on deliberately, so nothing can be removed by a
+stray click. The button shows that the layer is editable while it is on, and switching to a
+different layer turns it off again.
+
+**Undo edit** reverses the last deletion, up to five steps per layer. Deleting every feature at
+once is refused — remove the layer itself if that is what you want.
+
+### Fixed — switching tabs still showed a disconnection after a while
+
+The previous version ignored connection drops for 30 seconds after you left a tab, which was not
+long enough: coming back after a few minutes still showed the panel. There is no time limit now. A
+drop that happens while you are on another tab is simply held, and only reported if the connection
+is genuinely still gone once you are looking at the page again.
+
 ## v0.10.25 — 2026-08-06
 
 ### Fixed — switching browser tabs no longer looks like a disconnection

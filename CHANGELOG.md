@@ -22,6 +22,62 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.10.26 — 2026-08-06
+
+### Item 38 — delete features (GIS parity Step 4)
+
+The first destructive map operation, so it sits behind an explicit `edit_mode` toggle (the QGIS
+pencil idiom). Without it a stray click could remove data from a layer someone meant only to view.
+
+- **Undo per layer**, `.EDIT_UNDO_MAX = 5L`, newest last — deliberately mirroring `mod_data.R`'s
+  stack. Keyed by layer name so an undo cannot restore layer A's geometry into layer B.
+- **Pruning filters on the VALUE, not `names()`** — gotcha 14, applied pre-emptively this time
+  rather than after the leak. `vector_pool[[k]] <- NULL` keeps the name.
+- **The selection is cleared after a delete.** Row numbers shift, so keeping it would highlight
+  whatever now occupies those positions — a different feature.
+- **Refuses to empty a layer**: deleting every feature is a layer removal, not an edit.
+- **Switching layer disarms edit mode**, or someone deletes from the wrong one.
+- **A selection belonging to another layer is refused** (`identical(s$layer, nm)`), and
+  out-of-range rows are clamped.
+- `.ea-wsx-selclear.on` (warn) and `.ea-wsx-seldel` (danger) make the armed state visible — a
+  destructive mode that looks like a passive one is the failure to avoid.
+
+**Verified, 24 checks:** refused when not editing; the right features go and the rest survive;
+selection cleared; undo restores byte-identically; 7 deletes retain 5 snapshots and no stack is
+created for an untouched layer; emptying refused; layer switch disarms; a foreign selection is
+refused; out-of-range clamped; undo with no history refuses cleanly; no Edit control on a table
+layer.
+
+**Two test faults, not code faults.** Sections G/H toggled edit mode blindly and inherited an
+armed state, silently disarming it — fixed with an explicit `arm()` helper. Section I then failed
+because section E had whittled that layer to a single feature, so the do-not-empty guard correctly
+refused; the test needed its own layer. **The code was right both times.**
+
+### Item 60 — the tab-switch grace period was arbitrary
+
+The 30 s window was wrong in both directions: away for a minute and the panel still appeared,
+while a genuine failure 20 s after glancing at another tab was hidden.
+
+Replaced with **state, not elapsed time**: a disconnect arriving while `document.hidden` sets
+`eaPendingDc` and is **held indefinitely**; the `visibilitychange` handler decides it when the page
+is visible again. `shiny:connected` clears the flag, so a drop that recovered while away produces
+nothing at all.
+
+**Verified behaviourally** (functions extracted from `ui.R`, run against a fake document with a
+controllable clock): an hour hidden shows nothing and holds the disconnect; five minutes away then
+returning shows the panel after the delay; recovered-while-hidden shows nothing; a real disconnect
+on a visible tab still reports; a momentary drop is cancelled; Quit exempt; hidden during the delay
+does not pop up behind the tab.
+
+**My own escaping trap:** rewriting the test through a Python patch put `
+` inside JS string
+literals — gotcha 1b, in the test this time. Rewrote the file directly instead.
+
+### Housekeeping
+- Deleted `verify_step3.R` from the scratch tests: it asserted the coordinate hit-testing that
+  v0.10.20 deliberately removed, so it failed by design. `verify_v20.R` is the current test for
+  identify. A stale test that fails is worse than no test.
+
 ## v0.10.25 — 2026-08-06
 
 ### Item 60 — a hidden tab was reported as a disconnect

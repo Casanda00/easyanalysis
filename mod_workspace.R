@@ -1442,16 +1442,36 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     output$sel_info <- renderUI({
       s <- sel_feat()
       n <- length(s$rows)
-      if (!n) return(NULL)
+      ed <- isTRUE(edit_mode())
+      vec <- !is.null(activeLayer()) && activeLayer() %in% .names(vector_pool)
+      undo_n <- length(edit_undo()[[activeLayer() %||% ""]] %||% list())
+      if (!n && !ed && !undo_n) return(NULL)
       tags$span(class = "ea-wsx-selinfo",
-        tags$span(class = "ea-wsx-selcount",
-                  sprintf("%d selected", n)),
-        tags$button(class = "ea-wsx-selclear", type = "button",
+        if (n) tags$span(class = "ea-wsx-selcount", sprintf("%d selected", n)),
+        if (n) tags$button(class = "ea-wsx-selclear", type = "button",
                     title = "Zoom the map to the selected features",
                     onclick = .fire("ws_zoom_sel", "1"), "Zoom to"),
-        tags$button(class = "ea-wsx-selclear", type = "button",
+        if (n) tags$button(class = "ea-wsx-selclear", type = "button",
                     title = "Clear the selection",
-                    onclick = .fire("ws_sel_clear", "1"), "Clear"))
+                    onclick = .fire("ws_sel_clear", "1"), "Clear"),
+        # Edit mode is a toggle, not a hidden state: it is visibly on, and the
+        # Delete button only exists while it is.
+        if (vec) tags$button(
+          class = paste("ea-wsx-selclear", if (ed) "on" else ""), type = "button",
+          title = if (ed) "Leave edit mode" else "Allow this layer to be edited",
+          onclick = .fire("ws_edit_toggle", "1"),
+          if (ed) "Editing" else "Edit"),
+        if (ed && n) tags$button(
+          class = "ea-wsx-seldel", type = "button",
+          title = sprintf("Delete the %d selected feature%s from this layer",
+                          n, if (n == 1L) "" else "s"),
+          onclick = .fire("ws_del_features", "1"),
+          sprintf("Delete %d", n)),
+        if (undo_n) tags$button(
+          class = "ea-wsx-selclear", type = "button",
+          title = sprintf("Undo the last edit (%d step%s available)",
+                          undo_n, if (undo_n == 1L) "" else "s"),
+          onclick = .fire("ws_edit_undo", "1"), "Undo edit"))
     })
 
     # ---- FEATURE SELECTION (backlog items 38/40) ---------------------------
@@ -1534,6 +1554,103 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             group = "ws_sel", layerId = lid)
       }, error = function(e) m)
     }
+
+    # ---- EDITING A LAYER (backlog item 38) ---------------------------------
+    # Deleting features is the first DESTRUCTIVE thing the map can do, so it sits
+    # behind an explicit edit mode -- the QGIS pencil idiom. Without that, a
+    # Delete key or a stray click could quietly remove data from a layer the user
+    # only meant to look at.
+    edit_mode <- reactiveVal(FALSE)
+    observeEvent(input$ws_edit_toggle, {
+      if (is.null(activeLayer()) || !(activeLayer() %in% .names(vector_pool))) {
+        showNotification("Editing applies to a vector layer. Select one first.",
+                         type = "message", duration = 4)
+        return()
+      }
+      edit_mode(!isTRUE(edit_mode()))
+    })
+    # Leaving the layer leaves edit mode. Staying armed while switching layers is
+    # how someone deletes from the wrong one.
+    observeEvent(activeLayer(), { edit_mode(FALSE) })
+
+    # Undo for layer edits. A bounded stack PER LAYER, deliberately mirroring the
+    # data screen's: 5 snapshots, newest last, keyed by name so an undo can never
+    # restore layer A's geometry into layer B. Bounded because each entry is a
+    # full copy of an sf object, and unbounded caching of large objects is how
+    # this app has run out of memory before.
+    .EDIT_UNDO_MAX <- 5L
+    edit_undo <- reactiveVal(list())
+
+    .edit_snap <- function(nm) {
+      v <- tryCatch(vector_pool[[nm]], error = function(e) NULL)
+      if (is.null(v)) return(invisible(FALSE))
+      s <- edit_undo()
+      st <- c(s[[nm]] %||% list(), list(v))
+      if (length(st) > .EDIT_UNDO_MAX) st <- utils::tail(st, .EDIT_UNDO_MAX)
+      s[[nm]] <- st
+      # Filter on the VALUE, not names(): a removed layer keeps its name with a
+      # NULL value (gotcha 14), so pruning on names alone drops nothing and the
+      # snapshots of deleted layers are retained for the whole session.
+      live <- Filter(function(k) !is.null(tryCatch(vector_pool[[k]],
+                                                   error = function(e) NULL)),
+                     names(vector_pool))
+      edit_undo(s[names(s) %in% live])
+      invisible(TRUE)
+    }
+
+    observeEvent(input$ws_del_features, {
+      nm <- activeLayer()
+      if (!isTRUE(edit_mode())) return()
+      if (is.null(nm) || !(nm %in% .names(vector_pool))) return()
+      s <- sel_feat()
+      rows <- s$rows[s$rows >= 1L]
+      if (!identical(s$layer, nm) || !length(rows)) {
+        showNotification("Select the features to delete in the attribute table first.",
+                         type = "message", duration = 4)
+        return()
+      }
+      v <- vector_pool[[nm]]
+      rows <- rows[rows <= nrow(v)]
+      if (!length(rows)) return()
+      if (length(rows) >= nrow(v)) {
+        showNotification(
+          "That would delete every feature. Remove the layer instead if that is what you want.",
+          type = "warning", duration = 6)
+        return()
+      }
+      .edit_snap(nm)
+      vector_pool[[nm]] <- v[-rows, , drop = FALSE]
+      # The selection refers to row numbers that have just shifted, so it MUST be
+      # cleared -- keeping it would highlight whatever now occupies those
+      # positions, which is a different feature.
+      sel_feat(list(layer = nm, rows = integer(0)))
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
+      identify_at(NULL)
+      showNotification(sprintf("Deleted %d feature%s from '%s'. Undo is available.",
+                               length(rows), if (length(rows) == 1L) "" else "s", nm),
+                       type = "message", duration = 5)
+    })
+
+    observeEvent(input$ws_edit_undo, {
+      nm <- activeLayer()
+      if (is.null(nm)) return()
+      s <- edit_undo(); st <- s[[nm]] %||% list()
+      if (!length(st)) {
+        showNotification("Nothing left to undo on this layer.", type = "warning")
+        return()
+      }
+      prev <- st[[length(st)]]; st <- st[-length(st)]
+      s[[nm]] <- st; edit_undo(s)
+      vector_pool[[nm]] <- prev
+      sel_feat(list(layer = nm, rows = integer(0)))
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
+      showNotification(
+        sprintf("Edit undone. %s",
+                if (!length(st)) "No further steps for this layer."
+                else sprintf("%d step%s left.", length(st),
+                             if (length(st) == 1L) "" else "s")),
+        type = "message", duration = 4)
+    })
 
     # ---- Zoom to selected (backlog item 54) --------------------------------
     # Reuses the existing one-shot fit: fit_req() is consumed and cleared by the

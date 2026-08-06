@@ -4626,7 +4626,7 @@ of wiring gets Ctrl+Enter out of a textarea.
 unblocks C11, C12, C13 *and* is the editor item 26a's "Write code ▸ R" needs. It should be done
 once, deliberately, rather than approached three times from three items.
 
-### 60. Switching browser tabs makes the app think it disconnected — **OPEN, a defect in v0.10.14**
+### 60. Switching browser tabs makes the app think it disconnected — **FIXED v0.10.25, corrected v0.10.26**
 > "document that when we change tab, the app thinks it went to sleep."
 
 The disconnect panel added in v0.10.14 (item 50) fires when the user switches **browser tabs**, not
@@ -4807,3 +4807,41 @@ in, or `ie4uinit.exe -show`, clears it. That is a Windows behaviour, not a defec
 different failure: shortcut creation is wrapped in `try/catch` so it can never fail an install, and
 it prints `[EasyAnalysis] Could not create shortcuts (...)`. Worth checking the installer output for
 that line before assuming the icon is at fault.
+
+### GIS parity Step 4 / item 38 — **DELETE FEATURES DONE (v0.10.26)**
+
+The first destructive map operation, built on the selection model from Steps 1-3.
+
+**Behind an explicit edit mode** (the QGIS pencil idiom), off by default and visibly armed. A
+destructive mode that looks passive is the failure to avoid, so `.ea-wsx-selclear.on` uses the warn
+token and Delete uses danger.
+
+**Undo, per layer, bounded at 5** — deliberately the same shape as `mod_data.R`'s stack, keyed by
+name so an undo cannot restore layer A's geometry into layer B. **Pruning filters on the value, not
+`names()`** — gotcha 14 applied *before* it leaked this time, rather than after.
+
+**Five refusals, each for a reason:**
+
+| Refused | Why |
+|---|---|
+| Not in edit mode | The whole point of the toggle |
+| Selection belongs to another layer | Row numbers are only meaningful for the layer they came from |
+| Every feature selected | That is removing the layer, not editing it |
+| Rows past the end | A stale selection must not subscript out of bounds |
+| Undo with no history | Says so rather than doing nothing |
+
+**The selection is cleared after a delete** — row numbers shift, so keeping it would highlight
+whatever now occupies those positions.
+
+**Verified: 24 checks.** Two failures during development were **test faults, not code faults** —
+sections that toggled edit mode blindly and inherited an armed state, and a section whose layer had
+been whittled to one feature by an earlier section, so the do-not-empty guard correctly refused.
+Recorded because it is the seventh and eighth time this session a check has been wrong rather than
+the code.
+
+**Still open on item 38 / 54:** *edit attribute* and *add attribute* (a column, not a row), and
+moving these controls onto the right-click menu — they are dock-header buttons today. Both write
+paths should reuse `.edit_snap()` rather than inventing a second undo.
+
+**Next in the GIS sequence:** raster symbology (stretch / classified / paletted / hillshade), which
+is the remaining half of item 39 and the last piece before item 42's integration work.

@@ -1233,6 +1233,19 @@ page_fillable(
       border-radius: 5px; padding: 1px 7px; font: 500 11px var(--ui); cursor: pointer;
     }
     .ea-wsx-selclear:hover { border-color: var(--canopy); color: var(--forest); }
+    /* Edit mode must LOOK armed — a destructive state that is invisible is how
+       someone deletes from a layer they thought they were only viewing. */
+    .ea-wsx-selclear.on {
+      border-color: var(--warn); color: var(--ink);
+      background: color-mix(in srgb, var(--warn) 22%, transparent);
+    }
+    .ea-wsx-seldel {
+      border: 1px solid var(--danger); border-radius: 5px; padding: 1px 8px;
+      font: 600 11px var(--ui); cursor: pointer;
+      background: color-mix(in srgb, var(--danger) 16%, transparent);
+      color: var(--ink);
+    }
+    .ea-wsx-seldel:hover { background: var(--danger); color: #fff; }
     .ea-wsx-attrbody { max-height: 220px; overflow: auto; padding: 4px 8px; }
     .ea-wsx-attrdock.collapsed .ea-wsx-attrbody { display: none; }
     .ea-wsx-attrinfo { padding: 10px 4px; font: 400 12px var(--mono); color: var(--bark); }
@@ -2448,11 +2461,23 @@ page_fillable(
          browser, which arrives as shiny:disconnected and is indistinguishable
          from a real failure at that instant. Showing the panel then interrupts
          ordinary browsing -- switch tab, come back, get told you are
-         disconnected. Remember when the page was last hidden so the handler can
-         tell the two apart. */
-      window.eaLastHidden = 0;
+         disconnected.
+         NO TIME WINDOW. An earlier version suppressed for 30 s after the tab was
+         hidden, which was arbitrary and wrong in both directions: away for a
+         minute and you still got the panel, while a genuine failure 20 s after a
+         glance at another tab was hidden. The rule is about STATE, not elapsed
+         time -- a disconnect that arrives while the tab is hidden is simply
+         held, and decided when the user is looking at the page again. */
+      window.eaPendingDc = false;
       document.addEventListener('visibilitychange', function(){
-        if (document.hidden) window.eaLastHidden = Date.now();
+        if (document.hidden) return;
+        /* Back on the page. If a disconnect was held while away, decide it now:
+           still disconnected after the delay -> show; reconnected in the
+           meantime -> shiny:connected already cleared it. */
+        if (window.eaPendingDc) {
+          window.eaPendingDc = false;
+          eaShowDisconnect();
+        }
       });
 
       function eaShowDisconnect(){
@@ -2461,11 +2486,12 @@ page_fillable(
            user to reconnect to something they just closed. (No literal double
            quotes in here: this is inside an R HTML() string -- gotcha 1.) */
         if(window.eaQuitting) return;
-        /* Hidden right now, or hidden in the last 30 s: treat it as the browser
-           backgrounding the tab, not as a failure. If the connection really is
-           gone the panel still appears once the user is looking at the page and
-           the delay below expires. */
-        if(document.hidden || (Date.now() - (window.eaLastHidden || 0) < 30000)) return;
+        /* Hidden: HOLD it, indefinitely, and decide when the page is visible
+           again (the visibilitychange handler above re-calls this). Nothing is
+           lost -- if the connection really is gone the panel appears as soon as
+           the user is looking, and if it recovered while away shiny:connected
+           cleared the flag. */
+        if(document.hidden) { window.eaPendingDc = true; return; }
         var el = document.getElementById('ea-disconnect');
         if(!el || el.classList.contains('on')) return;   /* never stack */
 
@@ -2507,6 +2533,7 @@ page_fillable(
              drop that reconnects within the delay still pops the panel
              afterwards, which is the exact interruption this is meant to stop. */
           clearTimeout(window.eaDcTimer);
+          window.eaPendingDc = false;   /* a held disconnect that recovered */
           var el = document.getElementById('ea-disconnect');
           if(el) el.classList.remove('on');
         });
