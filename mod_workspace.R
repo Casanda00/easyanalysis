@@ -495,6 +495,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                                      ns("ws_basemap"), unname(BASEMAPS[[nm]])), nm)
           })),
           .msep(),
+          # Layer appearance sits with the other appearance controls (theme,
+          # basemap, layout) rather than in Edit -- symbology changes how a layer
+          # LOOKS, it does not change the data. It acts on the active layer;
+          # right-clicking a layer row opens it for that layer directly.
+          tags$div(class = "gm-grp", "Layer"),
+          .mi("Symbology…", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})",
+                                    ns("ws_sym_active"))),
+          .msep(),
           tags$div(class = "gm-grp", "Layout"),
           .mi("Map view",  sprintf("Shiny.setInputValue('%s','map',{priority:'event'})",   ns("wsview"))),
           .mi("Data view", sprintf("Shiny.setInputValue('%s','data',{priority:'event'})",  ns("wsview"))),
@@ -1212,6 +1220,35 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         list(mode = "rgb", r = det$r, g = det$g, b = det$b, why = det$why)
       else list(mode = "single", r = 1, g = 2, b = 3, why = NULL)  # undeclared: ask
     }
+    # ---- Opening symbology ---------------------------------------------------
+    # The controls live in the layer's expander, which was reachable only via a
+    # small chevron on the row -- built, but effectively hidden. These are the
+    # two ways in: right-click a layer, or View > Layer > Symbology for whichever
+    # layer is active.
+    #
+    # Opening it has to do everything needed to make it VISIBLE, not just set a
+    # flag: select the layer, switch to a view that shows the Layers panel, and
+    # expand the row. Doing only the last leaves the panel open behind the Data
+    # view, which reads as the menu item doing nothing.
+    .open_symbology <- function(nm) {
+      if (is.null(nm) || !nzchar(nm)) {
+        showNotification("Select a layer first, or right-click one in the Layers panel.",
+                         type = "message", duration = 4)
+        return(invisible(FALSE))
+      }
+      if (!(nm %in% c(.names(vector_pool), .names(raster_pool)))) {
+        showNotification(sprintf("'%s' has no symbology — it is not drawn on the map.", nm),
+                         type = "message", duration = 4)
+        return(invisible(FALSE))
+      }
+      activeLayer(nm)
+      if (identical(wsview(), "data")) { wsview("map"); user_picked_view(TRUE) }
+      lexp[[nm]] <- TRUE
+      invisible(TRUE)
+    }
+    observeEvent(input$ws_sym_open,   { .open_symbology(input$ws_sym_open) })
+    observeEvent(input$ws_sym_active, { .open_symbology(activeLayer()) })
+
     # One observer per symbology control. Each event carries {nm, v}, so a single
     # handler serves every layer -- the same reason ws_rgb does.
     local({

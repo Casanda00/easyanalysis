@@ -4351,7 +4351,7 @@ literal it was testing for. The pattern each time: **asserting against text rath
 behaviour** — matching prose, consumed state, or a mangled source. The behaviour assertions have
 been right every time; the source-grep assertions keep being wrong.
 
-### GIS parity Step 5 / item 39 — **VECTOR SYMBOLOGY DONE (v0.10.21)**
+### GIS parity Step 5 / item 39 — **VECTOR SYMBOLOGY DONE (v0.10.22)**
 
 Closes the vector half of round-3 item 11. Raster symbology (stretch, classified, hillshade blend)
 remains open.
@@ -4404,6 +4404,23 @@ map. Map renders; legend offers all three modes and lists ranges; the dead mock 
 `check_ui_js` PASS, HTTP 200.
 **Not verified:** appearance — worth checking the colour and range inputs are usable inside the
 layer expander, and that a long category list scrolls rather than stretching the panel.
+
+**Reaching it (added in the same release, before the reporter had tested any of it).**
+> "you also have not made it possible for us to access. right clicking the layer should open
+> symbology. also symbology in the menu (not sure where it belongs)"
+
+A fair hit: the controls were built into the layer expander, reachable **only** by finding a small
+chevron on the layer row. Built but effectively hidden, which is the same as not shipped.
+
+- **Right-click a layer → "Symbology…"**, listed **first** in the context menu because it is the
+  action most often wanted on a layer. Offered for vector and raster only.
+- **View ▸ Layer ▸ Symbology…** for the active layer. Placed in **View** rather than Edit
+  deliberately: symbology changes how a layer *looks*, not what the data *is*, so it belongs with
+  theme, basemap and layout.
+- **Opening it does everything needed to make it visible** — selects the layer, switches to the map
+  if you were on the data view, and expands the row. Setting only the expand flag would leave the
+  panel open behind the Data view, which reads as the menu item doing nothing.
+- Refusals are explicit: a table layer says it has no symbology; no selection says to pick a layer.
 
 **Still open on symbology:** raster stretch / classified / paletted / hillshade blend, rule-based
 vector styling, and labels. Documented in round-3 item 11.

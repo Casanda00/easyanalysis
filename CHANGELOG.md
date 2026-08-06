@@ -18,7 +18,7 @@ breaking changes. Newest first.
 
 ---
 
-## v0.10.21 — 2026-08-06
+## v0.10.22 — 2026-08-06
 
 ### Added — map symbology for vector layers
 
@@ -40,6 +40,10 @@ holds a similar number of features, which keeps skewed data readable.
 
 Outline width and fill opacity can be adjusted in every mode. Selected features stay outlined in
 red whatever styling you choose, so a selection is never lost in the colour scheme.
+
+Symbology is reached in two ways: **right-click a layer** in the Layers panel and choose
+**Symbology…**, or use **View ▸ Layer ▸ Symbology…** for the layer you are working in. Either one
+selects the layer, switches to the map if you were on the data view, and opens its settings.
 
 Full details are in the documentation under **Map symbology**.
 

@@ -2212,6 +2212,14 @@ page_fillable(
           m.appendChild(a);
         };
         var sep = function(){ var d=document.createElement('div'); d.className='ea-ctx-sep'; m.appendChild(d); };
+        /* Symbology first: it is the action a user is most often looking for on
+           a layer, and it was previously reachable ONLY by finding the small
+           chevron on the row -- built but effectively hidden. */
+        if (kind === 'vector' || kind === 'raster') {
+          add('Symbology…', function(){
+            Shiny.setInputValue('workspace-ws_sym_open', name, {priority:'event'}); });
+          sep();
+        }
         add('Zoom to layer', function(){
           Shiny.setInputValue('workspace-ws_zoom_layer', name, {priority:'event'}); });
         add('Rename…', function(){
