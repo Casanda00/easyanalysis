@@ -106,3 +106,16 @@ used — it is shown in **Help ▸ About** and in the app's status bar.
 Where a screen implements a published method, that method's own paper is listed on the app's
 **References** screen and should be cited alongside this one — citing the tool does not replace
 citing the method.
+
+## Licence
+
+EasyAnalysis is free software under the **GNU General Public License v3.0 or later**
+(see [LICENSE](LICENSE)).
+
+That is not a stylistic choice: the app cannot run without R packages that are GPL-3 and offer no
+permissive alternative — among them `lidR`, `terra`, `MASS`, `nnet`, `ape`, `shinyWidgets`,
+`leaflet.extras`, `base64enc` and `ggspatial`. A work that requires GPL-3 libraries has to be
+distributed on GPL-3-compatible terms, so GPL-3 is an honest description of what you receive
+rather than a restriction added on top. See [COPYRIGHT](COPYRIGHT) for the full reasoning.
+
+Each dependency remains under its own licence.

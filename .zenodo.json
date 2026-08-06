@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Zenodo reads this when GitHub notifies it of a new release, and uses it",
+    "instead of guessing metadata from the repo. Without it Zenodo derives the",
+    "author from the GitHub username, which would credit 'Casanda00' rather",
+    "than a person, and produce a citation nobody can match to a name.",
+    "",
+    "This file does NOT create a DOI on its own. See DOI.md for the two steps",
+    "that do (they need a Zenodo login, so they cannot be automated from here)."
+  ],
+  "title": "EasyAnalysis: point-and-click statistical, machine-learning and spatial analysis",
+  "description": "<p>EasyAnalysis is a free, local-first platform for running statistical, machine-learning and spatial/geospatial analysis without writing code. It installs on the user's own computer and runs there, so data being analysed never leaves the machine. It covers statistical modelling, machine learning, and spatial, raster, terrain, hydrology and LiDAR workflows, and includes an AI assistant that runs the application's own analyses and explains results.</p>",
+  "upload_type": "software",
+  "license": "GPL-3.0-or-later",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Gibson, Tim Casanda",
+      "affiliation": ""
+    }
+  ],
+  "keywords": [
+    "statistics",
+    "machine learning",
+    "spatial analysis",
+    "geospatial",
+    "remote sensing",
+    "LiDAR",
+    "GIS",
+    "R",
+    "Shiny",
+    "reproducible research"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://easyanalysis.dev",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

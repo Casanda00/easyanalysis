@@ -18,6 +18,20 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.17 — 2026-08-06
+
+### Fixed — selecting a row now actually highlights the feature
+
+The feature added in the previous version did not work: selecting rows in the attribute table
+changed nothing on the map. The right features were being found; they were simply never drawn.
+Selecting a row now outlines those features on the map.
+
+### Changed — the highlight is red, and drawn as an outline
+
+Selected features are outlined in red. The outline carries the highlight rather than a solid
+fill, so the selection stays visible over satellite imagery and you can still see the feature
+underneath instead of it being covered up.
+
 ## v0.10.16 — 2026-08-06
 
 ### Added — select a feature in the attribute table and see it on the map

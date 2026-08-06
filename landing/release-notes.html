@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.16.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.17.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.16</b> · 58 releases ·
+      <p class="meta">Latest: <b>v0.10.17</b> · 59 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-16"><h2><a class="anchor" href="#v0-10-16">v0.10.16</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-17"><h2><a class="anchor" href="#v0-10-17">v0.10.17</a><span class="when">2026-08-06</span></h2>
+<h3>Fixed — selecting a row now actually highlights the feature</h3>
+<p>The feature added in the previous version did not work: selecting rows in the attribute table
+changed nothing on the map. The right features were being found; they were simply never drawn.
+Selecting a row now outlines those features on the map.</p>
+<h3>Changed — the highlight is red, and drawn as an outline</h3>
+<p>Selected features are outlined in red. The outline carries the highlight rather than a solid
+fill, so the selection stays visible over satellite imagery and you can still see the feature
+underneath instead of it being covered up.</p>
+</section><section class="rel" id="v0-10-16"><h2><a class="anchor" href="#v0-10-16">v0.10.16</a><span class="when">2026-08-06</span></h2>
 <h3>Added — select a feature in the attribute table and see it on the map</h3>
 <p>Selecting rows in a layer&#39;s attribute table now highlights those features on the map in amber.
 Select several and they all highlight; the header shows how many are selected and offers

@@ -1,0 +1,35 @@
+EasyAnalysis
+Copyright (C) 2026 Tim Casanda Gibson
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+WHY GPL-3, AND NOT MIT
+----------------------
+This was not a stylistic choice. EasyAnalysis requires, at run time, R packages
+that are licensed GPL-3 (or GPL-2|GPL-3) and offer no permissive alternative --
+among them shinyWidgets, nnet, MASS, ape, lidR, terra, leaflet.extras,
+base64enc and ggspatial. A combined work that cannot function without GPL-3
+libraries has to be distributed under GPL-3-compatible terms, so GPL-3 is the
+honest description of what a user actually receives.
+
+Releasing the app itself as MIT would not have changed that: the moment it is
+distributed and run alongside those packages, the effective terms of the whole
+are GPL-3. Stating GPL-3 up front avoids implying a freedom that does not exist.
+
+Note that many other dependencies (shiny, bslib, DT, ggplot2, leaflet, httr,
+jsonlite, ...) are MIT or Apache. Those are GPL-compatible and impose no
+additional restriction; they are simply included on their own terms.
+
+Each dependency remains under its own licence. This notice covers the
+EasyAnalysis source code only.

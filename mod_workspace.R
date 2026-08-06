@@ -1281,9 +1281,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
 
     # Highlight styling. Literal colours on purpose: leaflet cannot read CSS
     # tokens, and this is the same legitimate exception as colours inside a plot
-    # (gotcha 31). Amber over the green layer palette, which is the GIS
-    # convention and stays legible on both light and satellite basemaps.
-    .SEL_COL <- "#FFC400"; .SEL_HALO <- "#3A2E00"
+    # (gotcha 31).
+    #
+    # RED, and carried by the OUTLINE rather than the fill. The layer palette is
+    # green, so red is the strongest available contrast, and a heavy border stays
+    # readable over satellite imagery where a translucent fill washes out. The
+    # fill is kept light so the feature underneath is still visible -- selecting
+    # a polygon should not hide what you selected.
+    .SEL_COL <- "#FF2D2D"
     .draw_selection <- function(m) {
       sel <- .sel_sf()
       if (is.null(sel)) return(m)
@@ -1291,29 +1296,28 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                      error = function(e) "")
       tryCatch({
         if (grepl("POINT", gt))
-          leaflet::addCircleMarkers(m, data = sel, radius = 8, color = .SEL_HALO,
-            weight = 2, opacity = 1, fillColor = .SEL_COL, fillOpacity = .9,
+          leaflet::addCircleMarkers(m, data = sel, radius = 9, color = .SEL_COL,
+            weight = 3, opacity = 1, fillColor = .SEL_COL, fillOpacity = .35,
             group = "ws_sel")
         else if (grepl("LINE", gt))
           leaflet::addPolylines(m, data = sel, color = .SEL_COL, weight = 5,
             opacity = 1, group = "ws_sel")
         else
-          leaflet::addPolygons(m, data = sel, color = .SEL_COL, weight = 3,
-            opacity = 1, fillColor = .SEL_COL, fillOpacity = .35, group = "ws_sel")
+          leaflet::addPolygons(m, data = sel, color = .SEL_COL, weight = 4,
+            opacity = 1, fillColor = .SEL_COL, fillOpacity = .18,
+            group = "ws_sel")
       }, error = function(e) m)
     }
 
-    # Selection changes must NOT rebuild the whole map -- that is slow with a big
-    # raster underneath. So the highlight is applied by PROXY here, and drawn
-    # again inside renderLeaflet below. Both read .sel_sf(), so they cannot
-    # drift; the render pass exists because proxy calls are lost when the map
-    # element is re-created (gotcha 23), and the proxy exists so that selecting
-    # a row does not trigger that re-creation in the first place.
-    observe({
-      sel <- .sel_sf()
-      px <- leaflet::clearGroup(leaflet::leafletProxy("map", session), "ws_sel")
-      if (!is.null(sel)) .draw_selection(px)
-    })
+    # NO leafletProxy here, deliberately -- see the note on .draw_layers() below
+    # and gotcha 23. The first version of this DID use a proxy for speed and
+    # isolate()d the render pass so selecting a row would not rebuild the map.
+    # That combination cannot work: the proxy is the mechanism this map is
+    # documented to drop, and isolate() meant the reliable path never re-ran, so
+    # the highlight never appeared at all. The map is rebuilt on selection
+    # instead -- the same one-atomic-build rule every other layer here follows.
+    # It costs a redraw per selection; a highlight that is always right beats one
+    # that is fast and sometimes invisible.
 
     # Deliberately NOT a leafletProxy: the map element is re-created whenever the
     # canvas re-renders or the basemap changes, and a proxy message that arrives
@@ -1447,11 +1451,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (nzchar(bm)) m <- leaflet::addProviderTiles(m, bm, layerId = "ws_base",
                              options = leaflet::providerTileOptions(zIndex = 0))
       # Selection is drawn LAST so it sits on top of the layer it belongs to.
-      # isolate(): the map must not re-render every time a row is picked -- the
-      # proxy above handles that. This call only exists so a map that is rebuilt
-      # for some other reason comes back with the highlight still on it.
+      # NOT isolated: this is the ONLY path that draws the highlight, so it has
+      # to be a real reactive dependency or picking a row changes nothing.
       m <- .draw_layers(m)
-      isolate(.draw_selection(m))
+      .draw_selection(m)
     })
     # Opening another project clears the pools first; re-arm the first-fit so
     # the incoming project frames itself instead of inheriting the old view.

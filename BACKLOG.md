@@ -4129,3 +4129,63 @@ undermines a citation for EasyAnalysis, so it was corrected.
   would falsify the log.
 - **`CITATION.cff`'s `version`/`date-released` are manual** and need bumping with `APP_VERSION`
   when a release is worth citing.
+
+### Step 2 FOLLOW-UP — the highlight never appeared; fixed in v0.10.17
+> "i am clicking the attribute in the table but I cant see it being identified on the map with red"
+> "selecting shape file should get the make the border red"
+
+**My design error, and it is the trap this very file documents.** Step 2 shipped with the
+highlight applied two ways: by `leafletProxy` when the selection changed (for speed), and inside
+`renderLeaflet` wrapped in `isolate()` (as a fallback for a rebuilt map).
+
+**That pairing cannot work here**, and gotcha 23 says why *three lines below the code I wrote*:
+`leafletProxy` calls are **silently dropped** for this map, which is exactly why every other layer
+is built in one atomic pass inside `renderLeaflet`. So the live path was the unreliable one, and
+`isolate()` meant the reliable path never re-ran. Net effect: **nothing ever drew.**
+
+The server logic was never wrong — a debug run on a realistic layer (5 polygons in **EPSG:3067**,
+as a real shapefile would be) confirmed `.sel_sf()` returned exactly features 2 and 4, correctly
+reprojected to 4326 with a sensible Finnish bbox. The fault was purely in **delivery**.
+
+**Fix:** drop the proxy entirely and make the render pass a **real reactive dependency**. Selecting
+a row now rebuilds the map, which is the same one-atomic-build rule every other layer here already
+follows. It costs a redraw per selection — accepted deliberately: **a highlight that is always
+right beats one that is fast and sometimes invisible.** If that redraw ever becomes a problem on a
+huge raster, the answer is to make the *map* cheaper to rebuild, not to reintroduce a mechanism
+this map is documented to drop.
+
+**Colour changed to red**, as asked, and carried by the **outline** rather than the fill: the layer
+palette is green, so red is the strongest contrast, and a heavy border survives satellite imagery
+where a translucent fill washes out. Fill is kept light (0.18) so the selected feature is still
+visible underneath — selecting a polygon should not hide what you selected. Polygons get a
+4px border, lines a 5px stroke, points a red ring. The count chip in the dock header matches.
+
+**Verified:** the isolated render and the proxy observer are both gone (control checks assert the
+old shapes are absent); the render pass draws the selection live; red with the outline weights
+above; and a regression run still returns features 2 and 4 reprojected 3067→4326, with the map
+rendering cleanly while a selection is active. `check_ui_js` PASS, serves HTTP 200.
+
+**Lesson, worth generalising:** when a codebase documents that a mechanism is unreliable in a
+place, do not use it there *even as an optimisation* — and never let the reliable path be the
+isolated one. A fallback that cannot fire is not a fallback.
+
+---
+
+### 54. Right-click menu on the attribute table — **OPEN, not started**
+> "can we add a right click function on the attribute table to zoom to attribute. like how arcgis
+> does it. more like some functions. edit attribute, add attribute, zoom to selected attributes"
+
+The ArcGIS/QGIS idiom: right-click in the attribute table for actions on the selection.
+
+| Action | Depends on | Notes |
+|---|---|---|
+| **Zoom to selected** | Steps 1-2 (**done**) | Cheapest and most useful. `sf::st_bbox()` of `.sel_sf()` → `fitBounds`. Buy: it is the natural completion of selection, and needs no new state. |
+| **Edit attribute** | an editing model | The table is currently read-only. DT supports `editable`, but a write-back must go to `vector_pool` and needs undo — same mechanism as item 38's delete and item 32's multi-step undo. **Do not invent a second one.** |
+| **Add attribute** | schema editing | Adds a *column* to the layer, not a row. Cheaper than row editing (no geometry involved) but still a write to the pool, so it shares the same undo question. |
+
+**Recommended split:** ship **Zoom to selected** with Step 3 — it is small, read-only, and makes
+selection immediately useful. Hold the two editing actions until the write/undo model is decided
+with item 38, so all three land on one mechanism.
+
+**Note:** the layers panel already has a right-click menu (`eaLayerMenu`), so there is an existing
+pattern and CSS to reuse rather than a new one to invent.

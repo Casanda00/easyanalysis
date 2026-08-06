@@ -27,8 +27,17 @@ authors:
     family-names: Gibson
 repository-code: "https://github.com/Casanda00/easyanalysis"
 url: "https://easyanalysis.dev"
+# GPL-3.0 is forced by the dependency graph, not chosen for taste: the app
+# cannot run without GPL-3-only R packages (lidR, terra, MASS, nnet, ape,
+# shinyWidgets, leaflet.extras, base64enc, ggspatial). See COPYRIGHT.
+license: GPL-3.0-or-later
 version: 0.10.16
 date-released: "2026-08-06"
+# Add the Zenodo DOI here after the first archived release — see .zenodo.json.
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX
+#     description: Concept DOI for all versions
 keywords:
   - statistics
   - machine learning
