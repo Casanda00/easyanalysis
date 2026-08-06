@@ -1,12 +1,12 @@
 # ---------------------------------------------------------------------------
-# Regenerate landing/release-notes.html from CHANGELOG.md.
+# Regenerate landing/release-notes.html from RELEASE_NOTES.md.
 #
 # Backlog item 24, approach C. The landing site is a PURE STATIC Vercel deploy
 # (landing/vercel.json has buildCommand: null) — that is what makes the
 # installer one-liners work, so the generation happens here in CI and the
 # rendered page is committed. The site itself keeps needing no build step.
 #
-# NO INFINITE LOOP: this workflow triggers only on CHANGELOG.md and its own
+# NO INFINITE LOOP: this workflow triggers only on RELEASE_NOTES.md and its own
 # generator, and it only ever writes landing/release-notes.html. The commit it
 # pushes therefore cannot re-trigger it. (GitHub also suppresses workflow runs
 # for pushes made with the default GITHUB_TOKEN, which is a second guard, but
@@ -18,7 +18,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "CHANGELOG.md"
+      - "RELEASE_NOTES.md"
       - "landing/build-release-notes.mjs"
       - ".github/workflows/release-notes.yml"
   workflow_dispatch: {}          # so it can be run by hand after a manual edit
@@ -60,5 +60,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add landing/release-notes.html
-          git commit -m "docs: regenerate release notes from CHANGELOG.md [skip ci]"
+          git commit -m "docs: regenerate release notes from RELEASE_NOTES.md [skip ci]"
           git push

@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
-   build-release-notes.mjs  --  CHANGELOG.md  ->  landing/release-notes.html
+   build-release-notes.mjs  --  RELEASE_NOTES.md  ->  landing/release-notes.html
 
    Backlog item 24. Approach C of the three that were considered: a GitHub
-   Action regenerates this page whenever CHANGELOG.md changes on main, and
+   Action regenerates this page whenever RELEASE_NOTES.md changes on main, and
    commits the result. The alternative approaches were rejected for reasons
    worth keeping:
 
@@ -29,17 +29,19 @@ import { marked } from "marked";
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..");
 
-const md = readFileSync(join(repo, "CHANGELOG.md"), "utf8");
+/* RELEASE_NOTES.md is the PUBLIC file. CHANGELOG.md is the internal engineering
+   record and is deliberately NOT read here -- it carries root causes, file paths
+   and gotcha numbers that mean nothing to a visitor. */
+const md = readFileSync(join(repo, "RELEASE_NOTES.md"), "utf8");
 
-/* The changelog's own preamble ("Every build/push gets a version…", the format
-   note) is instruction for whoever edits the file, not something a user of the
-   app needs. Drop everything before the first release heading and write a
-   proper introduction instead. */
+/* The file's own preamble (who it is for, the format note) is instruction for
+   whoever edits it, not something a user of the app needs. Drop everything
+   before the first release heading and write a proper introduction instead. */
 const firstRelease = md.search(/^## v/m);
 const body = firstRelease > 0 ? md.slice(firstRelease) : md;
 
 /* This page is PUBLIC, so a reporter's verbatim words must never reach it.
-   Feedback quotes belong in BACKLOG.md, which is not published. Three of them
+   Feedback quotes belong in BACKLOG.md, which is internal. Three of them
    were caught by eye on the way to the site once; a build that fails loudly is
    cheaper than noticing again. Only release bodies are checked -- the preamble
    above is already dropped, and editorial blockquotes that do not open with a
@@ -50,9 +52,39 @@ const quoted = body
   .filter(([, l]) => /^>\s*["“]/.test(l));
 if (quoted.length) {
   console.error(
-    "\nERROR: CHANGELOG.md contains verbatim quotes, and this file is published.\n" +
+    "\nERROR: RELEASE_NOTES.md contains verbatim quotes, and this file is published.\n" +
     "Move them to BACKLOG.md and describe the symptom in neutral language instead.\n" +
     quoted.map(([i, l]) => `  line ${i + 1}: ${l.trim()}`).join("\n") + "\n"
+  );
+  process.exit(1);
+}
+
+/* The same boundary, for INTERNAL VOCABULARY rather than quotes.
+   BACKLOG.md and CHANGELOG.md are internal; RELEASE_NOTES.md is the published
+   one. Cross-references to the internal notes ("BACKLOG item 24",
+   "Round 4 (items 18-25)", "CLAUDE.md gotcha 27") had leaked onto the public
+   page, where they read as jargon about tickets a reader cannot see — nine
+   instances before this check existed. Technical detail belongs in the
+   backlog; this file says what changed for someone using the app. */
+const jargon = [
+  [/\bBACKLOG(\.md)?\b/i,        "BACKLOG reference"],
+  [/\bCLAUDE\.md\b/i,            "CLAUDE.md reference"],
+  [/\bgotcha \d+/i,              "gotcha number"],
+  [/\bround[- ]?\d+ item\b/i,    "round/item reference"],
+  [/\bbacklog item \d+/i,        "backlog item number"],
+  [/^\s*[-*]?\s*\(?item \d+[.)]/im, "bare item number"],
+];
+const found = [];
+body.split("\n").forEach((l, i) => {
+  for (const [re, what] of jargon)
+    if (re.test(l)) found.push(`  line ${i + 1} (${what}): ${l.trim().slice(0, 90)}`);
+});
+if (found.length) {
+  console.error(
+    "\nERROR: RELEASE_NOTES.md refers to internal notes, and this file is published.\n" +
+    "BACKLOG.md is the engineering log and stays private. Describe the change for a\n" +
+    "user here, and keep the diagnosis, file paths and gotcha numbers in the backlog.\n" +
+    found.join("\n") + "\n"
   );
   process.exit(1);
 }

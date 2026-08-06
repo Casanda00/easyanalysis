@@ -43,7 +43,8 @@ itself (item 24).
 | Doc | What it is |
 |-----|------------|
 | [README.md](README.md) | Public-facing overview of the app + how to launch. |
-| [CHANGELOG.md](CHANGELOG.md) | Version history — `## vMAJOR.MINOR.PATCH — date`, newest first, version single-sourced in `global.R` (`APP_VERSION`). **Must be updated as part of finishing work**, not in a batch later: it is the source a future release-notes page publishes from (BACKLOG item 24), and it has already drifted behind the fixes that landed after v0.8.1. |
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | **PUBLISHED — the only user-facing release file.** Becomes [easyanalysis.dev/release-notes](https://easyanalysis.dev/release-notes) via `landing/build-release-notes.mjs` and `.github/workflows/release-notes.yml`. Plain language, no internal references. **The build FAILS** if a reporter quote or internal vocabulary (`BACKLOG`, `CLAUDE.md`, gotcha/item numbers) reaches it — control-tested. |
+| [CHANGELOG.md](CHANGELOG.md) | **INTERNAL engineering record**, one entry per version: root cause, what changed where, which trap it was, what was verified and what was not. As raw as is useful. Not published. Ship something user-visible → write **both** this and `RELEASE_NOTES.md`. |
 | [dev_updates.md](dev_updates.md) | Dated developer action log (early history; not actively maintained). |
 | [spatial_design_reference.md](spatial_design_reference.md) | Design reference for the spatial / remote-sensing / LiDAR screens (map-centric GeoLibre layout). |
 | [papers/METHODS.md](papers/METHODS.md) | Papers-as-methods notes — published methods to implement and auto-cite. |

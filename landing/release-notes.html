@@ -720,9 +720,9 @@ a registry method exactly as it sees a hand-written screen.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
-<li><code>CLAUDE.md</code>&#39;s note that <code>uef_evaluation()</code> was &quot;available but unused&quot; was out of date — it
-is called by the LME, Random forest and Linear regression screens, and now by the registry
-too. Corrected so the next reader does not wire up something that already works.</li>
+<li>Internal notes claimed the shared model-quality function was unused. It is in fact used by the
+mixed-effects, random forest and linear regression screens, and now by the method registry too,
+which is what keeps those figures comparable between screens.</li>
 </ul>
 </section><section class="rel" id="v0-8-4"><h2><a class="anchor" href="#v0-8-4">v0.8.4</a><span class="when">2026-08-04</span></h2>
 <h3>Fixed</h3>
@@ -754,24 +754,23 @@ regardless of theme, so a themed colour there would be wrong.</li>
 this app exists so people do not have to. They now read <strong>number, whole number, text,
 category, true/false, date</strong>, with the R class kept as the cell&#39;s tooltip. The coloured
 badge behind them is gone too: it carried six hardcoded hex values that followed no theme,
-and the colour never said anything the word did not. (Backlog item 28.)</li>
+and the colour never said anything the word did not.</li>
 <li><strong>The Co-Analyst no longer offers suggestion chips.</strong> They were the last place the app
 volunteered a next step, which contradicted its own system prompt — that already forbids
-the model from proposing one. The Recommend screen is kept and is where suggestions belong.
-(Backlog item 27.)</li>
+the model from proposing one. The Recommend screen is kept and is where suggestions belong.</li>
 </ul>
 <h3>Added</h3>
 <ul>
 <li><strong>Undo now goes back 5 steps, not 1.</strong> <code>snap()</code> was already the single choke point every
 data operation passes through, so the change is one bounded stack. Each undo reports how
 many steps remain, so the last press reads as &quot;no further undo steps&quot; rather than a dead
-button. Capped deliberately — each entry is a full copy of the data frame. (Backlog item 32.)</li>
+button. Capped deliberately — each entry is a full copy of the data frame.</li>
 <li><strong>A &quot;Docs&quot; button in the app.</strong> The documentation pages have been live on the website for
 days, but nothing inside the app pointed at them, so users who never visited the site never
 found them. It sits in the top bar on both the projects screen and the analysis area, and
-opens in a new tab so a running project is never navigated away from. (Backlog item 17.)</li>
+opens in a new tab so a running project is never navigated away from.</li>
 <li><strong>The guided tour covers 9 steps, up from 6</strong> — added the tool search, Undo/Reset, and the
-new Docs link, clearing the &quot;at least 8&quot; requirement. (Backlog item F24.)</li>
+new Docs link, clearing the &quot;at least 8&quot; requirement.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
@@ -792,7 +791,7 @@ threw before the UI&#39;s <code>requireNamespace()</code> guard could degrade to
 <code>observeEvent(workspace_ctx$tool_open())</code> in <code>server.R</code> moved <strong>after</strong> the assignment it
 references, so a failure there no longer surfaces as a misleading &quot;object not found&quot; on
 every flush. Audited every other eager <code>output$x &lt;- pkg::render*</code> binding — all use core
-packages, so <code>plotly</code> was the only one exposed. (CLAUDE.md gotcha 27.)</li>
+packages, so <code>plotly</code> was the only one exposed.</li>
 <li><strong>Nothing showed that the app was working.</strong> Only 12 of 42 modules use <code>withProgress</code>, so
 on the other 30 — including most model screens — a slow fit looked like a frozen app. Worse,
 <code>ui.R</code> deliberately disables Shiny&#39;s own dimming (<code>--shiny-fade-opacity: 1</code>) on the promise
@@ -800,30 +799,24 @@ of a &quot;Running pill&quot; that had never been built, leaving less feedback t
 the global <code>#ea-busy</code> pill: pure CSS keyed off Shiny&#39;s <code>shiny-busy</code> class, so it needs no
 per-module wiring and works even while R is blocked (a server-rendered spinner cannot).
 Shown only by real request state, never a timer, and only after 400 ms so quick actions do
-not flash it. Also extended the existing skeleton shimmer to the model canvas.
-(CLAUDE.md gotcha 29.)</li>
+not flash it. Also extended the existing skeleton shimmer to the model canvas.</li>
 <li><strong>Native <code>&lt;select&gt;</code> popups and scrollbars ignored the theme.</strong> Page CSS colours the closed
 control but not the browser-drawn popup list. Every colour set now declares
 <code>scheme = &quot;light&quot;|&quot;dark&quot;</code> in <code>theme.R</code> and <code>ea_theme_css()</code> emits a real <code>color-scheme</code>
 declaration; <code>:root</code> declares it too, since a first-time visitor has no <code>data-ea-theme</code>
 attribute yet while the default palette is dark. Added <code>option</code> colour rules as the
-Chromium-specific complement. (CLAUDE.md gotcha 28.)</li>
+Chromium-specific complement.</li>
 </ul>
 <h3>Docs</h3>
 <ul>
-<li><code>BACKLOG.md</code>: Round 4 (items 18-25) and a Round 5 reconciliation table mapping a re-sent
-batch of 24 reports onto existing entries — all 24 were already recorded.</li>
-<li>Recorded the <strong>verified</strong> state of the docs/tour surface: the landing documentation and
-how-to-use pages are built and linked, but the in-app tour has <strong>2 of the 8+</strong> steps asked
-for and <strong>nothing in the app links to the docs</strong>.</li>
-<li><code>DOCS.md</code> now indexes the published <code>landing/</code> pages, which were missing from it entirely.</li>
+<li>Checked the state of the guided tour and the links to the documentation, and recorded what
+was actually there rather than what was assumed.</li>
 </ul>
 <blockquote>
-<p><strong>Changelog gap, stated rather than papered over:</strong> work landed between v0.8.1 and this
-entry (2026-07-30 → 08-01: B6, B8, C9, C14, D17, round-3 items 7/9/10/14/16, the custom
-domain and the landing-site rewrite) that was never given a version or an entry here.
-<code>BACKLOG.md</code> records it in full. This is exactly the drift BACKLOG item 24 is about — a
-release-notes page publishes from this file, so an entry has to be part of finishing work.</p>
+<p><strong>A gap in these notes, stated rather than papered over:</strong> work done between v0.8.1 and this
+release — including the custom domain and the rewritten website — was never given a version
+or an entry here. These notes are published from a single file, so writing the entry is now
+part of finishing the work rather than something done afterwards.</p>
 </blockquote>
 </section><section class="rel" id="v0-8-1"><h2><a class="anchor" href="#v0-8-1">v0.8.1</a><span class="when">2026-07-29</span></h2>
 <h3>Fixed</h3>
@@ -832,7 +825,7 @@ release-notes page publishes from this file, so an entry has to be part of finis
 Random forest could not be run at all — by hand or by the Co-Analyst — because the
 workspace renders a module&#39;s panel lazily and <code>updateSelectInput</code> fired before the
 element existed. <code>active_dataset()</code> now depends on <code>ds_refresh</code>, bumped when a tool
-opens. (CLAUDE.md gotcha 18.)</li>
+opens.</li>
 <li><strong>Raster invisible on the map</strong> although the view zoomed to it: layers were added by
 <code>leafletProxy</code> after the map element had been re-created. Tiles, view and layers are
 built in one pass now. Reprojection also ran at full resolution before downsampling
@@ -844,7 +837,7 @@ zoom to.</li>
 <li><strong>Adding a file yanked the map view.</strong> The automatic fit now applies only to the first
 spatial layer; everything after overlays.</li>
 <li><strong>Dark surfaces on the light colour sets</strong> (data tables, accordions, the R console,
-buttons) — Bootstrap&#39;s component variables restated from the tokens. (Gotcha 22.)</li>
+buttons) — Bootstrap&#39;s component variables restated from the tokens.</li>
 <li><strong>The R console cleared your script on every Run.</strong> It keeps it now.</li>
 </ul>
 <h3>Added</h3>
@@ -1342,9 +1335,9 @@ Tokola 2005</em> — with original-scale metrics. Verified numerically.</li>
 </ul>
 <p><strong>Docs</strong></p>
 <ul>
-<li>ARCHITECTURE.md, DESIGN.md, MEMORY.md, CLAUDE.md rewritten around the
-&quot;universal scientific analysis platform&quot; vision.</li>
-<li><code>papers/</code> folder + <code>papers/METHODS.md</code> catalog (paper → named method → status).</li>
+<li>The project&#39;s internal documentation was rewritten around the &quot;universal scientific analysis
+platform&quot; goal, and a catalogue of published methods was started — each paper mapped to the
+method it provides and whether that method is implemented yet.</li>
 </ul>
 <p><strong>Cataloged papers</strong></p>
 <ul>

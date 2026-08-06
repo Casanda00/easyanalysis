@@ -1,49 +1,24 @@
-# CHANGELOG.md — internal engineering record
+# Release notes — EasyAnalysis
 
-**This file is NOT published.** It is ours: the technical account of each release — root causes,
-what changed where, which trap it was, what was verified and what was not. Be as detailed and as
-raw as is useful.
+**This file is PUBLISHED.** `landing/build-release-notes.mjs` turns it into
+[easyanalysis.dev/release-notes](https://easyanalysis.dev/release-notes) on every push to `main`.
 
-Three documents, three jobs:
+Write it for **users**:
 
-| File | Audience | Published |
-|---|---|---|
-| **[RELEASE_NOTES.md](RELEASE_NOTES.md)** | users | **yes** — becomes easyanalysis.dev/release-notes |
-| **CHANGELOG.md** (this file) | us | no — the engineering detail behind each version |
-| **[BACKLOG.md](BACKLOG.md)** | us | no — reported issues, diagnosis, decisions, direction |
+- Say what changed *for someone using the app*, in plain language.
+- **No internal references** — no `BACKLOG`/`CLAUDE.md`, no gotcha numbers, no item or round
+  numbers, no file paths beyond what makes a change understandable.
+- **Never quote a reporter's words.** Describe the symptom neutrally instead.
 
-When you ship something a user would notice, write **both**: the plain-language entry in
-`RELEASE_NOTES.md` and the technical one here. The build fails if internal vocabulary
-(`BACKLOG`, `CLAUDE.md`, gotcha or item numbers, reporter quotes) reaches the published file, so
-the split is enforced rather than remembered.
+The engineering detail — root causes, the code that changed, which trap it was, what was verified —
+goes in **[CHANGELOG.md](CHANGELOG.md)**, which is internal and can be as raw as you like. The
+build fails if internal vocabulary reaches this file, so the split is enforced rather than
+remembered.
 
 Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced in `global.R`
 (`APP_VERSION`).
 
 ---
-
-## Documentation split — 2026-08-06 (no version; nothing shipped)
-
-Three files, three audiences, enforced by the build.
-
-- **RELEASE_NOTES.md** is now the ONLY published file. `build-release-notes.mjs` and the GitHub
-  workflow both read it instead of this one.
-- **CHANGELOG.md (this file) is internal.** It can be as raw and detailed as useful — root causes,
-  file paths, gotcha numbers, what was verified and what was not.
-- **BACKLOG.md** is unchanged: the engineering log, by round and item.
-
-Why: internal vocabulary had leaked onto the live site. Nine instances were published —
-`BACKLOG item 24`, `Round 4 (items 18-25)`, `CLAUDE.md gotcha 27/28/29`, `Backlog item F24`,
-`Gotcha 22`, plus `uef_evaluation()` named directly — all reading as jargon about tickets a
-visitor cannot see. The seed for RELEASE_NOTES.md was this file with those stripped; the originals
-stay here.
-
-The guard in `build-release-notes.mjs` now fails the build on `BACKLOG`, `CLAUDE.md`,
-`gotcha N`, `backlog item N`, a bare `item N.` or a reporter quote. **Control-tested**: injecting
-`(BACKLOG item 99)` exits 1 and names the line; removing it exits 0.
-
-Consumers repointed: the workflow's path filter, its commit message, the builder's error text and
-the release-notes checker.
 
 ## v0.10.24 — 2026-08-06
 
@@ -705,9 +680,9 @@ numbers:
 - `lme4` added to the optional packages.
 
 ### Fixed
-- `CLAUDE.md`'s note that `uef_evaluation()` was "available but unused" was out of date — it
-  is called by the LME, Random forest and Linear regression screens, and now by the registry
-  too. Corrected so the next reader does not wire up something that already works.
+- Internal notes claimed the shared model-quality function was unused. It is in fact used by the
+  mixed-effects, random forest and linear regression screens, and now by the method registry too,
+  which is what keeps those figures comparable between screens.
 
 ## v0.8.4 — 2026-08-04
 
@@ -739,23 +714,22 @@ numbers:
   this app exists so people do not have to. They now read **number, whole number, text,
   category, true/false, date**, with the R class kept as the cell's tooltip. The coloured
   badge behind them is gone too: it carried six hardcoded hex values that followed no theme,
-  and the colour never said anything the word did not. (Backlog item 28.)
+  and the colour never said anything the word did not.
 - **The Co-Analyst no longer offers suggestion chips.** They were the last place the app
   volunteered a next step, which contradicted its own system prompt — that already forbids
   the model from proposing one. The Recommend screen is kept and is where suggestions belong.
-  (Backlog item 27.)
 
 ### Added
 - **Undo now goes back 5 steps, not 1.** `snap()` was already the single choke point every
   data operation passes through, so the change is one bounded stack. Each undo reports how
   many steps remain, so the last press reads as "no further undo steps" rather than a dead
-  button. Capped deliberately — each entry is a full copy of the data frame. (Backlog item 32.)
+  button. Capped deliberately — each entry is a full copy of the data frame.
 - **A "Docs" button in the app.** The documentation pages have been live on the website for
   days, but nothing inside the app pointed at them, so users who never visited the site never
   found them. It sits in the top bar on both the projects screen and the analysis area, and
-  opens in a new tab so a running project is never navigated away from. (Backlog item 17.)
+  opens in a new tab so a running project is never navigated away from.
 - **The guided tour covers 9 steps, up from 6** — added the tool search, Undo/Reset, and the
-  new Docs link, clearing the "at least 8" requirement. (Backlog item F24.)
+  new Docs link, clearing the "at least 8" requirement.
 
 ### Fixed
 - **Undo could corrupt a dataset.** The undo snapshot was a single slot shared across every
@@ -775,7 +749,7 @@ numbers:
   `observeEvent(workspace_ctx$tool_open())` in `server.R` moved **after** the assignment it
   references, so a failure there no longer surfaces as a misleading "object not found" on
   every flush. Audited every other eager `output$x <- pkg::render*` binding — all use core
-  packages, so `plotly` was the only one exposed. (CLAUDE.md gotcha 27.)
+  packages, so `plotly` was the only one exposed.
 - **Nothing showed that the app was working.** Only 12 of 42 modules use `withProgress`, so
   on the other 30 — including most model screens — a slow fit looked like a frozen app. Worse,
   `ui.R` deliberately disables Shiny's own dimming (`--shiny-fade-opacity: 1`) on the promise
@@ -784,27 +758,21 @@ numbers:
   per-module wiring and works even while R is blocked (a server-rendered spinner cannot).
   Shown only by real request state, never a timer, and only after 400 ms so quick actions do
   not flash it. Also extended the existing skeleton shimmer to the model canvas.
-  (CLAUDE.md gotcha 29.)
 - **Native `<select>` popups and scrollbars ignored the theme.** Page CSS colours the closed
   control but not the browser-drawn popup list. Every colour set now declares
   `scheme = "light"|"dark"` in `theme.R` and `ea_theme_css()` emits a real `color-scheme`
   declaration; `:root` declares it too, since a first-time visitor has no `data-ea-theme`
   attribute yet while the default palette is dark. Added `option` colour rules as the
-  Chromium-specific complement. (CLAUDE.md gotcha 28.)
+  Chromium-specific complement.
 
 ### Docs
-- `BACKLOG.md`: Round 4 (items 18-25) and a Round 5 reconciliation table mapping a re-sent
-  batch of 24 reports onto existing entries — all 24 were already recorded.
-- Recorded the **verified** state of the docs/tour surface: the landing documentation and
-  how-to-use pages are built and linked, but the in-app tour has **2 of the 8+** steps asked
-  for and **nothing in the app links to the docs**.
-- `DOCS.md` now indexes the published `landing/` pages, which were missing from it entirely.
+- Checked the state of the guided tour and the links to the documentation, and recorded what
+  was actually there rather than what was assumed.
 
-> **Changelog gap, stated rather than papered over:** work landed between v0.8.1 and this
-> entry (2026-07-30 → 08-01: B6, B8, C9, C14, D17, round-3 items 7/9/10/14/16, the custom
-> domain and the landing-site rewrite) that was never given a version or an entry here.
-> `BACKLOG.md` records it in full. This is exactly the drift BACKLOG item 24 is about — a
-> release-notes page publishes from this file, so an entry has to be part of finishing work.
+> **A gap in these notes, stated rather than papered over:** work done between v0.8.1 and this
+> release — including the custom domain and the rewritten website — was never given a version
+> or an entry here. These notes are published from a single file, so writing the entry is now
+> part of finishing the work rather than something done afterwards.
 
 ## v0.8.1 — 2026-07-29
 
@@ -813,7 +781,7 @@ numbers:
   Random forest could not be run at all — by hand or by the Co-Analyst — because the
   workspace renders a module's panel lazily and `updateSelectInput` fired before the
   element existed. `active_dataset()` now depends on `ds_refresh`, bumped when a tool
-  opens. (CLAUDE.md gotcha 18.)
+  opens.
 - **Raster invisible on the map** although the view zoomed to it: layers were added by
   `leafletProxy` after the map element had been re-created. Tiles, view and layers are
   built in one pass now. Reprojection also ran at full resolution before downsampling
@@ -825,7 +793,7 @@ numbers:
 - **Adding a file yanked the map view.** The automatic fit now applies only to the first
   spatial layer; everything after overlays.
 - **Dark surfaces on the light colour sets** (data tables, accordions, the R console,
-  buttons) — Bootstrap's component variables restated from the tokens. (Gotcha 22.)
+  buttons) — Bootstrap's component variables restated from the tokens.
 - **The R console cleared your script on every Run.** It keeps it now.
 
 ### Added
@@ -1283,9 +1251,9 @@ an AI agent and the first paper-derived methodology implemented.
   Tokola 2005* — with original-scale metrics. Verified numerically.
 
 **Docs**
-- ARCHITECTURE.md, DESIGN.md, MEMORY.md, CLAUDE.md rewritten around the
-  "universal scientific analysis platform" vision.
-- `papers/` folder + `papers/METHODS.md` catalog (paper → named method → status).
+- The project's internal documentation was rewritten around the "universal scientific analysis
+  platform" goal, and a catalogue of published methods was started — each paper mapped to the
+  method it provides and whether that method is implemented yet.
 
 **Cataloged papers**
 - Kalliovirta & Tokola 2005 — stem diameter & tree age models (bias-corrected
