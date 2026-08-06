@@ -18,6 +18,18 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.23 — 2026-08-06
+
+### Fixed — undo history for deleted datasets was never released
+
+Undo keeps up to five steps of history for each dataset. When a dataset was removed from the
+project its history was meant to be released with it, but never was, so a long session slowly
+accumulated saved copies of data that no longer existed. Removing a dataset now frees its history
+straight away.
+
+Undo itself is unchanged: still five steps, still separate for each dataset, and it tells you how
+many steps remain each time you use it.
+
 ## v0.10.22 — 2026-08-06
 
 ### Added — map symbology for vector layers

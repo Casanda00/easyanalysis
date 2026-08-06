@@ -2391,7 +2391,7 @@ on a step, and the two features reinforce each other instead of being built twic
 
 ---
 
-### 32. Multi-step undo — up to 5 — FIXED 2026-08-04
+### 32. Multi-step undo — up to 5 — FIXED 2026-08-04, VERIFIED + leak fixed 2026-08-06
 > "multi step undo. could be undo up to 5 times."
 
 **Currently exactly one step**, and the code says so itself —
@@ -2428,6 +2428,30 @@ change than extending `mod_data.R`'s.
 
 **Related:** "Reset to Raw Data" (round-3 item 5, still open) is the unbounded version of the
 same idea and should be scoped to the active dataset. Worth doing in one visit.
+
+#### OUTCOME — built, and re-verified 2026-08-06 (v0.10.23)
+
+Everything above is the *plan*; the entry carried a FIXED marker but never recorded what was
+actually shipped. Checked against the code and driven through `testServer` rather than trusted:
+
+- `undo_stacks` is a **per-dataset** bounded stack, `.UNDO_MAX <- 5L` as a named constant next to
+  it. **Confirmed:** 7 mutations retain exactly 5 snapshots; five undos walk backwards through the
+  history in order (6→5→4→3→2); the sixth refuses with a message instead of corrupting anything.
+- **Keyed by dataset**, which fixes a real bug the single slot had: switching from A to B and
+  pressing Undo restored **A's data into B**. **Confirmed** an undo on B uses B's own history and
+  leaves A's stack intact.
+- The remaining-steps count is reported in the notification, because the Undo control is static
+  markup fired from JS in four places and has no server-rendered label to update.
+
+**One real bug found by that verification — gotcha 14 again.** The pruning that drops stacks for
+deleted datasets read `names(dataset_pool)`. Removing a dataset sets `dataset_pool[[k]] <- NULL`,
+which **leaves the name in place with a NULL value**, so every deleted dataset still looked live
+and the pruning dropped nothing — the memory leak it existed to prevent stayed open for the whole
+session. Now filtered on the **value**, the same thing `.pool_names()` does in `server.R`.
+
+**Still open on this item:** the decision above — undo covers **the Data screen only**, not the R
+console (C9). A console assignment can overwrite a dataset in place with no undo. A shared stack on
+`dataset_pool` would cover both and is the natural home for **Step 4's feature deletion** too.
 
 ---
 
@@ -4450,3 +4474,45 @@ already past the point of being readable top-to-bottom.
   unusable. Consider showing only the most recent N with a "show all" toggle.
 - Worth pairing with **grouping by minor version** (v0.10.x) so the sidebar is two levels rather
   than one flat list of 62.
+
+### 56. Split the docs: "Getting started" vs a living technical reference — **OPEN, documented not built**
+> "I am thinking we have to rename Documentation in the landing page to getting started or similar.
+> then create a proper documentation page. thi documentation will be the living source of truth on
+> how the app does things. for eg, how it calculates regression analyses."
+
+**The problem is real and getting worse.** `documentation.html` is currently doing two jobs at
+once: telling a new user how to install and find things, *and* being the reference for what the app
+does. The symbology section added in v0.10.22 made that obvious — it is method documentation sitting
+in what is otherwise an orientation guide.
+
+**Proposed split:**
+
+| Page | Audience | Contains |
+|---|---|---|
+| **Getting started** (the renamed `documentation.html`) | someone who has just installed it | install, requirements, the workspace, menus, file formats, projects, privacy, troubleshooting, how to cite |
+| **Reference** (new) | someone who has a result and needs to know what produced it | **per method: the function actually called, its arguments, how inputs are prepared, what the metrics mean, and the assumptions** |
+
+**Why this matters more than tidiness.** A user publishing a result needs to say what was computed.
+Right now the only way to know that a regression is `stats::lm` with a particular
+handling of factors, or that graduated symbology uses **quantile** breaks, is to read the source.
+For a tool aimed at people who do not write code, that is the wrong place to keep it.
+
+**It must be a LIVING source of truth, which is the hard part.** Hand-written method docs drift from
+the code — this repo has already produced three examples (`llms.txt` describing a build that no
+longer existed, a favicon claimed as done and never served, `uef_evaluation()` documented as unused
+while four modules called it). Options, cheapest first:
+1. **Generate what can be generated.** `statistics.R` and `algorithms.R` are registries: id, label,
+   group, summary, roles, parameters are already structured data. A build script could emit the
+   method list, its inputs and its parameters directly from them — the same approach
+   `build-release-notes.mjs` uses for the changelog, which has not drifted since.
+2. **Hand-write only what the registry cannot express** — the assumptions, the interpretation, the
+   caveats — and keep it beside the spec so it is edited in the same place.
+3. **A check that fails** when a registry entry has no reference text, the way `check_ui_js.R` fails
+   on bad JS.
+
+**Cross-references:** the in-app **References** screen already lists published methods and their
+DOIs (`references.R`) — the new page should link to it rather than duplicate it. `papers/METHODS.md`
+covers the same ground internally.
+
+**Do not start until items 38/39 land** — per the working agreement, and because a reference page
+written now would need rewriting as delete, edit and raster symbology arrive.

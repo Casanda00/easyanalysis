@@ -289,7 +289,15 @@ dataServer <- function(id, raw_pool, dataset_pool, dataset_names, active_dataset
       s[[ds]] <- st
       # Drop stacks for datasets that no longer exist, so a long session cannot
       # accumulate snapshots of deleted layers.
-      live <- names(dataset_pool)
+      #
+      # names() ALONE DOES NOT WORK HERE (gotcha 14): removing a dataset sets
+      # dataset_pool[[k]] <- NULL, which leaves the NAME in place with a NULL
+      # value. So every deleted dataset still looked "live" and this pruning
+      # dropped nothing -- the leak it was written to prevent stayed open. Filter
+      # on the VALUE, the same thing .pool_names() does in server.R.
+      live <- Filter(function(k) !is.null(tryCatch(dataset_pool[[k]],
+                                                   error = function(e) NULL)),
+                     names(dataset_pool))
       s <- s[names(s) %in% live]
       undo_stacks(s)
       invisible(NULL)
