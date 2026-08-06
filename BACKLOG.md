@@ -3946,3 +3946,91 @@ layer above quit. `check_ui_js` PASS, build OK, app serves HTTP 200.
 **Note:** a literal `"` inside the new JS comment broke the R parse on the first run — CLAUDE.md
 gotcha 1, caught loudly by the build. Recorded because it is the second escaping trip-up in this
 file in two days (gotcha 1b was the silent `\n` variant).
+
+### 51. Tables of the user's own data were limited to 100 rows a page — **DONE (v0.10.15)**
+> "i tried to do the DT sorting. so I loaded a data, but I can only see 100 rows max."
+> "i was looking at the attribute table. maybe for view datatable, we should have full tabe too"
+> "yes, ALL is good"
+
+**A second, independent limit that Step 0 did not remove.** Step 0 took the 200-row cap out of the
+*data*; this was a cap on the *page size*. **DT's default `lengthMenu` is 10/25/50/100**, so the
+largest page anyone could ask for was 100 rows — which reads as "this table only holds 100",
+and there was no way to ask for more.
+
+Three tables show a user's own data, and each had a problem:
+
+| Table | Where | Problem |
+|---|---|---|
+| Attribute table (`attr_dt`) | `mod_workspace.R` | page size capped at 100 (data cap fixed in Step 0) |
+| Data view (`dt`) | `mod_workspace.R` | **still had `head(df, 200)`** — Step 0 missed it — *and* the page cap |
+| View Data modal | `server.R` | never row-capped, but the same 100-row page cap |
+
+**Fix:** `ea_dt_len()` in `helpers.R` — one shared page-size menu offering
+**10 / 25 / 50 / 100 / 500 / 1000 / All**, used by all three. Put in `helpers.R` rather than
+duplicated, since a fourth data table will want it too.
+
+`All` (DT's `-1`) is offered **last on purpose**: these tables are `server = TRUE`, so All really
+does ship every row. It should be a deliberate choice on a large layer, not something to stumble
+into by picking the biggest number.
+
+**Only for data tables.** Fixed result tables (metrics, coefficients) use `dom = "t"` with no
+pager and must not get this — noted in the helper.
+
+**Verified:** neither workspace table calls `head()` any more (checked with comments stripped);
+all three use the shared menu; the menu really does offer sizes past 100 and All; a
+**control** confirms the old shape capped at 200 rows with DT's default menu; `testServer` runs
+with a 1,200-row table and a 1,200-feature layer bound. `check_ui_js` PASS, serves HTTP 200.
+
+---
+
+### GIS parity Step 1 — **the sorting assumption is CONFIRMED (tested by the reporter)**
+> "when I select a row, and sort, then sort again, that row stays selected. both sort for up and
+> down, the selection remains the same for the selected row… assume its ascending order and i
+> clicked row 1, when i sort, i dont see it. so i sort to descending, i select row 1 (which is
+> different), when i sort back to ascending order, the original row one is still selected."
+
+**This is the answer Step 2 was waiting on, and it is the good outcome.** The selection is bound
+to the **underlying data row**, not to the screen position: a selected row stays selected through
+a re-sort, moves with its data, and two rows selected under different sort orders both persist as
+distinct selections.
+
+So `input$attr_dt_rows_selected` returns **original-data indices**, and because Step 0 proved row
+*i* of the table is feature *i* of the layer, **Step 2 can index the `sf` object directly** —
+`vector_pool[[layer]][idx, ]` — with no lookup table and no spatial hit-testing. That is the
+cheapest possible form of the feature, and it is now confirmed by observation rather than assumed
+from documentation.
+
+**One consequence worth designing for:** selections *accumulate* across sorts. That is correct
+behaviour for multi-select, but it means the user can build a selection they cannot see all of at
+once, so the UI needs a visible **selected count** and a **Clear selection** control. Fold both
+into Step 2.
+
+---
+
+### 52. Make the attribute table dockable, with window controls — **OPEN, not started**
+> "I think we should make the attribute table dockable. and in the header, instead of just
+> attribute table, use the state like dock attribute tabe or undock. for the table itself, we can
+> have the close, minimize (which docks it), maximize."
+
+The attribute table currently lives in a fixed dock at the bottom of the Map view
+(`mod_workspace.R`, "Step 6: attribute-table dock"). Reading a wide table in a short strip is
+cramped, which is what prompted this.
+
+**Asked for:**
+- **Dock / undock** the panel, with the header naming the *action* (i.e. it reads "Undock" while
+  docked), not just the panel.
+- **Window controls on the table itself:** close, minimize (which docks it), maximize.
+
+**Notes before building:**
+- **Maximize is the highest value and the cheapest** — a full-canvas attribute table solves the
+  cramped-strip problem on its own. Worth doing first and possibly on its own.
+- **Undock implies a floating, draggable, resizable panel**, which is a genuine step up: it needs
+  position/size state, a drag implementation, and it must not fight the workspace CSS grid. The
+  `.ea-pop` reusable hover panel already exists (UNIFIED_WORKSPACE.md) — **check whether it can
+  carry this** before writing anything new.
+- **Interaction with items 38/40:** the table becomes a selection surface, so the same panel must
+  stay usable while clicking the map. A floating panel that covers the map would fight
+  click-to-identify — so if undocked, it must be movable *and* the map must stay reachable.
+- **State belongs in the project**, alongside the last view, or the layout resets on every reopen.
+- **Sequencing:** this is UI polish over the same panel Steps 2-4 are about to change. Doing it
+  *after* Step 2 avoids rewriting the panel twice — but Maximize alone could land at any time.

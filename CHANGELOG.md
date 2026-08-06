@@ -18,6 +18,18 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.15 — 2026-08-06
+
+### Fixed — tables of your own data were limited to 100 rows a page
+
+Whatever the size of your dataset, the largest page a table would show was 100 rows, and there
+was no way to ask for more — so a table of thousands of rows looked like it held 100.
+
+The attribute table, the data view and the View Data window now let you choose
+**10 / 25 / 50 / 100 / 500 / 1000 / All** rows a page. The data view had a second, separate limit
+that stopped it at 200 rows regardless; that is gone too, so all three now show the whole
+dataset.
+
 ## v0.10.14 — 2026-08-06
 
 ### Fixed — the app no longer becomes unusable after the computer sleeps

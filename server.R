@@ -928,12 +928,16 @@ server <- function(input, output, session) {
     # position mid-edit. DT already updates the edited cell in the browser, so
     # there is nothing to re-render. Switching dataset still rebuilds, because
     # active_dataset() is a real dependency.
+    # The whole dataset, with page sizes up to All (ea_dt_len, helpers.R). DT's
+    # default menu stopped at 100 rows a page, which made even an uncapped table
+    # look like it held only 100.
     DT::datatable(isolate(dataset_pool[[ds]]),
                   editable = "cell",
                   class    = "compact stripe hover ea-dt",
-                  options  = list(pageLength = 15, scrollX = TRUE,
-                                  scrollY = "58vh", scrollCollapse = TRUE,
-                                  paging = TRUE, autoWidth = FALSE))
+                  options  = c(list(pageLength = 15, scrollX = TRUE,
+                                    scrollY = "58vh", scrollCollapse = TRUE,
+                                    paging = TRUE, autoWidth = FALSE),
+                               ea_dt_len()))
   })
 
   observeEvent(input$global_data_table_cell_edit, {

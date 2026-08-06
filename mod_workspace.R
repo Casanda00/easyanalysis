@@ -1485,14 +1485,17 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # deleted. `selection = "multiple"` is enabled here for the same reason --
       # it costs nothing now and is what those items need.
       DT::datatable(df, selection = "multiple", rownames = FALSE,
-                    options = list(pageLength = 6, scrollX = TRUE))
+                    options = c(list(pageLength = 6, scrollX = TRUE), ea_dt_len()))
     }, server = TRUE)
 
     output$dt <- DT::renderDataTable({
       ds <- dtName(); req(ds)
       df <- dataset_pool[[ds]]; req(is.data.frame(df))
-      DT::datatable(utils::head(df, 200),
-                    options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
+      # Was head(df, 200) -- the same invisible truncation the attribute table
+      # had. DT's own "Showing 1 to N of M entries" line now tells the truth,
+      # which is what makes a cap unnecessary AND detectable.
+      DT::datatable(df, rownames = FALSE,
+                    options = c(list(pageLength = 10, scrollX = TRUE), ea_dt_len()))
     }, server = TRUE)
 
     # ONE ggplot spec, rendered either STATIC (ggplot) or INTERACTIVE (plotly:

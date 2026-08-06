@@ -149,6 +149,19 @@
     DT::formatStyle("Metric", fontWeight = "bold")
 }
 
+# Page-size choices for any table showing a USER'S OWN DATA (attribute table,
+# data view, View Data modal). DT's default lengthMenu is 10/25/50/100, so the
+# largest page anyone could ask for was 100 rows -- which reads as "this table
+# only holds 100", and did. -1 is DT's code for All; it comes last because with
+# server-side tables it genuinely ships every row, so it should be a deliberate
+# choice rather than something to stumble into.
+#
+# Only for data tables. Small fixed result tables (metrics, coefficients) use
+# dom = "t" with no pager and must not get this.
+ea_dt_len <- function()
+  list(lengthMenu = list(c(10, 25, 50, 100, 500, 1000, -1),
+                         c("10", "25", "50", "100", "500", "1000", "All")))
+
 # Pretty-print .clf_prf() result to console.
 .print_prf <- function(prf_df, acc = NULL) {
   if (!is.null(acc))

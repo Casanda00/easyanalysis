@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.14.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.15.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,22 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.14</b> · 56 releases ·
+      <p class="meta">Latest: <b>v0.10.15</b> · 57 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-14"><h2><a class="anchor" href="#v0-10-14">v0.10.14</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-15"><h2><a class="anchor" href="#v0-10-15">v0.10.15</a><span class="when">2026-08-06</span></h2>
+<h3>Fixed — tables of your own data were limited to 100 rows a page</h3>
+<p>Whatever the size of your dataset, the largest page a table would show was 100 rows, and there
+was no way to ask for more — so a table of thousands of rows looked like it held 100.</p>
+<p>The attribute table, the data view and the View Data window now let you choose
+<strong>10 / 25 / 50 / 100 / 500 / 1000 / All</strong> rows a page. The data view had a second, separate limit
+that stopped it at 200 rows regardless; that is gone too, so all three now show the whole
+dataset.</p>
+</section><section class="rel" id="v0-10-14"><h2><a class="anchor" href="#v0-10-14">v0.10.14</a><span class="when">2026-08-06</span></h2>
 <h3>Fixed — the app no longer becomes unusable after the computer sleeps</h3>
 <p>Closing a laptop lid, or leaving the machine to sleep, broke the connection between the page and
 EasyAnalysis. All you got was a grey screen with no way to recover — the app looked permanently
