@@ -18,6 +18,29 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.24 — 2026-08-06
+
+### Added — a Reference page: what EasyAnalysis actually computes
+
+There is a new **Reference** page on the website describing what happens when you run an analysis:
+the R function behind each method, the variables it needs, the options it offers, and what the
+results mean. It covers 14 statistical methods and 50 spatial operations.
+
+**The page is generated from the application itself.** The method names, variable roles, options
+and the underlying function calls are read out of the app when the page is built, so they cannot
+drift away from what the software actually does. Assumptions and caveats are written by hand,
+because those cannot be derived from code.
+
+If you are publishing a result, this is the page that tells you what to describe in your methods
+section.
+
+### Changed — Documentation is now "Getting started"
+
+The old Documentation page was doing two jobs: helping new users find their way around, and
+serving as the reference for what the app does. It is now **Getting started** — install, the
+workspace, menus, file formats, projects, privacy and troubleshooting — and the method detail
+lives on the new Reference page. Existing links still work.
+
 ## v0.10.23 — 2026-08-06
 
 ### Fixed — undo history for deleted datasets was never released

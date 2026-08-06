@@ -4516,3 +4516,122 @@ covers the same ground internally.
 
 **Do not start until items 38/39 land** — per the working agreement, and because a reference page
 written now would need rewriting as delete, edit and raster symbology arrive.
+
+### 56 (part 1) — **DONE (v0.10.24)**: docs split, and a GENERATED method reference
+
+The split proposed above is built.
+
+| Page | URL | Role |
+|---|---|---|
+| **Getting started** | `/documentation` *(URL unchanged)* | install, workspace, menus, formats, projects, privacy, troubleshooting, citing |
+| **Reference** | `/reference` *(new)* | what the app actually computes |
+
+**The URL of the existing page was deliberately NOT changed.** `/documentation` is linked from the
+app's Docs button, `llms.txt`, the sitemap, the README and both other pages. Renaming the file to
+match the new title would have broken every one of them for a cosmetic gain. Only the **title, the
+`<h1>` and the nav label** changed.
+
+#### The reference page is generated — `tools/build-reference.R`
+
+**This is the anti-drift decision, and it is the point of the whole item.** Prose that repeats what
+code does eventually lies about it, and this repo has three proofs already: `llms.txt` described a
+WebAssembly build that no longer existed; the favicon was recorded as "linked from the page
+`<head>`" while the site 404'd it; CLAUDE.md called `uef_evaluation()` unused while four modules
+called it.
+
+So the page is built **from the registries**: `ea_statistics()` and `ea_algorithms()` already hold
+id, label, group, summary, variable roles and parameters as structured data. Currently **14
+statistical methods and 50 spatial operations** — note the 50, where CLAUDE.md still says 33; the
+generated page is now the accurate count and the prose is the stale one.
+
+**The strongest part: the engine call is extracted from the code.** Each spec's `fit()` / `run()`
+is deparsed and its `pkg::fn` calls read out, filtered against a list of plumbing packages. So the
+page states `MASS::polr()`, `lme4::glmer()`, `mgcv::gam()`, `randomForest::randomForest()`,
+`lidR::rasterize_terrain()` and so on **because the code says so**, not because someone wrote it
+down. Change the engine and the page follows on the next build; it cannot quietly become wrong.
+
+**What is deliberately NOT generated:** assumptions, interpretation and caveats — they cannot be
+derived from a spec. They live in `REFERENCE_NOTES` inside the build script, so they are edited
+next to the thing they describe rather than in a separate file that rots.
+
+Also hand-written, because they are cross-cutting rather than per-method: the **metrics** section
+(what RMSE / R² / Bias / RelBias mean, and that they come from one shared `uef_evaluation()` so
+they are comparable across screens) and the **symbology** section (quantile breaks and why,
+palette choice and colour-blind safety, the repeat rule for categorical numerics).
+
+**Follow-up, not done:** the generator is run by hand. It should run in CI like
+`build-release-notes.mjs` does — but it needs the full R app loaded, which is far heavier than the
+node build, so that needs its own decision.
+
+---
+
+### 57. Show the script that ran an analysis — **OPEN, documented not built**
+> "this should be a feature where the user can click see script ran and the script that was used
+> for the analyses gets shown."
+
+A **"See script"** control on a result that shows the R code which produced it.
+
+**This is the highest-value item in this group, and it is close to free**, because the registries
+already hold everything: `statistics.R` specs carry a `fit(df, r, p)` whose body IS the script, and
+the runner already knows the chosen roles and parameter values. Deparsing the fit body and
+substituting the actual column names produces a runnable script rather than a description of one.
+
+**Why it matters beyond convenience:**
+- **Reproducibility.** A point-and-click result currently cannot be reproduced by anyone who was
+  not sitting at the machine. A visible script makes it citable and checkable.
+- **It is the same mechanism as the reference page** (item 56) — one deparses the spec generically,
+  the other deparses it with the user's actual arguments filled in. Build them on one helper.
+- **Trust.** For an audience told not to write code, showing the code on demand is what makes the
+  tool inspectable rather than a black box.
+
+**Notes:** the script must include the library calls and the data-loading line, or it is not
+runnable. Where a method does preprocessing the user did not ask for (dropping NA rows, coercing a
+factor), **that must appear in the script** — it is exactly the hidden step someone needs to see.
+
+### 58. Download and upload scripts — R, Python, Jupyter — **OPEN, documented not built**
+> "document download r scipts and uploading r scripts. same for python and jupyter notebooks."
+
+- **Download** is the natural extension of item 57: once the script exists, save it as `.R`.
+- **Upload/run** is a much larger step and a **security boundary**: running an uploaded script is
+  arbitrary code execution in the user's session. Locally that is the same trust level as opening
+  RStudio, but it must be a deliberate decision, not a side effect of a file picker.
+- **Python and Jupyter are gated on the toolchain question in item 26/26a** — no Python
+  integration exists anywhere in the app, and Jupyter additionally needs a running server. Exporting
+  a `.ipynb` is *not* gated (a notebook is just JSON, and an R-kernel notebook needs no Python at
+  all) — worth separating those two, since export is cheap and execution is not.
+
+**Order:** show (57) → download `.R` → export `.ipynb` → upload/run R → Python at all.
+
+### 59. Multi-script tabs and run-a-line — **OPEN, partly a duplicate**
+> "document multi script tabs and one line code selector runs."
+
+**Already recorded as C11 (run line/selection, like RStudio's Ctrl+Enter) and C12 (script tabs)**,
+both open, and both blocked on the same thing recorded in item 26 part 2: the console's editor is a
+plain `textAreaInput`, which **has no notion of a current line, a selection or a gutter**. No amount
+of wiring gets Ctrl+Enter out of a textarea.
+
+**So the prerequisite is a real editor** (`shinyAce`, CodeMirror or Monaco). That single change
+unblocks C11, C12, C13 *and* is the editor item 26a's "Write code ▸ R" needs. It should be done
+once, deliberately, rather than approached three times from three items.
+
+### 60. Switching browser tabs makes the app think it disconnected — **OPEN, a defect in v0.10.14**
+> "document that when we change tab, the app thinks it went to sleep."
+
+The disconnect panel added in v0.10.14 (item 50) fires when the user switches **browser tabs**, not
+only when the machine sleeps. Wrong, and annoying: it interrupts normal use of a browser.
+
+**Likely cause, to confirm before fixing:** the panel is triggered by `shiny:disconnected`, and a
+backgrounded tab can have its websocket throttled or dropped by the browser. The handler cannot
+currently tell a real disconnect from a tab that was simply hidden.
+
+**Shape of the fix:**
+- Use the **Page Visibility API** — if `document.hidden` was true, treat a reconnect as routine and
+  do not show the panel at all.
+- **Wait before showing it.** A momentary drop should reconnect silently; only a disconnect that
+  persists past a short delay is worth a panel.
+- The existing **server probe already distinguishes the two real cases** (R alive vs stopped), so
+  the missing piece is only "is this worth telling the user about at all".
+- Keep the panel for genuine sleep/wake — that was a real complaint and the fix works.
+
+**This is a defect in shipped work, so under the working agreement it counts as closing rather than
+opening.** It is the next thing to fix.

@@ -81,6 +81,16 @@ To run the app, set your working directory to the `Shiny_app` folder and run:
 shiny::runApp()
 ```
 
+## Documentation
+
+- **[Getting started](https://easyanalysis.dev/documentation)** — installing it, the workspace,
+  menus, file formats, projects, privacy, troubleshooting.
+- **[Reference](https://easyanalysis.dev/reference)** — what the app actually computes: the R
+  function behind each analysis, the variables it needs, its options and what the metrics mean.
+  **Generated from the method registries**, so it cannot drift from the code.
+- **[How to use](https://easyanalysis.dev/how-to-use)** — a walkthrough from install to a mapped
+  result.
+
 ## How to cite
 
 If EasyAnalysis contributed to your work, please cite it. Replace the version with the one you

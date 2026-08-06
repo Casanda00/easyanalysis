@@ -25,7 +25,8 @@ with the app. Deployed from `landing/` to **easyanalysis.dev** (see [DEPLOY.md](
 | Page | What it is |
 |------|------------|
 | [landing/index.html](landing/index.html) | The landing page — what the app is, why, and the install one-liners. Nav links to the two pages below. |
-| [landing/documentation.html](landing/documentation.html) | **User documentation.** The detailed reference users are pointed at. |
+| [landing/documentation.html](landing/documentation.html) | **Getting started** (URL still `/documentation` — deliberately unchanged, since the app's Docs button, llms.txt, the sitemap and the README all point at it). Install, workspace, menus, formats, projects, privacy, troubleshooting, citing. |
+| [landing/reference.html](landing/reference.html) | **Method reference — GENERATED, do not hand-edit.** Built from the `statistics.R` / `algorithms.R` registries by `tools/build-reference.R`. States the R function each method actually calls, extracted by deparsing the spec's `fit()`/`run()`, so it cannot drift from the code. Hand-written notes live in `REFERENCE_NOTES` inside that script. **Not yet run in CI** (needs the full R app loaded) — rerun it after adding or changing a registry entry. |
 | [landing/how-to-use.html](landing/how-to-use.html) | **Practical walkthrough** — the task-oriented companion to the reference. |
 | [landing/release-notes.html](landing/release-notes.html) | **Published release notes — GENERATED, do not hand-edit.** Built from `CHANGELOG.md` by `landing/build-release-notes.mjs` and regenerated automatically by `.github/workflows/release-notes.yml` on any push to `main` that touches the changelog. Edit `CHANGELOG.md` instead; the page follows. One anchor per version (`#v0-10-4`). |
 | [landing/install.ps1](landing/install.ps1) / [landing/install.sh](landing/install.sh) | Static copies of the installers, served with explicit MIME headers via `landing/vercel.json`. They must stay in sync with the repo-root originals. |

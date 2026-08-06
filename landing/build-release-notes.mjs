@@ -191,7 +191,8 @@ const page = `<!doctype html>
       </a>
       <span class="links">
         <a href="how-to-use.html">How to use</a>
-        <a href="documentation.html">Docs</a>
+        <a href="documentation.html">Getting started</a>
+        <a href="reference.html">Reference</a>
         <a href="release-notes.html" style="color:var(--ink)">Release notes</a>
       </span>
     </div>
@@ -217,7 +218,7 @@ ${html}
     <div class="wrap">
       <a href="index.html">Home</a>
       <a href="how-to-use.html">How to use</a>
-      <a href="documentation.html">Documentation</a>
+      <a href="documentation.html">Getting started</a>
       <span style="margin-left:auto">Local-first · your data never leaves your machine.</span>
     </div>
   </footer>

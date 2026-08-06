@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.23.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.24.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -114,7 +114,8 @@
       </a>
       <span class="links">
         <a href="how-to-use.html">How to use</a>
-        <a href="documentation.html">Docs</a>
+        <a href="documentation.html">Getting started</a>
+        <a href="reference.html">Reference</a>
         <a href="release-notes.html" style="color:var(--ink)">Release notes</a>
       </span>
     </div>
@@ -125,14 +126,30 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.23</b> · 64 releases ·
+      <p class="meta">Latest: <b>v0.10.24</b> · 65 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-23"><h2><a class="anchor" href="#v0-10-23">v0.10.23</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-24"><h2><a class="anchor" href="#v0-10-24">v0.10.24</a><span class="when">2026-08-06</span></h2>
+<h3>Added — a Reference page: what EasyAnalysis actually computes</h3>
+<p>There is a new <strong>Reference</strong> page on the website describing what happens when you run an analysis:
+the R function behind each method, the variables it needs, the options it offers, and what the
+results mean. It covers 14 statistical methods and 50 spatial operations.</p>
+<p><strong>The page is generated from the application itself.</strong> The method names, variable roles, options
+and the underlying function calls are read out of the app when the page is built, so they cannot
+drift away from what the software actually does. Assumptions and caveats are written by hand,
+because those cannot be derived from code.</p>
+<p>If you are publishing a result, this is the page that tells you what to describe in your methods
+section.</p>
+<h3>Changed — Documentation is now &quot;Getting started&quot;</h3>
+<p>The old Documentation page was doing two jobs: helping new users find their way around, and
+serving as the reference for what the app does. It is now <strong>Getting started</strong> — install, the
+workspace, menus, file formats, projects, privacy and troubleshooting — and the method detail
+lives on the new Reference page. Existing links still work.</p>
+</section><section class="rel" id="v0-10-23"><h2><a class="anchor" href="#v0-10-23">v0.10.23</a><span class="when">2026-08-06</span></h2>
 <h3>Fixed — undo history for deleted datasets was never released</h3>
 <p>Undo keeps up to five steps of history for each dataset. When a dataset was removed from the
 project its history was meant to be released with it, but never was, so a long session slowly
@@ -1342,7 +1359,7 @@ transformed-Y regression). core methodology implemented.</li>
     <div class="wrap">
       <a href="index.html">Home</a>
       <a href="how-to-use.html">How to use</a>
-      <a href="documentation.html">Documentation</a>
+      <a href="documentation.html">Getting started</a>
       <span style="margin-left:auto">Local-first · your data never leaves your machine.</span>
     </div>
   </footer>

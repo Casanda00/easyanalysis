@@ -68,6 +68,12 @@ pasted in from scratch, and edited in a spreadsheet grid.
 Coordinate reference systems are searched against GDAL/PROJ's own database, so any of the ~6,900
 non-deprecated EPSG systems can be selected by code or by name.
 
+## Where the methods are documented
+
+Every analysis is described at https://easyanalysis.dev/reference — the R function actually
+called, the variables it requires, its options and what the results mean. That page is GENERATED
+from the application's own method registries, so it cannot drift from what the software does.
+
 ## How it works (technical)
 
 EasyAnalysis is an R Shiny application that runs locally. The installer fetches R (if needed) and
@@ -107,7 +113,8 @@ and should be cited as well — citing the tool does not replace citing the meth
 ## Links
 
 - Site: https://easyanalysis.dev
-- Documentation: https://easyanalysis.dev/documentation
+- Getting started: https://easyanalysis.dev/documentation
+- Method reference (what each analysis actually computes): https://easyanalysis.dev/reference
 - How to use: https://easyanalysis.dev/how-to-use
 - Release notes: https://easyanalysis.dev/release-notes
 - Source: https://github.com/Casanda00/easyanalysis
