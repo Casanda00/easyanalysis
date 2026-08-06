@@ -3899,3 +3899,50 @@ when the table is sorted or filtered. It is DT's documented behaviour and Step 2
 row is the one-minute check.
 
 **Next:** Step 1, the selection model (`reactiveVal(list(layer=, rows=))`), then Step 2.
+
+### 50. Sleeping the computer killed the app with no way back — **DONE (v0.10.14)**
+> "when the computer sleeps, the app disconnects and there's no way to restart the app."
+
+**Confirmed: there was no disconnect handling anywhere in the app.** Shiny's default response is
+a grey `#shiny-disconnected-overlay` that says the connection was lost and offers **nothing** — no
+reload, no explanation, no route back. So a laptop lid closing left the app looking permanently
+broken, and the only recovery was to find and re-run the launcher.
+
+**Why it happens:** sleeping suspends the network stack, so the websocket between the browser and
+the local R process dies. The **R process itself normally survives** — which is what makes this
+fixable, because reloading the page reconnects to a server that is still there.
+
+**Fix:** a replacement panel that says what happened and gives a way back. Shiny's own veil is
+hidden, since two overlays would stack and its one is the dead end.
+
+**It probes the server before advising, because the two cases need opposite remedies:**
+- **R still running** (the usual case after sleep) → "Reconnect" reloads the page and work
+  continues.
+- **R has stopped** → reloading can never work; the panel says to start EasyAnalysis again from
+  the Desktop shortcut and reopen the project.
+
+The probe uses `cache: 'no-store'` — a cached 200 would make a dead server look alive and send the
+user round a loop that cannot succeed.
+
+**One collision worth recording.** Quit also drops the websocket, so the disconnect panel would
+have fired on a deliberate close — and since it sits at `z-index` 100001 against the quit veil's
+100000, it would have **covered the "has closed" message and told the user to reconnect to
+something they had just closed.** `eaQuitApp()` now sets `window.eaQuitting` *before* firing the
+quit input, and the disconnect handler returns early on it. The verification checks the z-index
+ordering specifically, so the guard is proven load-bearing rather than assumed.
+
+**Nothing is lost on reconnect:** projects autosave to disk, so reopening restores the datasets,
+the active layer and the last view. Note the session-end handler still clears the in-RAM pools on
+disconnect (by design, ARCHITECTURE §9) — so after a reconnect the user reopens their project
+rather than finding it already loaded. That is a deliberate memory trade-off, not a bug.
+
+**Verified:** panel present and hidden until `.on`; fully tokenised (no hex, so it themes);
+Shiny's overlay suppressed; wired to `shiny:disconnected` and cleared on `shiny:connected`; the
+probe is cache-busting; the quit flag is set *before* the quit input fires; disconnect really does
+layer above quit. `check_ui_js` PASS, build OK, app serves HTTP 200.
+**Not verified here:** an actual sleep/wake cycle — no way to suspend this machine from a test.
+**Worth checking:** sleep the computer, wake it, and confirm the panel appears and Reconnect works.
+
+**Note:** a literal `"` inside the new JS comment broke the R parse on the first run — CLAUDE.md
+gotcha 1, caught loudly by the build. Recorded because it is the second escaping trip-up in this
+file in two days (gotcha 1b was the silent `\n` variant).

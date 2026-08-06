@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.13.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.14.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -125,14 +125,26 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.13</b> · 55 releases ·
+      <p class="meta">Latest: <b>v0.10.14</b> · 56 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-13"><h2><a class="anchor" href="#v0-10-13">v0.10.13</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-14"><h2><a class="anchor" href="#v0-10-14">v0.10.14</a><span class="when">2026-08-06</span></h2>
+<h3>Fixed — the app no longer becomes unusable after the computer sleeps</h3>
+<p>Closing a laptop lid, or leaving the machine to sleep, broke the connection between the page and
+EasyAnalysis. All you got was a grey screen with no way to recover — the app looked permanently
+broken, and the only way back was to find and run the launcher again.</p>
+<p>There is now a panel that explains what happened and offers a <strong>Reconnect</strong> button. It also
+checks whether EasyAnalysis is still running and tells you which situation you are in:</p>
+<ul>
+<li>still running (the usual case after sleep) — Reconnect picks up where you left off</li>
+<li>no longer running — it tells you to start EasyAnalysis again from the Desktop shortcut</li>
+</ul>
+<p>Your project is saved as you work, so nothing is lost either way.</p>
+</section><section class="rel" id="v0-10-13"><h2><a class="anchor" href="#v0-10-13">v0.10.13</a><span class="when">2026-08-06</span></h2>
 <h3>Fixed — the attribute table stopped at 200 features</h3>
 <p>A layer&#39;s attribute table only ever showed its first 200 features, with nothing to indicate there
 were more — so a shapefile with thousands of features looked like it had 200. It now shows every

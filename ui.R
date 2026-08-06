@@ -557,6 +557,39 @@ page_fillable(
       -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     }
     #ea-quit-veil.on { display: flex; }
+    /* Disconnect panel. Replaces Shiny's own grey veil, which is hidden below —
+       two overlays would stack, and Shiny's offers no way to recover. */
+    #shiny-disconnected-overlay { display: none !important; }
+    #ea-disconnect {
+      position: fixed; inset: 0; z-index: 100001; display: none;
+      align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--paper) 92%, transparent);
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    #ea-disconnect.on { display: flex; }
+    .ea-dc-card {
+      text-align: center; max-width: 460px; padding: 30px 34px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.32);
+      color: var(--ink); font-family: var(--ui);
+    }
+    .ea-dc-card h3 { margin: 14px 0 8px; font-size: 17px; }
+    .ea-dc-card p { margin: 0 0 6px; font-size: 13px; color: var(--bark); }
+    .ea-dc-sub { font-size: 12px !important; opacity: .8; margin-top: 10px !important; }
+    .ea-dc-mark {
+      width: 46px; height: 46px; margin: 0 auto; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--warn) 18%, transparent);
+      color: var(--warn); font-size: 19px;
+    }
+    .ea-dc-actions { margin: 16px 0 4px; }
+    .ea-dc-btn {
+      background: var(--forest); color: var(--onbrand); border: none;
+      border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: var(--ui);
+    }
+    .ea-dc-btn:hover { background: var(--canopy); }
+    .ea-dc-btn[disabled] { opacity: .5; cursor: default; }
     .ea-quit-card {
       text-align: center; max-width: 420px; padding: 30px 34px;
       background: var(--panel); border: 1px solid var(--line);
@@ -2332,6 +2365,48 @@ page_fillable(
         }
       }
 
+      /* ---- Disconnect (usually: the computer slept) ----
+         The websocket dies when the OS suspends the network stack. Shiny's own
+         response is a grey veil with no way out, so the app looked permanently
+         broken. Probe the server to tell the two cases apart, because the
+         remedy is different: R still running -> reload reconnects; R gone ->
+         it has to be started again. */
+      function eaShowDisconnect(){
+        /* Quit drops the websocket too, and that disconnect is EXPECTED -- without
+           this guard the panel would cover the has-closed message and tell the
+           user to reconnect to something they just closed. (No literal double
+           quotes in here: this is inside an R HTML() string -- gotcha 1.) */
+        if(window.eaQuitting) return;
+        var el = document.getElementById('ea-disconnect');
+        if(!el || el.classList.contains('on')) return;   /* never stack */
+        el.classList.add('on');
+        var msg = document.getElementById('ea-dc-msg');
+        var btn = document.getElementById('ea-dc-reload');
+        if(btn) btn.disabled = true;
+        /* cache: no-store so a cached 200 cannot make a dead server look alive. */
+        fetch(window.location.pathname + '?ea-ping=' + Date.now(),
+              { method: 'GET', cache: 'no-store' })
+          .then(function(r){
+            if(!r.ok) throw new Error('bad status');
+            if(msg) msg.textContent =
+              'EasyAnalysis is still running. This usually happens after the computer sleeps. Reconnect to carry on.';
+            if(btn){ btn.disabled = false; btn.textContent = 'Reconnect'; btn.focus(); }
+          })
+          .catch(function(){
+            if(msg) msg.textContent =
+              'EasyAnalysis has stopped. Start it again from the EasyAnalysis shortcut on your Desktop, then reopen your project.';
+            if(btn){ btn.disabled = false; btn.textContent = 'Try again'; }
+          });
+      }
+      if(window.jQuery){
+        jQuery(document).on('shiny:disconnected', eaShowDisconnect);
+        /* If it comes back on its own, get out of the way. */
+        jQuery(document).on('shiny:connected', function(){
+          var el = document.getElementById('ea-disconnect');
+          if(el) el.classList.remove('on');
+        });
+      }
+
       /* ---- Quit ----
          Confirm, then show the veil BEFORE telling the server to stop: once
          stopApp() runs the websocket drops, and anything we try to render after
@@ -2343,6 +2418,8 @@ page_fillable(
            block, taking openSettings() and every other handler with it. The
            app rendered fine and nothing was clickable. (Gotcha 1, new form.) */
         if(!confirm('Close EasyAnalysis?\\n\\nThe R session will stop. Your project is saved automatically.')) return;
+        /* Tell the disconnect handler this drop is intentional (see above). */
+        window.eaQuitting = true;
         var v = document.getElementById('ea-quit-veil');
         if(v) v.classList.add('on');
         Shiny.setInputValue('app_quit', Date.now(), {priority:'event'});
@@ -2754,6 +2831,27 @@ page_fillable(
         tags$p("The R session has stopped. You can close this tab now."),
         tags$p(class = "ea-quit-sub",
                "To start again, use the EasyAnalysis shortcut or run the launcher."))),
+
+    # Shown when the connection to R drops — which happens routinely when the
+    # computer SLEEPS, because the OS suspends the network stack and the
+    # websocket dies. Shiny's own response is a grey veil with no way out, so
+    # the app looked permanently broken and the only recourse was to hunt for
+    # the launcher. This panel says what happened and offers the way back.
+    #
+    # It distinguishes two very different cases by probing the server, because
+    # the remedy differs: if R is still running (the usual case after sleep) a
+    # reload reconnects; if R has stopped, no amount of reloading will help and
+    # the app has to be started again.
+    tags$div(id = "ea-disconnect",
+      tags$div(class = "ea-dc-card",
+        tags$div(class = "ea-dc-mark", icon("plug-circle-exclamation")),
+        tags$h3("Connection to R was lost"),
+        tags$p(id = "ea-dc-msg", "Checking whether EasyAnalysis is still running…"),
+        tags$div(class = "ea-dc-actions",
+          tags$button(id = "ea-dc-reload", class = "ea-dc-btn",
+                      onclick = "location.reload()", "Reconnect")),
+        tags$p(class = "ea-dc-sub",
+               "Your project is saved as you work, so nothing is lost."))),
 
     # =================== BODY ===================
     # Starts on Projects, so ship the layout class in the MARKUP. Adding it via

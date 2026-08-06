@@ -18,6 +18,22 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.14 — 2026-08-06
+
+### Fixed — the app no longer becomes unusable after the computer sleeps
+
+Closing a laptop lid, or leaving the machine to sleep, broke the connection between the page and
+EasyAnalysis. All you got was a grey screen with no way to recover — the app looked permanently
+broken, and the only way back was to find and run the launcher again.
+
+There is now a panel that explains what happened and offers a **Reconnect** button. It also
+checks whether EasyAnalysis is still running and tells you which situation you are in:
+
+- still running (the usual case after sleep) — Reconnect picks up where you left off
+- no longer running — it tells you to start EasyAnalysis again from the Desktop shortcut
+
+Your project is saved as you work, so nothing is lost either way.
+
 ## v0.10.13 — 2026-08-06
 
 ### Fixed — the attribute table stopped at 200 features
