@@ -4635,3 +4635,127 @@ currently tell a real disconnect from a tab that was simply hidden.
 
 **This is a defect in shipped work, so under the working agreement it counts as closing rather than
 opening.** It is the next thing to fix.
+
+---
+
+## Round 7 — scalability direction (2026-08-06)
+
+Not defects. This is **architectural direction**, recorded now so the next build decisions are made
+against it rather than around it. The reporter's framing:
+
+> "plugins ecosystem must be built for scability"
+> "plugin sdk, plugin repo, make built in tools use the same plugin system and many others. we
+> will plan better"
+> "scability: workflow automation / model builder (easy drag and drop)"
+> "multi language only when it adds value. for advanced deep learning and machine learning tasks,
+> use python under the hood. for statistical, use R."
+
+**These four are one architecture, not four features**, and the order they are built in matters
+more than any of them individually. Read 61 first — the rest sit on it.
+
+### 61. Plugin ecosystem — SDK, repo, and moving built-ins onto it
+
+**The important thing to say up front: this is half-built already, and it works.**
+`algorithms.R` + `mod_algo.R` and `statistics.R` + `mod_stat.R` are a plugin system in embryo —
+a declarative spec plus one generic runner. The evidence that the pattern scales is in this repo:
+spatial operations went from 33 to **50** and 14 statistical methods exist, every one added as a
+**list entry and nothing else**. When cancellation was needed it was **one change instead of 33**.
+So "build a plugin system" is really **finish and externalise the one that already exists**.
+
+**What is genuinely missing** — these are the gap, and each is a decision:
+
+| Gap | Why it matters |
+|---|---|
+| **Specs live inside the repo** and are sourced at boot | A plugin must load from *outside* the installation. This is the single defining change. |
+| **No manifest** — no id, version, author, min-app-version, declared dependencies | Without it there is no compatibility story and no way to tell why a plugin failed. |
+| **No isolation** | A single missing package (`plotly`) once took down the **entire workspace** — `::` resolved at module construction, `workspaceServer()` threw, and a forward-referenced observer then failed on every flush. A third-party plugin doing the same must degrade to "this plugin is unavailable", never to a dead app. |
+| **No trust boundary** | A plugin is **arbitrary R code running in the user's session**. Same boundary as item 58's script upload, and it must be a deliberate, visible decision — not a side effect of clicking Install. |
+| **Not every screen is on a registry** | 5 are deliberately irregular: `mod_tests.R` (variable-length roles), `mod_da.R` (two-stage canvas), `mod_descriptive.R` (no run button), `mod_clustering.R` (unsupervised), `mod_suitability.R` (variable-length criteria). `mod_raster.R` stays for layer management and draw-based ops. **These are exactly what "make built-in tools use the same plugin system" means** — and each is a real spec-expressiveness question, not a port. |
+
+**Sequencing that follows from the above:**
+
+1. **Document the spec contract properly.** Partly done — `/reference` now publishes roles,
+   parameters and engines *generated from the specs*, which is the beginning of an SDK document.
+2. **Make the spec expressive enough for the 5 irregular screens**, or decide each stays a module.
+   Doing this *before* opening the format publicly avoids a breaking change later.
+3. **External loading + manifest.** Only then is it a plugin system rather than a registry.
+4. **Isolation.** `compute_worker.R` already runs work in a **separate killable R process** — that
+   is the natural sandbox and it exists.
+5. **A repo/distribution story last**, because it is the part that cannot be changed quietly once
+   people depend on it.
+
+**Do not start 3-5 until 2 is settled.** Publishing a spec format that then has to change is the
+one mistake here that is expensive to undo.
+
+### 62. Workflow automation
+
+Chaining operations into a repeatable pipeline.
+
+**The registries make this unusually tractable**, and that is not a coincidence — every entry
+already declares its **inputs (with pools), its parameters and its output pool**. A workflow is a
+DAG over registry entries, and the type information needed to validate one is already there: an
+operation that takes a raster cannot be wired to a vector output, and the specs already say so.
+
+**Connections worth recording:**
+
+- This is the natural home for item 57's **script generation** — a workflow *is* a script, and both
+  should be produced from the same representation rather than two.
+- It is also how **item 42** ("has the platform met its goal of analysing and mapping in one
+  place?") gets a concrete answer: a workflow that runs a model and then maps its prediction is
+  precisely the integration that entry says is missing.
+- Cancellation and progress already exist for single operations (`compute_worker.R`); a workflow
+  needs them per step.
+
+### 63. Model builder — drag and drop
+
+A visual pipeline editor.
+
+**This is the same engine as 62 with a different front end**, and should be built that way. If the
+canvas gets its own execution model there will be two ways to express a pipeline and they will
+diverge — the same failure the selection model was built once to avoid (items 38/40).
+
+**Order: 62 before 63.** A drag-and-drop canvas over an execution engine that does not exist yet
+would define the engine implicitly, through the UI, which is the wrong way round.
+
+### 64. Multi-language policy — R for statistics, Python for deep learning
+
+> "multi language only when it adds value."
+
+**This is a policy, and a good one, because it answers a question that has been open since item 26
+with a criterion rather than a yes/no.** Python earns its place *where R genuinely lacks*, not for
+parity:
+
+| Use | Language | Why |
+|---|---|---|
+| Statistics, mixed models, spatial/LiDAR | **R** | Where the ecosystem is strongest, and where the app already is. |
+| Deep learning, modern ML, foundation/segmentation models | **Python** | `torch`, `transformers`, `samgeo` and similar have no R equivalent worth pretending about. |
+
+**The constraint this must respect** — and it is the app's main advantage: *"one installer, no
+toolchain, no admin rights"*. So:
+
+- **Python must be OPTIONAL and LAZY.** Installed when a user first asks for a tool that needs it,
+  never at install time. A managed virtual environment via `reticulate`, not a documented
+  prerequisite.
+- **A Python-backed tool must degrade like any other optional dependency** — the screen says what
+  is missing and how to get it, per gotcha 27, guarded at the **server binding** and not only in
+  the UI.
+- **This retires the ambiguity in item 26a**: the "Write code / Python / Jupyter" entries are about
+  *the user writing Python*, which is a different question from *the app using Python underneath*.
+  This policy answers the second and leaves the first open.
+
+**Note the plugin connection:** if 61 lands, a Python-backed method is just a plugin whose engine
+happens to be Python — the manifest declares it, and the toolchain is that plugin's problem rather
+than the app's. **That is the strongest argument for doing 61 first**: it turns a platform-wide
+commitment into a per-plugin one.
+
+### Recommended order for Round 7
+
+1. **61 step 2** — make the spec expressive enough for the irregular screens (decides the format).
+2. **62** — workflow engine over the registries; also delivers 57's script generation.
+3. **64** — Python as an optional engine, ideally arriving as a plugin.
+4. **63** — drag-and-drop over the proven engine.
+5. **61 steps 3-5** — external loading, isolation, distribution.
+
+**None of this should start before the GIS work finishes** (delete features, raster symbology), per
+the standing decision that the GIS side is fixed first. Recorded here so it is planned against, not
+started.
