@@ -1163,6 +1163,22 @@ page_fillable(
                    border: 1px solid var(--line); border-radius: 5px; }
     .ea-wsx-sc { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); cursor: pointer; }
     .ea-wsx-symrow { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--bark); margin-top: 6px; }
+    /* Symbology controls in the layer expander. The colour input and range
+       slider are BROWSER-DRAWN, so they follow `color-scheme` (gotcha 28)
+       rather than any rule here -- which is why the app declares it per theme
+       and these only need sizing. */
+    .ea-wsx-col {
+      width: 30px; height: 22px; padding: 0; border: 1px solid var(--line);
+      border-radius: 5px; background: var(--panel); cursor: pointer;
+    }
+    .ea-wsx-rng { flex: 1 1 0; min-width: 0; accent-color: var(--forest); cursor: pointer; }
+    .ea-wsx-vleg { margin-top: 5px; display: flex; flex-direction: column; gap: 3px; }
+    .ea-wsx-vlegrow {
+      display: flex; align-items: center; gap: 7px;
+      font: 400 11px var(--ui); color: var(--bark);
+    }
+    /* A long category list must not push the layer row to full height. */
+    .ea-wsx-vleg { max-height: 150px; overflow-y: auto; }
     .ea-wsx-sym { width: 13px; height: 13px; border-radius: 50%; flex: none; }
     /* Step 3: tool-panel host */
     .ea-wsx-toolhead { display: flex; align-items: center; gap: 8px; margin: 2px 0 12px;

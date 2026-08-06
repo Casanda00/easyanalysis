@@ -4350,3 +4350,86 @@ because the comment-stripper cuts at the first `#`, which swallowed the `"##"` i
 literal it was testing for. The pattern each time: **asserting against text rather than
 behaviour** — matching prose, consumed state, or a mangled source. The behaviour assertions have
 been right every time; the source-grep assertions keep being wrong.
+
+### GIS parity Step 5 / item 39 — **VECTOR SYMBOLOGY DONE (v0.10.21)**
+
+Closes the vector half of round-3 item 11. Raster symbology (stretch, classified, hillshade blend)
+remains open.
+
+**What it replaced.** The layer expander showed the words "single symbol" and three coloured
+swatches that **did nothing** — a mock. Vector styling was hardcoded green in `.draw_layers`.
+
+**Built on the store that already existed.** `layer_style` (a `reactiveVal` holding a list,
+persisted into the project by `project_store.R`) already carried the raster band mapping. Vector
+settings are nested under a **`vec`** key so they can never collide with the raster `mode` key.
+Verified that **renaming a layer carries its styling across** — `server.R:616` moves the entry.
+
+#### What is available
+
+| Mode | Drives | Notes |
+|---|---|---|
+| **Single symbol** | fill + outline colour | The default. Computes nothing per feature, so the common case stays cheap. |
+| **Categorised** | one colour per distinct value | Legend lists every level. |
+| **Graduated** | numeric column, 3-9 classes | **Quantile** breaks. Legend lists each range. |
+
+- **Palettes:** viridis, magma, plasma, cividis, turbo — stored **by name**, not as a colour
+  vector, so a palette definition changing later does not freeze old projects to stale colours.
+- **Outline width** (0-6) and **fill opacity** (0-1) apply in every mode.
+- Points, lines and polygons each take an appropriate path; polygons keep a separate outline colour
+  so class boundaries stay legible.
+
+#### Decisions worth keeping
+
+- **Quantile breaks, not equal interval.** Most measured attributes are skewed; equal-width bands
+  put nearly everything in one class. Falls back to equal-width only when values are too tied for
+  quantiles to produce distinct breaks.
+- **Field lists are filtered by what the mode can actually use**, and a numeric column is offered as
+  a *category* only if its values repeat (`unique * 2 <= n`). **Caught by a test**: with 12 features
+  and 12 distinct volumes, every feature became its own class — a legend as long as the layer. The
+  rule was wrong, not the test.
+- **One resolver.** `.vec_colours()` returns one colour per feature (or NULL for single symbol), and
+  both the map and the legend read it, so what you see and what the legend says cannot drift.
+- **Selection stays red regardless of symbology** — a selection must stand out from the scheme, not
+  blend into it.
+- **One observer per control keyed by `{nm, v}`**, following `.band_sel`'s reasoning: the expander
+  is rebuilt for every layer on every render, so per-layer Shiny inputs would need per-layer
+  observers.
+
+**Verified:** defaults; field typing in both directions including the repeat rule; categorised gives
+one colour per level with equal categories sharing a colour; graduated breaks bound the data and
+colour tracks magnitude with no feature uncoloured; settings persist into `layer_style` under `vec`;
+all appearance controls store; changing palette changes the colours; and four degenerate inputs (no
+field, missing column, constant column, blank) fall back to single symbol instead of breaking the
+map. Map renders; legend offers all three modes and lists ranges; the dead mock markup is gone.
+`check_ui_js` PASS, HTTP 200.
+**Not verified:** appearance — worth checking the colour and range inputs are usable inside the
+layer expander, and that a long category list scrolls rather than stretching the panel.
+
+**Still open on symbology:** raster stretch / classified / paletted / hillshade blend, rule-based
+vector styling, and labels. Documented in round-3 item 11.
+
+---
+
+### 55. Release-notes page needs a contents sidebar — **OPEN, documented not built**
+> "the release notes page is getting long. we need a notebook style with contents on the side to
+> help readers"
+
+The page now carries **62+ releases** in one continuous scroll and grows with every push, so it is
+already past the point of being readable top-to-bottom.
+
+**Asked for:** a notebook-style layout — the release list in a **sidebar**, content beside it.
+
+**Notes before building:**
+- **`landing/release-notes.html` is GENERATED.** The change belongs in
+  `landing/build-release-notes.mjs`, not the output file, or the next push overwrites it.
+- **The anchors already exist** — every release renders `id="v0-10-21"`, so a contents list is a
+  loop over the versions already parsed (`body.match(/^## v/gm)`), not new parsing.
+- **`documentation.html` already has this exact layout** (a sticky `<aside>` of anchor links beside
+  an `<article>`), and `assets/site.css` carries its styling. **Reuse that** rather than inventing a
+  second sidebar idiom — the two pages should look like the same site.
+- **The site's CSP allows no external host**, so no scroll-spy library: highlighting the current
+  section needs a few lines of inline JS or `:target` styling.
+- **Mobile:** a fixed sidebar cannot simply collapse to nothing — 62 versions in a dropdown is also
+  unusable. Consider showing only the most recent N with a "show all" toggle.
+- Worth pairing with **grouping by minor version** (v0.10.x) so the sidebar is two levels rather
+  than one flat list of 62.

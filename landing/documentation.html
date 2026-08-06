@@ -63,6 +63,7 @@
       <a href="#menus">Menu reference</a>
       <a href="#methods">Methods available</a>
       <a href="#formats">Supported files</a>
+      <a href="#symbology">Map symbology</a>
       <a href="#projects">Projects &amp; storage</a>
       <a href="#packages">Packages</a>
       <a href="#privacy">Privacy &amp; security</a>
@@ -306,6 +307,112 @@
         </table>
         <div class="callout">An unrecognised extension isn't rejected outright — the app inspects the
           file and loads it as a raster or vector if it can.</div>
+      </section>
+
+      <section id="symbology">
+        <h2>Map symbology</h2>
+        <p>Symbology is how a layer is drawn on the map — its colours, outlines and transparency, and
+          whether those vary with the data. Every layer keeps its own settings, and they are saved
+          with the project, so a map you style once looks the same when you reopen it.</p>
+
+        <h3>Where to find it</h3>
+        <p>In the <strong>Layers</strong> panel, click the <strong>▶</strong> chevron at the right of
+          a layer's row to expand it. The symbology controls appear beneath the layer name, along
+          with a legend once the colours vary.</p>
+
+        <h3>Vector layers — three ways to colour</h3>
+        <table>
+          <tr><th>Mode</th><th>What it does</th><th>Use it when</th></tr>
+          <tr>
+            <td><strong>Single symbol</strong></td>
+            <td>Every feature drawn the same. You choose a fill colour and an outline colour.</td>
+            <td>The layer is context — boundaries, roads, a study area — and the data behind it is
+              not what you are showing.</td>
+          </tr>
+          <tr>
+            <td><strong>Categorised</strong></td>
+            <td>One colour per distinct value of a column. Species, land-cover class, treatment
+              group, yes/no.</td>
+            <td>The column holds <em>groups</em>. Each group gets its own colour and its own legend
+              entry.</td>
+          </tr>
+          <tr>
+            <td><strong>Graduated</strong></td>
+            <td>A numeric column split into classes, shaded light to dark. Volume, height, area,
+              density, a model prediction.</td>
+            <td>The column holds <em>amounts</em>, and you want to see where the high and low values
+              are.</td>
+          </tr>
+        </table>
+
+        <h3>Choosing a column</h3>
+        <p>Only columns that suit the mode are offered, so you cannot pick something that produces a
+          meaningless map:</p>
+        <ul>
+          <li><strong>Categorised</strong> offers text, factor and yes/no columns, plus number
+            columns whose values genuinely repeat. A number column with a different value on every
+            feature — an ID, a measurement — is <em>not</em> offered, because colouring by it would
+            give every feature its own colour and a legend as long as the layer.</li>
+          <li><strong>Graduated</strong> offers number columns only.</li>
+        </ul>
+        <p>If a layer has no suitable column for the mode you picked, the panel says so rather than
+          leaving you with an empty list.</p>
+
+        <h3>Classes and breaks (graduated)</h3>
+        <p>You can split the values into <strong>3 to 9 classes</strong>. The class boundaries are
+          chosen by <strong>quantiles</strong> — each class holds roughly the same number of
+          features. This is deliberate: most measured data is skewed, and cutting it into equal-width
+          bands would put nearly everything in one class and leave the rest almost empty. Where the
+          values are too tied for quantiles to give distinct boundaries, equal-width bands are used
+          instead.</p>
+        <p>The legend lists each class and the range of values it covers.</p>
+
+        <h3>Palettes</h3>
+        <p>Five colour ramps are available for categorised and graduated layers:
+          <strong>viridis</strong>, <strong>magma</strong>, <strong>plasma</strong>,
+          <strong>cividis</strong> and <strong>turbo</strong>. These are perceptually uniform — equal
+          steps in the data look like equal steps in colour — and viridis, magma, plasma and cividis
+          remain distinguishable for the most common forms of colour blindness. Cividis is the safest
+          choice if that matters for your audience.</p>
+
+        <h3>Outline and opacity</h3>
+        <p>Two sliders apply in every mode:</p>
+        <ul>
+          <li><strong>Outline width</strong> — 0 to 6. Set it to 0 for fills with no border; raise it
+            to make thin lines easier to see and to click.</li>
+          <li><strong>Fill opacity</strong> — 0 to 1. Lower it to see the basemap or another layer
+            through a polygon; set it to 0 for outline-only polygons.</li>
+        </ul>
+        <p>Point layers also use the outline width for the ring around each point.</p>
+
+        <h3>How it applies to each geometry type</h3>
+        <table>
+          <tr><th>Geometry</th><th>What the colour drives</th></tr>
+          <tr><td>Points</td><td>Fill of the circle; the outline ring uses the outline colour, or the
+            class colour when categorised or graduated.</td></tr>
+          <tr><td>Lines</td><td>The line colour. Opacity is applied more strongly than for fills, so
+            lines stay visible.</td></tr>
+          <tr><td>Polygons</td><td>The fill. The outline keeps its own colour so class boundaries
+            stay legible.</td></tr>
+        </table>
+
+        <h3>Raster layers</h3>
+        <p>Rasters have their own controls in the same place:</p>
+        <ul>
+          <li><strong>True colour (RGB)</strong> — for imagery with three or more bands, choose which
+            band feeds red, green and blue. Sentinel-2 and similar products are detected
+            automatically where the bands are labelled.</li>
+          <li><strong>Single band</strong> — draw one band as a shaded ramp instead.</li>
+        </ul>
+
+        <h3>Selection is not symbology</h3>
+        <p>Selected features are always outlined in <strong>red</strong>, whatever the layer's
+          symbology. That is deliberate: a selection has to stand out from your colour scheme rather
+          than blend into it. Clearing the selection returns the features to their normal
+          appearance.</p>
+
+        <div class="callout">Symbology settings are stored per layer and saved with the project. If
+          you rename a layer, its styling follows the new name.</div>
       </section>
 
       <section id="projects">

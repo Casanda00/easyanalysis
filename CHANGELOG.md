@@ -18,6 +18,31 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.21 — 2026-08-06
+
+### Added — map symbology for vector layers
+
+Layers were always drawn in the same green. You can now style each one, and the settings are saved
+with the project.
+
+Expand a layer in the **Layers** panel and choose how it is drawn:
+
+- **Single symbol** — one fill and outline colour for the whole layer.
+- **Categorised** — a colour per distinct value of a column, such as species or land-cover class.
+- **Graduated** — a numeric column split into 3 to 9 shaded classes, such as volume or height.
+
+Categorised and graduated layers get a legend showing what each colour means. Five colour ramps
+are available, four of which stay readable for the most common forms of colour blindness.
+
+Only columns that suit the mode are offered, so you cannot accidentally colour by something that
+gives every feature its own colour. Class boundaries for graduated layers are chosen so each class
+holds a similar number of features, which keeps skewed data readable.
+
+Outline width and fill opacity can be adjusted in every mode. Selected features stay outlined in
+red whatever styling you choose, so a selection is never lost in the colour scheme.
+
+Full details are in the documentation under **Map symbology**.
+
 ## v0.10.20 — 2026-08-06
 
 ### Fixed — clicking a point on the map did nothing

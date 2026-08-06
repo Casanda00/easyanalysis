@@ -206,13 +206,86 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           else if (n > 0) paste0("point cloud · height-shaded · ", format(n, big.mark = ","), " points")
           else "point cloud · extent only (points not loaded)"))
       }
-      tagList(  # vector
+      # ---- vector symbology controls ----
+      # This block used to be a MOCK: the words "single symbol" and three dead
+      # swatches that did nothing. These are the real thing.
+      st <- .vec_style(l$nm)
+      nmj <- jsonlite::toJSON(l$nm, auto_unbox = TRUE)
+      # One event per control, each carrying {nm, ...} -- the same reason the
+      # band selector does it (see .band_sel): these are rebuilt for every layer
+      # on every render, so per-layer Shiny inputs would need per-layer observers.
+      fire <- function(inp, expr)
+        sprintf("event.stopPropagation();Shiny.setInputValue('%s',{nm:%s,v:%s},{priority:'event'});",
+                ns(inp), nmj, expr)
+      cat_f <- .vec_fields(l$nm, "cat"); num_f <- .vec_fields(l$nm, "num")
+      cc <- tryCatch(.vec_colours(l$nm, vector_pool[[l$nm]], st), error = function(e) NULL)
+
+      tagList(
         div(class = "ea-wsx-lgh", "Symbol"),
-        div(class = "ea-wsx-symrow", span(class = "ea-wsx-sym", style = paste0("background:", l$col, ";")), " single symbol"),
-        div(class = "ea-wsx-lgh", "Colour by"),
-        div(class = "ea-wsx-style", span(class = "ea-wsx-sc", style = paste0("background:", l$col, ";")),
-          span(class = "ea-wsx-sc", style = "background:var(--sky)"),
-          span(class = "ea-wsx-sc", style = "background:var(--earth)")))
+        div(class = "ea-wsx-symrow",
+          tags$select(class = "ea-wsx-band", onchange = fire("ws_vsym", "this.value"),
+            tags$option(value = "single",
+                        selected = if (identical(st$sym, "single")) "selected", "Single symbol"),
+            tags$option(value = "categorised",
+                        selected = if (identical(st$sym, "categorised")) "selected", "Categorised"),
+            tags$option(value = "graduated",
+                        selected = if (identical(st$sym, "graduated")) "selected", "Graduated"))),
+
+        if (identical(st$sym, "single")) tagList(
+          div(class = "ea-wsx-lgh", "Colours"),
+          div(class = "ea-wsx-symrow",
+            tags$input(type = "color", class = "ea-wsx-col", value = st$fill,
+                       title = "Fill", onchange = fire("ws_vfill", "this.value")),
+            tags$input(type = "color", class = "ea-wsx-col", value = st$stroke,
+                       title = "Outline", onchange = fire("ws_vstroke", "this.value")))
+        ) else tagList(
+          div(class = "ea-wsx-lgh", "Colour by"),
+          if (!length(if (identical(st$sym, "categorised")) cat_f else num_f))
+            div(class = "ea-wsx-lgh2",
+                if (identical(st$sym, "categorised"))
+                  "No category-like columns in this layer."
+                else "No numeric columns in this layer.")
+          else tags$select(class = "ea-wsx-band", onchange = fire("ws_vfield", "this.value"),
+            tags$option(value = "", selected = if (!nzchar(st$field)) "selected", "— choose —"),
+            lapply(if (identical(st$sym, "categorised")) cat_f else num_f, function(f)
+              tags$option(value = f, selected = if (identical(f, st$field)) "selected", f))),
+          div(class = "ea-wsx-lgh", "Palette"),
+          tags$select(class = "ea-wsx-band", onchange = fire("ws_vpal", "this.value"),
+            lapply(.VEC_PALS, function(p)
+              tags$option(value = p, selected = if (identical(p, st$palette)) "selected", p))),
+          if (identical(st$sym, "graduated")) tagList(
+            div(class = "ea-wsx-lgh", "Classes"),
+            tags$select(class = "ea-wsx-band", onchange = fire("ws_vcls", "parseInt(this.value)"),
+              lapply(3:9, function(k)
+                tags$option(value = k, selected = if (k == st$classes) "selected", k))))
+        ),
+
+        div(class = "ea-wsx-lgh", "Outline & opacity"),
+        div(class = "ea-wsx-symrow",
+          tags$input(type = "range", class = "ea-wsx-rng", min = 0, max = 6, step = .5,
+                     value = st$weight, title = "Outline width",
+                     onchange = fire("ws_vweight", "parseFloat(this.value)")),
+          tags$input(type = "range", class = "ea-wsx-rng", min = 0, max = 1, step = .05,
+                     value = st$alpha, title = "Fill opacity",
+                     onchange = fire("ws_valpha", "parseFloat(this.value)"))),
+
+        # The legend: what the colours actually MEAN. Without it a graduated map
+        # is just pretty -- this is the half that makes it readable.
+        if (!is.null(cc)) tagList(
+          div(class = "ea-wsx-lgh", if (identical(cc$kind, "cat")) "Classes" else "Ranges"),
+          div(class = "ea-wsx-vleg",
+            if (identical(cc$kind, "cat"))
+              lapply(seq_along(cc$levels), function(i)
+                div(class = "ea-wsx-vlegrow",
+                  span(class = "ea-wsx-sc", style = paste0("background:", cc$cols[i], ";")),
+                  span(cc$levels[i])))
+            else
+              lapply(seq_len(length(cc$breaks) - 1L), function(i)
+                div(class = "ea-wsx-vlegrow",
+                  span(class = "ea-wsx-sc", style = paste0("background:", cc$cols[i], ";")),
+                  span(sprintf("%s – %s", format(cc$breaks[i], digits = 4),
+                               format(cc$breaks[i + 1L], digits = 4)))))))
+      )
     }
 
     # The basemap as a row in the Layers panel, pinned to the BOTTOM because that
@@ -1046,6 +1119,91 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (is.null(layer_style)) return(invisible(NULL))
       st <- .style_get(); st[[nm]] <- cfg; layer_style(st)
     }
+    # ---- VECTOR SYMBOLOGY (backlog item 39 / round-3 item 11) --------------
+    # Stored in the SAME per-layer style store as the raster band mapping, so it
+    # is persisted in the project and survives closing the app. Vector keys are
+    # namespaced under `vec` so they can never collide with the raster `mode`.
+    #
+    # Literal hex throughout: leaflet cannot read CSS tokens, so map colours are
+    # the same legitimate exception as colours inside a plot (gotcha 31).
+    .VEC_DEF <- list(sym = "single", fill = "#5FBF62", stroke = "#2E7D32",
+                     weight = 1.5, alpha = 0.55, radius = 5,
+                     field = "", classes = 5L, palette = "viridis")
+
+    # Palettes offered for categorised / graduated. Named so the choice can be
+    # stored and replayed rather than a vector of colours being written into the
+    # project (which would not survive a palette being changed later).
+    .VEC_PALS <- c("viridis", "magma", "plasma", "cividis", "turbo")
+    .pal_n <- function(pal, n) {
+      n <- max(as.integer(n), 1L)
+      tryCatch(viridisLite::viridis(n, option = pal), error = function(e)
+        grDevices::hcl.colors(n, "viridis"))
+    }
+
+    .vec_style <- function(nm) {
+      cur <- .style_get()[[nm]]
+      v <- if (is.list(cur) && is.list(cur$vec)) cur$vec else list()
+      utils::modifyList(.VEC_DEF, v[!vapply(v, is.null, logical(1))])
+    }
+    .vec_style_set <- function(nm, patch) {
+      cur <- .style_get()[[nm]]; if (!is.list(cur)) cur <- list()
+      cur$vec <- utils::modifyList(.vec_style(nm), patch)
+      .style_set(nm, cur)
+    }
+
+    # Attribute columns available to colour by, split by what each mode needs:
+    # categorised wants something with levels, graduated wants a number.
+    .vec_fields <- function(nm, kind = c("cat", "num")) {
+      kind <- match.arg(kind)
+      df <- tryCatch(as.data.frame(sf::st_drop_geometry(vector_pool[[nm]])),
+                     error = function(e) NULL)
+      if (is.null(df) || !ncol(df)) return(character(0))
+      ok <- vapply(df, function(x) if (kind == "num") is.numeric(x) else {
+        if (is.character(x) || is.factor(x) || is.logical(x)) return(TRUE)
+        # A numeric column is category-LIKE only if its values repeat. A measured
+        # column with one distinct value per feature would otherwise be offered,
+        # and categorising by it gives every feature its own colour -- a legend
+        # as long as the layer, which is worse than no legend. Requiring at least
+        # two features per class on average excludes exactly that case.
+        if (!is.numeric(x)) return(FALSE)
+        u <- length(unique(x[!is.na(x)]))
+        u <= 12L && u * 2L <= length(x)
+      }, logical(1))
+      names(df)[ok]
+    }
+
+    # Resolve a style into ONE COLOUR PER FEATURE. Everything the map draws goes
+    # through here, so single/categorised/graduated cannot drift apart.
+    # Returns NULL when the style is a plain single symbol (the caller then uses
+    # the scalar colours, which keeps the common case cheap).
+    .vec_colours <- function(nm, v, st) {
+      if (identical(st$sym, "single") || !nzchar(st$field %||% "")) return(NULL)
+      x <- tryCatch(sf::st_drop_geometry(v)[[st$field]], error = function(e) NULL)
+      if (is.null(x) || !length(x)) return(NULL)
+      if (identical(st$sym, "categorised")) {
+        lv <- sort(unique(as.character(x[!is.na(x)])))
+        if (!length(lv)) return(NULL)
+        pal <- stats::setNames(.pal_n(st$palette, length(lv)), lv)
+        list(kind = "cat", levels = lv, cols = unname(pal),
+             per = unname(pal[as.character(x)]))
+      } else {
+        xn <- suppressWarnings(as.numeric(x))
+        if (!any(is.finite(xn))) return(NULL)
+        k <- max(2L, min(as.integer(st$classes), 12L))
+        # Quantile breaks: equal-interval is useless on skewed data, which most
+        # measured attributes are. Fall back to equal interval if the values are
+        # too tied for quantiles to produce distinct breaks.
+        br <- unique(stats::quantile(xn, probs = seq(0, 1, length.out = k + 1L),
+                                     na.rm = TRUE))
+        if (length(br) < 3L) br <- seq(min(xn, na.rm = TRUE), max(xn, na.rm = TRUE),
+                                       length.out = k + 1L)
+        br <- unique(br); if (length(br) < 3L) return(NULL)
+        cls <- cut(xn, breaks = br, include.lowest = TRUE, labels = FALSE)
+        pal <- .pal_n(st$palette, length(br) - 1L)
+        list(kind = "num", breaks = br, cols = pal, per = pal[cls])
+      }
+    }
+
     .rgb_of <- function(nm, nb) {
       cur <- .style_get()[[nm]]
       if (is.list(cur) && !is.null(cur$mode)) return(cur)   # the user decided
@@ -1054,6 +1212,29 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         list(mode = "rgb", r = det$r, g = det$g, b = det$b, why = det$why)
       else list(mode = "single", r = 1, g = 2, b = 3, why = NULL)  # undeclared: ask
     }
+    # One observer per symbology control. Each event carries {nm, v}, so a single
+    # handler serves every layer -- the same reason ws_rgb does.
+    local({
+      binds <- list(
+        ws_vsym    = function(v) list(sym = as.character(v)),
+        ws_vfield  = function(v) list(field = as.character(v)),
+        ws_vpal    = function(v) list(palette = as.character(v)),
+        ws_vcls    = function(v) list(classes = as.integer(v)),
+        ws_vfill   = function(v) list(fill = as.character(v)),
+        ws_vstroke = function(v) list(stroke = as.character(v)),
+        ws_vweight = function(v) list(weight = as.numeric(v)),
+        ws_valpha  = function(v) list(alpha = as.numeric(v))
+      )
+      for (k in names(binds)) local({
+        key <- k; mk <- binds[[k]]
+        observeEvent(input[[key]], {
+          e <- input[[key]]
+          if (is.null(e$nm) || is.null(e$v)) return()
+          .vec_style_set(e$nm, mk(e$v))
+        })
+      })
+    })
+
     observeEvent(input$ws_rgb, {
       s <- input$ws_rgb; nm <- s$nm
       r <- raster_pool[[nm]]; if (is.null(r)) return()
@@ -1583,16 +1764,27 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               # map click, so coordinate hit-testing never saw it at all.
               # "<layer>##<row>" because ids must be unique across layers.
               lid <- .fid(l$nm, seq_len(nrow(v1)))
+              # Symbology. `cc` is one colour per feature for categorised /
+              # graduated, or NULL for a plain single symbol -- in which case the
+              # scalar colours are used and nothing is computed per row.
+              st <- .vec_style(l$nm)
+              cc <- tryCatch(.vec_colours(l$nm, v1, st), error = function(e) NULL)
+              fillc <- if (is.null(cc)) st$fill else cc$per
+              strokec <- if (is.null(cc)) st$stroke else cc$per
               if (grepl("POINT", gt))
-                leaflet::addCircleMarkers(m, data = v1, radius = 5, color = "#7ED481",
-                  fillOpacity = .85, stroke = TRUE, weight = 1, group = "ws_layers",
-                  layerId = lid)
+                leaflet::addCircleMarkers(m, data = v1, radius = st$radius,
+                  color = strokec, weight = st$weight, stroke = TRUE,
+                  fillColor = fillc, fillOpacity = st$alpha,
+                  group = "ws_layers", layerId = lid)
               else if (grepl("LINE", gt))
-                leaflet::addPolylines(m, data = v1, color = "#7ED481", weight = 2,
+                leaflet::addPolylines(m, data = v1, color = strokec,
+                  weight = max(st$weight, 1), opacity = min(1, st$alpha + .35),
                   group = "ws_layers", layerId = lid)
               else
-                leaflet::addPolygons(m, data = v1, color = "#5FBF62", weight = 1.5,
-                  fillOpacity = .25, group = "ws_layers", layerId = lid)
+                leaflet::addPolygons(m, data = v1, color = st$stroke,
+                  weight = st$weight, opacity = 1,
+                  fillColor = fillc, fillOpacity = st$alpha,
+                  group = "ws_layers", layerId = lid)
             }
           }
         }, error = function(e) m)   # one bad layer must not blank the whole map
