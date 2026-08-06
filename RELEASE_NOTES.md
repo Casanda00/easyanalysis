@@ -20,6 +20,18 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.10.25 — 2026-08-06
+
+### Fixed — switching browser tabs no longer looks like a disconnection
+
+Moving to another tab and coming back could show the "connection lost" panel even though nothing
+was wrong. Browsers slow down or drop the connection for tabs you are not looking at, and the app
+was treating that as a failure.
+
+It now ignores connection drops while a tab is in the background, and waits a moment before
+reporting anything — so a brief interruption that recovers on its own passes unnoticed. A genuine
+disconnection, such as after the computer sleeps, still reports as before.
+
 ## v0.10.24 — 2026-08-06
 
 ### Added — a Reference page: what EasyAnalysis actually computes

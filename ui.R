@@ -2444,14 +2444,42 @@ page_fillable(
          broken. Probe the server to tell the two cases apart, because the
          remedy is different: R still running -> reload reconnects; R gone ->
          it has to be started again. */
+      /* A backgrounded tab can have its websocket throttled or dropped by the
+         browser, which arrives as shiny:disconnected and is indistinguishable
+         from a real failure at that instant. Showing the panel then interrupts
+         ordinary browsing -- switch tab, come back, get told you are
+         disconnected. Remember when the page was last hidden so the handler can
+         tell the two apart. */
+      window.eaLastHidden = 0;
+      document.addEventListener('visibilitychange', function(){
+        if (document.hidden) window.eaLastHidden = Date.now();
+      });
+
       function eaShowDisconnect(){
         /* Quit drops the websocket too, and that disconnect is EXPECTED -- without
            this guard the panel would cover the has-closed message and tell the
            user to reconnect to something they just closed. (No literal double
            quotes in here: this is inside an R HTML() string -- gotcha 1.) */
         if(window.eaQuitting) return;
+        /* Hidden right now, or hidden in the last 30 s: treat it as the browser
+           backgrounding the tab, not as a failure. If the connection really is
+           gone the panel still appears once the user is looking at the page and
+           the delay below expires. */
+        if(document.hidden || (Date.now() - (window.eaLastHidden || 0) < 30000)) return;
         var el = document.getElementById('ea-disconnect');
         if(!el || el.classList.contains('on')) return;   /* never stack */
+
+        /* WAIT before shouting. A momentary drop usually reconnects on its own,
+           and a panel that appears and vanishes is worse than no panel. Only a
+           disconnect still standing after the delay is worth interrupting for --
+           shiny:connected cancels it (see the handler below). */
+        clearTimeout(window.eaDcTimer);
+        window.eaDcTimer = setTimeout(function(){ eaRenderDisconnect(el); }, 2500);
+      }
+
+      function eaRenderDisconnect(el){
+        if(window.eaQuitting || document.hidden) return;
+        if(!el || el.classList.contains('on')) return;
         el.classList.add('on');
         var msg = document.getElementById('ea-dc-msg');
         var btn = document.getElementById('ea-dc-reload');
@@ -2475,6 +2503,10 @@ page_fillable(
         jQuery(document).on('shiny:disconnected', eaShowDisconnect);
         /* If it comes back on its own, get out of the way. */
         jQuery(document).on('shiny:connected', function(){
+          /* Cancel a pending panel as well as hiding a shown one -- otherwise a
+             drop that reconnects within the delay still pops the panel
+             afterwards, which is the exact interruption this is meant to stop. */
+          clearTimeout(window.eaDcTimer);
           var el = document.getElementById('ea-disconnect');
           if(el) el.classList.remove('on');
         });

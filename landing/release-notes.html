@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.24.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.25.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,22 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.24</b> · 65 releases ·
+      <p class="meta">Latest: <b>v0.10.25</b> · 66 releases ·
         generated from CHANGELOG.md</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-24"><h2><a class="anchor" href="#v0-10-24">v0.10.24</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-10-25"><h2><a class="anchor" href="#v0-10-25">v0.10.25</a><span class="when">2026-08-06</span></h2>
+<h3>Fixed — switching browser tabs no longer looks like a disconnection</h3>
+<p>Moving to another tab and coming back could show the &quot;connection lost&quot; panel even though nothing
+was wrong. Browsers slow down or drop the connection for tabs you are not looking at, and the app
+was treating that as a failure.</p>
+<p>It now ignores connection drops while a tab is in the background, and waits a moment before
+reporting anything — so a brief interruption that recovers on its own passes unnoticed. A genuine
+disconnection, such as after the computer sleeps, still reports as before.</p>
+</section><section class="rel" id="v0-10-24"><h2><a class="anchor" href="#v0-10-24">v0.10.24</a><span class="when">2026-08-06</span></h2>
 <h3>Added — a Reference page: what EasyAnalysis actually computes</h3>
 <p>There is a new <strong>Reference</strong> page on the website describing what happens when you run an analysis:
 the R function behind each method, the variables it needs, the options it offers, and what the

@@ -22,6 +22,52 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.10.25 — 2026-08-06
+
+### Item 60 — a hidden tab was reported as a disconnect
+
+My defect from v0.10.14. `eaShowDisconnect` fired on `shiny:disconnected`, and a backgrounded tab
+has its websocket throttled or dropped by the browser — indistinguishable from a real failure at
+the instant the event arrives.
+
+Three changes, all in the client:
+
+- **`visibilitychange` records `window.eaLastHidden`.** The handler returns early if the page is
+  hidden *now*, or was hidden within the last 30 s. That covers both "dropped while away" and
+  "dropped on the way back".
+- **A 2.5 s delay before showing anything** (`window.eaDcTimer`). A momentary drop usually
+  reconnects on its own, and a panel that appears and vanishes is worse than no panel. Split
+  `eaShowDisconnect` (decide) from `eaRenderDisconnect` (show) so the delay has something to call.
+- **`shiny:connected` now clears the pending timer as well as the shown panel.** Without that, a
+  drop that recovered inside the delay still popped the panel afterwards — the exact interruption
+  being fixed.
+
+`eaRenderDisconnect` re-checks `eaQuitting` and `document.hidden`, so a tab hidden *during* the
+delay cannot have a panel appear behind it.
+
+**Verified behaviourally, not by grep.** `verify_tab.mjs` extracts both functions from `ui.R` by
+brace-matching and runs them against a fake `document`/`window` with a controllable clock: hidden
+tab → no panel; just-returned → no panel; real disconnect → nothing immediately, panel after the
+delay; reconnect inside the delay → cancelled; quitting → exempt; hidden during the delay → no
+panel. All 7 pass. `check_ui_js` PASS (9 blocks), symbology regression clean, serves 200.
+
+**Harness fault (sixth this session):** the first run threw `TypeError: Cannot read properties of
+undefined (reading 'pathname')` — my fake `window` had no `location`, which `eaRenderDisconnect`
+needs for the server probe. The code was fine.
+
+### Docs
+- Symbology recorded as **tested and working by the reporter**, with deferred improvements listed
+  explicitly so they are not mistaken for oversights: raster symbology (stretch / classified /
+  paletted / hillshade), rule-based styling, labels, more break methods (equal interval, Jenks,
+  stddev, manual), size-by-value for points, and style presets.
+- **DOI still not done** — `.zenodo.json`, `DOI.md` and the commented `identifiers` block are all
+  waiting on a Zenodo login.
+- **Desktop icon on existing installs: answered from the code.** Re-running the installer is
+  enough — it re-downloads the app (`install.ps1:100-104`), recreates both shortcuts
+  unconditionally (`:217-223`) and copies the `.ico` into `$AppHome` each run (`:210-212`). Caveat
+  recorded: Windows caches shortcut icons, so Explorer may show the old one until sign-out; and a
+  *missing* shortcut is a different failure that prints a warning during install.
+
 ## Documentation split — 2026-08-06 (no version; nothing shipped)
 
 Three files, three audiences, enforced by the build.

@@ -7,9 +7,10 @@
 # ==========================================================================
 
 # App version — single source of truth. Bump on every build/push and add a
-# matching entry to CHANGELOG.md. Shown in the status bar + About panel, and
+# matching entry to RELEASE_NOTES.md (public) AND CHANGELOG.md (internal).
+# Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.10.24"
+APP_VERSION <- "0.10.25"
 
 library(shiny)
 library(bslib)

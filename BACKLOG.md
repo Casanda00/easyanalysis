@@ -4446,8 +4446,20 @@ chevron on the layer row. Built but effectively hidden, which is the same as not
   panel open behind the Data view, which reads as the menu item doing nothing.
 - Refusals are explicit: a table layer says it has no symbology; no selection says to pick a layer.
 
-**Still open on symbology:** raster stretch / classified / paletted / hillshade blend, rule-based
-vector styling, and labels. Documented in round-3 item 11.
+**TESTED AND WORKING (reporter, 2026-08-06).** Vector symbology and both access routes confirmed in
+the browser.
+
+**Improvements deferred deliberately, not forgotten:**
+
+- **Raster symbology** — the open half of round-3 item 11: stretch, classified / paletted,
+  hillshade blend, transparency. Only the RGB / single-band toggle exists today.
+- **Rule-based styling and labels** — the two remaining vector tools from item 11.
+- **More break methods** for graduated: equal interval, natural breaks (Jenks), standard deviation,
+  manual. Only quantile exists, with an equal-width fallback.
+- **Size by value** — graduated symbol *size* for points, not only colour; and per-class control.
+- **Copy a style between layers**, and saving one as a reusable preset.
+- **Still not eyeballed:** whether the colour inputs and sliders are usable at that width inside the
+  layer expander, and whether a long category list scrolls rather than stretching the panel.
 
 ---
 
@@ -4759,3 +4771,39 @@ commitment into a per-plugin one.
 **None of this should start before the GIS work finishes** (delete features, raster symbology), per
 the standing decision that the GIS side is fixed first. Recorded here so it is planned against, not
 started.
+
+### DOI — **STILL NOT DONE (reporter, 2026-08-06)**
+
+`.zenodo.json`, `DOI.md` and the commented `identifiers` block in `CITATION.cff` are all in place
+and waiting. **The two remaining steps need a Zenodo login and so cannot be automated from here:**
+connect Zenodo to the repository, then publish a GitHub release. See [DOI.md](DOI.md).
+
+Until it is done the citation resolves to `https://easyanalysis.dev` rather than a permanent
+identifier. Not blocking anything, but it is the difference between a citation that survives the
+domain and one that does not.
+
+### Desktop icon on EXISTING installations — answered 2026-08-06
+> "the app favicon is there but since i have tested it on a new pc, i havent seen the desktop icon.
+> can that work for existing pcs?"
+
+**Yes, and it needs nothing special — just re-run the installer.** Checked in `install.ps1` rather
+than assumed:
+
+- **The app is re-downloaded on every run** (`:100-104` fetches the zip and replaces `$AppDir`), so
+  `launcher/easyanalysis.ico` arrives on an existing machine.
+- **The shortcut block runs unconditionally on every install** (`:217-223`), recreating both the
+  Desktop and Start Menu `.lnk`.
+- **The icon is copied to `$AppHome` and set as `IconLocation` each time** (`:210-212`) — copied out
+  of `$App` deliberately, so a later reinstall replacing the app folder cannot break the shortcut's
+  icon path.
+
+So an install predating v0.10.11 gets the icon by running the same one-liner again.
+
+**One caveat worth telling users:** *Windows caches shortcut icons.* Even with a correct `.lnk`,
+Explorer can keep showing the old PowerShell icon until the cache refreshes — signing out and back
+in, or `ie4uinit.exe -show`, clears it. That is a Windows behaviour, not a defect in the shortcut.
+
+**If the Desktop shortcut is missing entirely** (rather than showing the wrong icon), that is a
+different failure: shortcut creation is wrapped in `try/catch` so it can never fail an install, and
+it prints `[EasyAnalysis] Could not create shortcuts (...)`. Worth checking the installer output for
+that line before assuming the icon is at fault.
