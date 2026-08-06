@@ -4294,3 +4294,59 @@ is a defect in something just shipped (which is closing, not opening).
 Open, in the recommended order — symbology, multi-step undo, delete features, then edit/add
 attribute + the right-click menu, then the dockable table. Item 42 (analysis ↔ mapping) waits for
 the GIS side, per the reporter's earlier ruling.
+
+### Step 3 FOLLOW-UP 2 — points did not work, and zoom is now manual (v0.10.20)
+> "i think the automatic zooming should be removed… we keep zoom to manual instead of automatic."
+> "I had to click on the item in the attribute first before the clicking of objects worked… its
+> like clicking the attribute table activated the function."
+> "seems like it really doesnt work for point layers but works great on polygons."
+
+**Root cause of the point-layer failure — and it explains the polygon/point split exactly.**
+Identify used **coordinate hit-testing** on `input$map_click`. But **leaflet swallows the map click
+on a marker**: clicking a point fires `map_marker_click` and **no `map_click` at all**, so the
+handler never ran. Polygons are paths, which *do* fire a map click alongside, which is why they
+"worked great". The zoom-scaled tolerance I built for points was solving a problem the event
+model never let it see.
+
+**Fix: features carry their own identity.** Every drawn feature now gets
+`layerId = "<layer>##<row>"`, and `map_shape_click` / `map_marker_click` report exactly which
+feature was hit. **All coordinate hit-testing is gone** — no `st_nearest_feature`, no
+metres-per-pixel tolerance, no guesswork. Identity is drawn onto the map and read straight back.
+
+Three consequences handled:
+- **The highlight gets the same id** as the feature beneath it. It sits on top, so without this a
+  click on an already-selected feature would hit the highlight and identify nothing.
+- **Clicking a feature of a non-active layer switches to that layer**, which is what a GIS does —
+  otherwise the click would select a row in a table showing something else.
+- **The echoed map click is suppressed.** Paths fire *both* events; without a guard the map click
+  would immediately read as "empty space" and undo the selection. Feature handlers run at
+  `priority = 10` so the ordering is guaranteed rather than incidental.
+
+`map_click` is now only two things: **raster identify**, and **clear on empty space**.
+
+**"Had to click the attribute table first"** is very likely the same cause — the reporter was
+testing a point layer, where the map click never arrived. Recorded honestly: this symptom was
+**not reproduced in `testServer`**, so it is inferred, not proven. If it recurs on *polygons*,
+it is a different bug and the diagnosis above is incomplete.
+
+**Automatic zooming removed.** The map now moves **only** on an explicit "Zoom to …". Both
+automatic paths are gone — the first-fit for a new layer set, and the fallback fit when no saved
+view existed. This matters more than it did yesterday: the selection highlight now rebuilds the
+map on every click, so an automatic fit would have yanked the view each time.
+**Accepted consequence:** adding the first layer no longer frames it; "Zoom to layers" does.
+
+**Verified:** clicking a point marker selects that point and pops its attributes — the reported
+failure, now working, with **no table interaction anywhere in the test**; polygons still work and
+switch the active layer; the echoed map click does not undo the selection; genuinely empty space
+still clears; a malformed id is ignored rather than crashing; manual Zoom to still works; and the
+automatic fit branches are gone while the user's own view is still restored. `check_ui_js` PASS,
+HTTP 200.
+**Not verified:** thin LINE layers. Leaflet's clickable area for a 2px polyline is narrow, so
+lines may need a click closer than feels natural. If that proves annoying, the fix is a wider
+invisible hit-stroke, **not** a return to coordinate tolerance.
+
+**A recurring testing fault, now four times in this session.** This check reported a false failure
+because the comment-stripper cuts at the first `#`, which swallowed the `"##"` inside the string
+literal it was testing for. The pattern each time: **asserting against text rather than
+behaviour** — matching prose, consumed state, or a mangled source. The behaviour assertions have
+been right every time; the source-grep assertions keep being wrong.

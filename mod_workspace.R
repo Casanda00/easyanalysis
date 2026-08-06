@@ -1297,18 +1297,23 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (is.null(sel)) return(m)
       gt <- tryCatch(as.character(sf::st_geometry_type(sel, by_geometry = FALSE)),
                      error = function(e) "")
+      # The highlight sits ON TOP of the feature it marks, so it would otherwise
+      # swallow clicks on an already-selected feature. Giving it the SAME id
+      # means clicking a highlighted feature still identifies that feature.
+      s <- sel_feat()
+      lid <- .fid(s$layer, s$rows[s$rows >= 1L][seq_len(nrow(sel))])
       tryCatch({
         if (grepl("POINT", gt))
           leaflet::addCircleMarkers(m, data = sel, radius = 9, color = .SEL_COL,
             weight = 3, opacity = 1, fillColor = .SEL_COL, fillOpacity = .35,
-            group = "ws_sel")
+            group = "ws_sel", layerId = lid)
         else if (grepl("LINE", gt))
           leaflet::addPolylines(m, data = sel, color = .SEL_COL, weight = 5,
-            opacity = 1, group = "ws_sel")
+            opacity = 1, group = "ws_sel", layerId = lid)
         else
           leaflet::addPolygons(m, data = sel, color = .SEL_COL, weight = 4,
             opacity = 1, fillColor = .SEL_COL, fillOpacity = .18,
-            group = "ws_sel")
+            group = "ws_sel", layerId = lid)
       }, error = function(e) m)
     }
 
@@ -1342,8 +1347,74 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # as they follow a table click -- one mechanism, two entry points.
     identify_at <- reactiveVal(NULL)   # list(lng, lat, html) for the popup
 
+    # Feature ids drawn onto the map: "<layer>##<row>". Unique across layers, and
+    # decodable back to (layer, row) with no coordinate maths.
+    .fid   <- function(layer, rows) if (!length(rows)) character(0) else
+                paste0(layer, "##", rows)
+    .unfid <- function(id) {
+      p <- strsplit(as.character(id), "##", fixed = TRUE)[[1]]
+      if (length(p) != 2L) return(NULL)
+      i <- suppressWarnings(as.integer(p[2]))
+      if (is.na(i)) return(NULL)
+      list(layer = p[1], row = i)
+    }
+
+    # Build the popup for one feature of one layer.
+    .feature_popup <- function(nm, row, lng, lat) {
+      v <- tryCatch(vector_pool[[nm]], error = function(e) NULL)
+      if (is.null(v) || row < 1L || row > nrow(v)) return(invisible(FALSE))
+      att <- tryCatch(as.data.frame(sf::st_drop_geometry(v))[row, , drop = FALSE],
+                      error = function(e) NULL)
+      body <- if (is.null(att) || !ncol(att)) "<i>no attribute columns</i>"
+        else paste0("<table>", paste0(vapply(names(att), function(k)
+          sprintf("<tr><td>%s</td><td><b>%s</b></td></tr>",
+                  htmltools::htmlEscape(k),
+                  htmltools::htmlEscape(format(att[[k]][1]))), character(1)),
+          collapse = ""), "</table>")
+      identify_at(list(lng = lng, lat = lat,
+                       html = paste0("<b>", htmltools::htmlEscape(nm),
+                                     "</b> &middot; feature ", row, body)))
+      invisible(TRUE)
+    }
+
+    # A click that landed ON a feature. Recorded so the map click that leaflet
+    # fires alongside it (for paths) is not treated as a click on empty space.
+    feat_click <- reactiveVal(NULL)
+
+    .on_feature_click <- function(ev) {
+      if (is.null(ev) || is.null(ev$id)) return()
+      f <- .unfid(ev$id)
+      if (is.null(f)) return()
+      feat_click(c(ev$lng, ev$lat))
+      # Clicking a feature of a layer that is not active switches to it, which
+      # is what a GIS does -- otherwise the click would select a row in a table
+      # showing a different layer.
+      if (!identical(activeLayer(), f$layer)) activeLayer(f$layer)
+      sel_feat(list(layer = f$layer, rows = f$row))
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), f$row)
+      .feature_popup(f$layer, f$row, ev$lng, ev$lat)
+    }
+
+    # priority: these MUST run before the map-click handler below. Leaflet fires
+    # a map click alongside a path click, and without a guaranteed order that
+    # echo could clear the selection the feature click just made.
+    observeEvent(input$map_shape_click,  { .on_feature_click(input$map_shape_click) },
+                 priority = 10)
+    observeEvent(input$map_marker_click, { .on_feature_click(input$map_marker_click) },
+                 priority = 10)
+
     observeEvent(input$map_click, {
       cl <- input$map_click; req(cl$lng, cl$lat)
+      # Leaflet fires a map click alongside a click on a PATH. That echo must
+      # not be read as "clicked empty space", or selecting a polygon would
+      # immediately deselect it. Markers swallow the map click entirely, which
+      # is why coordinate hit-testing never worked for point layers at all.
+      fc <- feat_click()
+      if (!is.null(fc) &&
+          isTRUE(all.equal(c(cl$lng, cl$lat), fc, tolerance = 1e-9))) {
+        feat_click(NULL)
+        return()
+      }
       act <- activeLayer()
       if (is.null(act)) return()
 
@@ -1373,57 +1444,18 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       }
 
       if (!act %in% .names(vector_pool)) return()
-      v <- vector_pool[[act]]
-      if (is.null(v) || !nrow(v)) return()
 
-      hit <- tryCatch({
-        pt <- sf::st_transform(sf::st_sfc(sf::st_point(c(cl$lng, cl$lat)), crs = 4326),
-                               sf::st_crs(v))
-        gt <- as.character(sf::st_geometry_type(v, by_geometry = FALSE))
-        if (grepl("POLYGON", gt)) {
-          # Polygons: a click is either inside a feature or it is not.
-          idx <- sf::st_intersects(pt, v)[[1]]
-          if (length(idx)) idx[1] else integer(0)
-        } else {
-          # Points and lines: an exact intersection essentially never happens, so
-          # take the nearest feature and require it to be within a few pixels.
-          # The tolerance MUST scale with zoom -- a fixed metre value is far too
-          # coarse when zoomed out and unusably strict when zoomed in.
-          zm  <- suppressWarnings(as.numeric(input$map_zoom %||% 12))
-          if (!is.finite(zm)) zm <- 12
-          mpp <- 156543.03392 * cos(cl$lat * pi / 180) / (2^zm)   # metres per pixel
-          tol <- max(mpp * 12, 1)                                  # ~12 px of slack
-          near <- sf::st_nearest_feature(pt, v)
-          d <- suppressWarnings(as.numeric(sf::st_distance(pt, v[near, ])))
-          if (length(d) && is.finite(d) && d <= tol) near else integer(0)
-        }
-      }, error = function(e) integer(0))
-
-      if (!length(hit)) {          # clicked empty space -> clear, like a GIS
-        sel_feat(list(layer = act, rows = integer(0)))
-        DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
-        identify_at(NULL)
-        return()
-      }
-
-      sel_feat(list(layer = act, rows = as.integer(hit)))
-      # Push the selection back INTO the table, so clicking the map scrolls the
-      # attribute table to that row and highlights it -- the mirror of clicking
-      # a row and seeing the feature.
-      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), as.integer(hit))
-
-      att <- tryCatch(as.data.frame(sf::st_drop_geometry(v))[hit, , drop = FALSE],
-                      error = function(e) NULL)
-      body <- if (is.null(att) || !ncol(att))
-        "<i>no attribute columns</i>"
-      else paste0("<table>", paste0(vapply(names(att), function(k)
-        sprintf("<tr><td style='padding-right:8px;opacity:.7'>%s</td><td><b>%s</b></td></tr>",
-                htmltools::htmlEscape(k),
-                htmltools::htmlEscape(format(att[[k]][1]))), character(1)),
-        collapse = ""), "</table>")
-      identify_at(list(lng = cl$lng, lat = cl$lat,
-                       html = paste0("<b>", htmltools::htmlEscape(act),
-                                     "</b> &middot; feature ", hit, body)))
+      # Reaching here means the click did NOT land on a feature -- a real hit
+      # arrives as map_shape_click / map_marker_click and is handled above, with
+      # the feature's own id, so there is nothing to reverse-engineer.
+      #
+      # The coordinate hit-testing that used to live here is GONE. It could not
+      # work for points (leaflet swallows the map click on a marker) and it made
+      # lines depend on a zoom-scaled tolerance that was guesswork. Identity now
+      # comes from the layerId drawn onto each feature.
+      sel_feat(list(layer = act, rows = integer(0)))
+      DT::selectRows(DT::dataTableProxy("attr_dt", session = session), NULL)
+      identify_at(NULL)
     })
 
     # Clicking a row in the TABLE should drop a stale map popup -- otherwise the
@@ -1544,15 +1576,23 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             if (is.null(v)) m else {
               v1 <- sf::st_transform(sf::st_zm(v), 4326)
               gt <- as.character(sf::st_geometry_type(v1, by_geometry = FALSE))
+              # Every feature carries its identity, so a click reports EXACTLY
+              # which one was hit instead of being reverse-engineered from
+              # coordinates. This is what makes identify work on points: a click
+              # on a marker fires map_marker_click and leaflet SWALLOWS the
+              # map click, so coordinate hit-testing never saw it at all.
+              # "<layer>##<row>" because ids must be unique across layers.
+              lid <- .fid(l$nm, seq_len(nrow(v1)))
               if (grepl("POINT", gt))
                 leaflet::addCircleMarkers(m, data = v1, radius = 5, color = "#7ED481",
-                  fillOpacity = .85, stroke = TRUE, weight = 1, group = "ws_layers")
+                  fillOpacity = .85, stroke = TRUE, weight = 1, group = "ws_layers",
+                  layerId = lid)
               else if (grepl("LINE", gt))
                 leaflet::addPolylines(m, data = v1, color = "#7ED481", weight = 2,
-                  group = "ws_layers")
+                  group = "ws_layers", layerId = lid)
               else
                 leaflet::addPolygons(m, data = v1, color = "#5FBF62", weight = 1.5,
-                  fillOpacity = .25, group = "ws_layers")
+                  fillOpacity = .25, group = "ws_layers", layerId = lid)
             }
           }
         }, error = function(e) m)   # one bad layer must not blank the whole map
@@ -1582,22 +1622,24 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # SVG renderer makes one DOM node per point. Canvas keeps tens of
       # thousands of points viable without turning them into a raster.
       m <- leaflet::leaflet(options = leaflet::leafletOptions(preferCanvas = TRUE))
-      # An explicit "Zoom to ..." outranks everything; then the automatic
-      # first-fit for a new layer set; then wherever the user had panned to.
+      # ZOOM IS MANUAL. The map moves only when the user asks it to.
+      #
+      # There used to be an automatic first-fit for a new layer set, plus a
+      # fallback fit whenever no saved view existed. Both are gone: the map now
+      # moves ONLY for an explicit "Zoom to ..." (fit_req), and otherwise stays
+      # exactly where the user left it. Re-selecting a row, adding a layer or
+      # rebuilding the map for any reason must never move the view -- and with
+      # the selection highlight now rebuilding the map, an automatic fit would
+      # have yanked the view on every click.
+      #
+      # Consequence, accepted deliberately: adding the first layer no longer
+      # frames it. "Zoom to layers" (menu, or the button in the map toolbar) is
+      # how you get there.
       if (!is.null(fr)) {
         m <- leaflet::fitBounds(m, fr[1], fr[2], fr[3], fr[4])
         fit_req(NULL); fit_sig(sig)
-      } else if (!is.null(bb) && !nzchar(isolate(fit_sig())) && nzchar(sig)) {
-        # ONE MAP, everything overlays on it. The automatic fit therefore fires
-        # only for the FIRST spatial layer, to get off the default world view.
-        # Adding a second file must not yank the view away from what the user is
-        # looking at — re-framing is on request ("Zoom to layers").
-        m <- leaflet::fitBounds(m, bb[1], bb[2], bb[3], bb[4])
-        fit_sig(sig)
       } else if (!is.null(ctr) && !is.null(zm)) {
         m <- leaflet::setView(m, lng = ctr$lng, lat = ctr$lat, zoom = zm)
-      } else if (!is.null(bb)) {
-        m <- leaflet::fitBounds(m, bb[1], bb[2], bb[3], bb[4])
       } else {
         m <- leaflet::setView(m, lng = 27, lat = 63, zoom = 5)
       }

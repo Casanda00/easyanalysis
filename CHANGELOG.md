@@ -18,6 +18,27 @@ breaking changes. Newest first.
 
 ---
 
+## v0.10.20 — 2026-08-06
+
+### Fixed — clicking a point on the map did nothing
+
+Identify worked on polygons but not on point layers. Clicking a point marker was being handled
+differently by the map, and the code was watching for the wrong thing, so the click never
+registered.
+
+Every feature drawn on the map now carries its own identity, so a click reports exactly which
+feature was hit rather than working it out from coordinates. Points, lines and polygons all
+identify the same way, and clicking a feature of a layer you were not already working in switches
+to that layer.
+
+### Changed — the map only moves when you ask it to
+
+The map used to zoom automatically to frame your data the first time a layer was added. It no
+longer moves on its own: use **Zoom to layers**, **Zoom to active layer**, or the **Zoom to**
+button beside the selection count.
+
+This also means selecting features no longer disturbs the view you have set up.
+
 ## v0.10.19 — 2026-08-06
 
 ### Fixed — the identify panel stayed only for a moment
