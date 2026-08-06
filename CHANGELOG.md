@@ -22,6 +22,49 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.10.27 — 2026-08-06
+
+### Raster symbology — the second half of round-3 item 11
+
+What it replaced: the single-band branch of `.draw_layers()` was hardcoded to **band 1, viridis,
+`range(vals)` and `opacity = 0.85`**. The band was the worst of those — a multi-band stack could
+only ever show its first.
+
+Stored under **`ras`** in the same `layer_style` entry, so `mode`/`r`/`g`/`b` (RGB composite),
+`vec` and `ras` coexist without collision. Persisted in the project like the rest.
+
+- **`.ras_range()`** resolves the display range: minmax / 2-98 / 5-95 / manual. Falls back to the
+  data range when manual is blank or inverted, and returns NULL for a constant or empty raster so
+  the caller skips drawing rather than building a degenerate palette.
+- **`.ras_pal()`** builds one leaflet palette from the style — `colorNumeric` for continuous,
+  `colorBin` with even breaks for 3-9 classes. Reverse applies to both.
+- The band is **clamped** to `nlyr()` at draw time, so a stored band from a raster that was later
+  replaced by a narrower one cannot error.
+- UI only appears when NOT in RGB composite mode; a true-colour composite has no ramp to configure.
+
+**Verified, 30 checks.** The one that demonstrates the point: a test raster whose band 2 holds four
+outlier pixels at 1e4 gives **full range 0-10000** versus **2-98% = 0.2-9.8** — the flat-grey
+problem, and the fix, measured. Also: manual honoured; blank and inverted manual both fall back;
+constant and empty rasters produce no palette; continuous gives >10 distinct colours where 5
+classes gives at most 5; reverse changes the mapping; every control stores and persists under
+`ras` without colliding; out-of-range band still renders.
+
+**Test discipline held this time** — 30 checks, no false failures, because every assertion is
+behavioural (call the function, inspect the result) and the fixtures were built from the real
+signatures. See the rules recorded as gotcha 33.
+
+### Docs
+- **Item 65** opened: drag layers up/down. Recorded that this is **draw order, not just panel
+  order** — `.draw_layers()` adds in sequence and leaflet puts the last on top — so it needs an
+  explicit persisted order, `.draw_layers()` following it, a drag handle that does not fight the
+  three existing click targets on a row, and the basemap row staying pinned.
+- **Item 66** opened: the eight false test failures, categorised by root cause, with the rules that
+  follow. Condensed into **CLAUDE.md gotcha 33**.
+- Fixed a stale label on the published page: the header read "generated from CHANGELOG.md" after
+  the source moved to `RELEASE_NOTES.md`. It now says "updated with every release" — naming an
+  internal file on a public page is the same leak the guard blocks in release bodies. An older
+  release body naming `release-notes.html` was cleaned too.
+
 ## v0.10.26 — 2026-08-06
 
 ### Item 38 — delete features (GIS parity Step 4)

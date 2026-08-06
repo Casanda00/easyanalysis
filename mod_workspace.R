@@ -166,6 +166,56 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                         tags$span(class = "knob")),
               tags$span(class = "ea-wsx-rgblab",
                         if (rgb_on) "True colour (RGB)" else "Single band"))),
+          # Single-band styling. Only shown when NOT in RGB composite mode --
+          # a true-colour composite has no ramp to configure.
+          if (!rgb_on) {
+            rs <- .ras_style(l$nm)
+            nmj <- jsonlite::toJSON(l$nm, auto_unbox = TRUE)
+            rfire <- function(inp, expr)
+              sprintf("event.stopPropagation();Shiny.setInputValue('%s',{nm:%s,v:%s},{priority:'event'});",
+                      ns(inp), nmj, expr)
+            tagList(
+              if (nb > 1) tagList(
+                div(class = "ea-wsx-lgh", "Band"),
+                tags$select(class = "ea-wsx-band", onchange = rfire("ws_rband", "parseInt(this.value)"),
+                  lapply(seq_len(nb), function(i)
+                    tags$option(value = i, selected = if (i == rs$band) "selected",
+                                paste("Band", i))))),
+              div(class = "ea-wsx-lgh", "Palette"),
+              div(class = "ea-wsx-symrow",
+                tags$select(class = "ea-wsx-band", onchange = rfire("ws_rpal", "this.value"),
+                  lapply(.VEC_PALS, function(p)
+                    tags$option(value = p, selected = if (identical(p, rs$palette)) "selected", p))),
+                tags$button(class = paste("ea-wsx-selclear", if (isTRUE(rs$rev)) "on" else ""),
+                            type = "button", title = "Reverse the colour ramp",
+                            onclick = rfire("ws_rrev", "1"), "Reverse")),
+              # Stretch is the control that matters most for imagery: a few
+              # extreme or no-data pixels flatten a full min-max ramp to grey.
+              div(class = "ea-wsx-lgh", "Stretch"),
+              tags$select(class = "ea-wsx-band", onchange = rfire("ws_rstretch", "this.value"),
+                lapply(seq_along(.RAS_STRETCH), function(i)
+                  tags$option(value = unname(.RAS_STRETCH)[i],
+                              selected = if (identical(unname(.RAS_STRETCH)[i], rs$stretch)) "selected",
+                              names(.RAS_STRETCH)[i]))),
+              if (identical(rs$stretch, "manual")) div(class = "ea-wsx-symrow",
+                tags$input(type = "number", class = "ea-wsx-band", style = "width:48%",
+                           value = if (is.finite(rs$vmin)) rs$vmin else NULL, placeholder = "min",
+                           onchange = rfire("ws_rmin", "parseFloat(this.value)")),
+                tags$input(type = "number", class = "ea-wsx-band", style = "width:48%",
+                           value = if (is.finite(rs$vmax)) rs$vmax else NULL, placeholder = "max",
+                           onchange = rfire("ws_rmax", "parseFloat(this.value)"))),
+              div(class = "ea-wsx-lgh", "Classes"),
+              tags$select(class = "ea-wsx-band", onchange = rfire("ws_rcls", "parseInt(this.value)"),
+                tags$option(value = 0, selected = if (as.integer(rs$classes) < 2L) "selected",
+                            "Continuous"),
+                lapply(3:9, function(k)
+                  tags$option(value = k, selected = if (k == as.integer(rs$classes)) "selected",
+                              paste(k, "classes")))),
+              div(class = "ea-wsx-lgh", "Opacity"),
+              tags$input(type = "range", class = "ea-wsx-rng", min = 0, max = 1, step = .05,
+                         value = rs$alpha, title = "Layer opacity",
+                         onchange = rfire("ws_ralpha", "parseFloat(this.value)")))
+          },
           if (rgb_on) tagList(
             div(class = "ea-wsx-lgh", "Band mapping"),
             div(class = "ea-wsx-rgbsel",
@@ -1212,6 +1262,70 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       }
     }
 
+    # ---- RASTER SYMBOLOGY (round-3 item 11, second half) -------------------
+    # Same store as the vector side, nested under `ras` so the three cannot
+    # collide (`mode`/`r`/`g`/`b` for the RGB composite, `vec`, `ras`).
+    #
+    # What this replaces: a single-band raster was drawn with band 1, viridis, the
+    # full min-max range and a fixed 0.85 opacity, none of it adjustable. The band
+    # was the worst of those -- a multi-band stack could only ever show its first.
+    .RAS_DEF <- list(band = 1L, palette = "viridis", stretch = "minmax",
+                     classes = 0L, alpha = 0.85, rev = FALSE,
+                     vmin = NA_real_, vmax = NA_real_)
+    .RAS_STRETCH <- c("Full range (min-max)" = "minmax",
+                      "2-98% (clip outliers)" = "p98",
+                      "5-95%"                 = "p95",
+                      "Manual"                = "manual")
+
+    .ras_style <- function(nm) {
+      cur <- .style_get()[[nm]]
+      v <- if (is.list(cur) && is.list(cur$ras)) cur$ras else list()
+      utils::modifyList(.RAS_DEF, v[!vapply(v, is.null, logical(1))])
+    }
+    .ras_style_set <- function(nm, patch) {
+      cur <- .style_get()[[nm]]; if (!is.list(cur)) cur <- list()
+      cur$ras <- utils::modifyList(.ras_style(nm), patch)
+      .style_set(nm, cur)
+    }
+
+    # The value range the colours are stretched across. Percentile clipping
+    # matters more for imagery than any palette choice: a handful of bright or
+    # no-data pixels drags a min-max stretch so far that everything real ends up
+    # in the middle of the ramp and the image looks flat grey.
+    .ras_range <- function(vals, st) {
+      vals <- vals[is.finite(vals)]
+      if (!length(vals)) return(NULL)
+      rng <- switch(st$stretch %||% "minmax",
+        p98    = stats::quantile(vals, c(0.02, 0.98), na.rm = TRUE),
+        p95    = stats::quantile(vals, c(0.05, 0.95), na.rm = TRUE),
+        manual = c(st$vmin, st$vmax),
+        range(vals))
+      rng <- suppressWarnings(as.numeric(rng))
+      if (any(!is.finite(rng))) rng <- range(vals)      # manual left blank
+      if (rng[1] >= rng[2]) rng <- range(vals)          # degenerate
+      if (rng[1] >= rng[2]) return(NULL)                # genuinely constant
+      rng
+    }
+
+    # One leaflet palette function from the stored style. `classes > 0` bins the
+    # values into discrete steps (the raster equivalent of graduated vector
+    # styling); 0 keeps a continuous ramp.
+    .ras_pal <- function(vals, st) {
+      rng <- .ras_range(vals, st)
+      if (is.null(rng)) return(NULL)
+      cols <- .pal_n(st$palette, 128L)
+      if (isTRUE(st$rev)) cols <- rev(cols)
+      k <- as.integer(st$classes %||% 0L)
+      if (k >= 2L) {
+        brk <- seq(rng[1], rng[2], length.out = k + 1L)
+        leaflet::colorBin(.pal_n(st$palette, k), domain = rng, bins = brk,
+                          na.color = "transparent",
+                          reverse = isTRUE(st$rev))
+      } else {
+        leaflet::colorNumeric(cols, domain = rng, na.color = "transparent")
+      }
+    }
+
     .rgb_of <- function(nm, nb) {
       cur <- .style_get()[[nm]]
       if (is.list(cur) && !is.null(cur$mode)) return(cur)   # the user decided
@@ -1248,6 +1362,31 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     }
     observeEvent(input$ws_sym_open,   { .open_symbology(input$ws_sym_open) })
     observeEvent(input$ws_sym_active, { .open_symbology(activeLayer()) })
+
+    # Raster symbology controls. Same {nm, v} shape as the vector ones.
+    local({
+      rbinds <- list(
+        ws_rband    = function(v) list(band = as.integer(v)),
+        ws_rpal     = function(v) list(palette = as.character(v)),
+        ws_rstretch = function(v) list(stretch = as.character(v)),
+        ws_rcls     = function(v) list(classes = as.integer(v)),
+        ws_ralpha   = function(v) list(alpha = as.numeric(v)),
+        ws_rmin     = function(v) list(vmin = suppressWarnings(as.numeric(v))),
+        ws_rmax     = function(v) list(vmax = suppressWarnings(as.numeric(v)))
+      )
+      for (k in names(rbinds)) local({
+        key <- k; mk <- rbinds[[k]]
+        observeEvent(input[[key]], {
+          e <- input[[key]]
+          if (is.null(e$nm) || is.null(e$v)) return()
+          .ras_style_set(e$nm, mk(e$v))
+        })
+      })
+    })
+    observeEvent(input$ws_rrev, {
+      e <- input$ws_rrev; if (is.null(e$nm)) return()
+      .ras_style_set(e$nm, list(rev = !isTRUE(.ras_style(e$nm)$rev)))
+    })
 
     # One observer per symbology control. Each event carries {nm, v}, so a single
     # handler serves every layer -- the same reason ws_rgb does.
@@ -1866,16 +2005,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
               if (is.null(x)) m else
                 leaflet::addRasterImage(m, x, opacity = 0.9, group = "ws_layers")
             } else {
-              r1 <- .disp_raster(l$nm, 1L)   # cached, downsampled + in WGS84
+              # Single band, styled from the stored raster symbology: which band,
+              # which palette, how the values are stretched, whether it is binned
+              # into classes, and how opaque. Was: band 1, viridis, full range,
+              # 0.85, none of it adjustable.
+              rs  <- .ras_style(l$nm)
+              bnd <- max(1L, min(as.integer(rs$band %||% 1L), max(nb, 1L)))
+              r1  <- .disp_raster(l$nm, bnd)   # cached, downsampled + in WGS84
               if (is.null(r1)) m else {
                 vals <- suppressWarnings(terra::values(r1, mat = FALSE))
                 vals <- vals[is.finite(vals)]
-                if (!length(vals)) m else {
-                  pal <- leaflet::colorNumeric(.pal_colors("viridis"), range(vals),
-                                               na.color = "transparent")
-                  leaflet::addRasterImage(m, r1, colors = pal, opacity = 0.85,
-                                          group = "ws_layers")
-                }
+                pal  <- if (length(vals)) .ras_pal(vals, rs) else NULL
+                if (is.null(pal)) m else
+                  leaflet::addRasterImage(m, r1, colors = pal,
+                                          opacity = rs$alpha, group = "ws_layers")
               }
             }
           } else if (identical(l$kind, "lidar")) {

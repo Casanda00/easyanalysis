@@ -236,7 +236,7 @@ const page = `<!doctype html>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
       <p class="meta">Latest: <b>${latest}</b> · ${releaseCount} releases ·
-        generated from CHANGELOG.md</p>
+        updated with every release</p>
     </div>
   </header>
 

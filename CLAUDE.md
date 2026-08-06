@@ -149,6 +149,23 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+33. **A failing CHECK is more likely wrong than the code — assert on BEHAVIOUR, not on source
+    text.** Eight checks in one session reported failures that did not exist, and in every case
+    the app was correct. Four grepped source and matched **the comment explaining the code**
+    (a comment saying "not `head(df, 200)`" matched a search for `head(df, 200)`); one
+    comment-stripper (`sub("#.*$", "")`) **ate the `"##"` inside the string literal it was
+    testing for**; one regex spanned from the close-quote of one JS string to the open-quote of
+    the next. Rules that follow: **never grep source when behaviour can be observed**; if a
+    source check is unavoidable **parse it** (`node --check`, R's parser — both were right every
+    time a regex was wrong) and **never strip comments with a regex**. Two more failures were
+    **incomplete test doubles** — `testServer(dataServer, ...)` without `dataset_names` threw
+    inside the framework and looked like "undo is broken"; a fake `window` without `location`
+    looked like "the panel never renders". **Build fixtures from the real signature** (`formals()`),
+    not from memory. Two more were **state inherited between test sections** — arm preconditions
+    explicitly in each section, and **never assert on state the system legitimately consumes**
+    (a one-shot `fit_req` is cleared by the render that applies it; assert the *effect*).
+    Finally: **a scripted patch must `assert` its anchor exists**, or a silent no-op reports
+    success.
 32. **A function that accepts a query proves nothing if no CALL SITE passes one.**
     `ea_search_crs(query, limit)` genuinely queried PROJ's `proj.db` and was signed off as
     "Tested & verified" — but all three CRS pickers called `.ea_crs_choices()`, i.e.

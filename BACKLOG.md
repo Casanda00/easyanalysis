@@ -4843,5 +4843,107 @@ the code.
 moving these controls onto the right-click menu — they are dock-header buttons today. Both write
 paths should reuse `.edit_snap()` rather than inventing a second undo.
 
-**Next in the GIS sequence:** raster symbology (stretch / classified / paletted / hillshade), which
-is the remaining half of item 39 and the last piece before item 42's integration work.
+**Raster symbology DONE (v0.10.27)** — band selection, five palettes with reverse, stretch
+(min-max / 2-98% / 5-95% / manual), 3-9 classes or continuous, and opacity. Stored under `ras` in
+the same per-layer style entry and persisted in the project.
+
+**Measured, because it is the reason the feature exists:** a band whose values run 0-10 with four
+pixels at 10,000 stretches full-range to **0-10000**, putting every real value in the bottom
+thousandth of the ramp. Clipping to 2-98% gives **0.2-9.8**.
+
+**Still open on item 11:** hillshade blend (needs a DEM and a blend pass — genuinely more work than
+the rest), rule-based vector styling, and labels.
+
+**Next:** item 42's integration work — the GIS side is now done.
+
+### 65. Drag layers up and down to reorder them — **OPEN, documented not built**
+> "make layers draggable: up and down"
+
+**This is not only a panel affordance — it is draw order.** `.draw_layers()` iterates `layers()`
+and adds each to the map in sequence, and in leaflet **the last one added sits on top**. So the
+order in the panel *is* the stacking order, and today it is fixed: tables, then rasters, then
+LiDAR, then vectors, in whatever order the pools happen to hold them. A user cannot currently put
+a vector outline over a raster, or move one raster above another.
+
+**What it needs:**
+
+| Piece | Note |
+|---|---|
+| **An explicit order** | Today order is *derived* from the four pools in `layers()`. Reordering needs a stored sequence of layer names, with anything unlisted appended so a newly added layer still appears. |
+| **Persisted in the project** | Same place as `layer_style` — a stacking order the user set once must survive reopening, or it is not worth setting. |
+| **`.draw_layers()` follows it** | Otherwise the panel and the map disagree, which is worse than no reordering at all. |
+| **Drag interaction** | HTML5 `draggable` is enough; no library needed. The layer rows are already rebuilt by `renderUI` on every change, so the drop handler should fire one event carrying the new order rather than mutating the DOM and hoping it sticks. |
+
+**Traps to respect:**
+
+- **The basemap row is pinned to the bottom and must not be draggable** — it is tiles, not a
+  project layer, and it is added with `zIndex = 0` beneath everything.
+- **The row already has three click targets** (visibility toggle, name, delete) and a right-click
+  menu. A drag handle needs its own grip area or it will fight them — a `cursor: grab` zone on the
+  left, not the whole row.
+- **Reordering rebuilds the map**, which is correct here and consistent with how selection and
+  symbology already work. Do not reach for `leafletProxy` (gotcha 23).
+- **Rasters are drawn as images**; two overlapping rasters make the order visible immediately,
+  which is the case worth testing first.
+
+**Related, worth doing in the same visit:** the panel groups by type implicitly. Once order is
+explicit, "move to top / move to bottom" from the right-click menu is nearly free and is often
+easier than dragging in a long list.
+
+### 66. Test failures kept being MY failures — the pattern, and the rules that follow
+> "failures and errors in your tests have persisted. document this and ensure that the reasons are
+> explained so that it does not happen again."
+
+**Fair, and worth being precise about rather than apologetic.** Across this session **eight checks
+reported failures that did not exist**, plus two scripted patches that silently did nothing. In
+every single case the application code was correct and the *check* was wrong. That is not a
+harmless kind of noise: a false failure invites "fixing" working code, and it costs exactly the
+trust that testing is supposed to buy.
+
+#### What actually happened
+
+| # | Symptom | Real cause |
+|---|---|---|
+| 1 | "`ea_worker_shutdown()` does not precede `stopApp()`" | The regex matched the **comment** explaining the ordering, which mentions `stopApp()` first |
+| 2 | "attribute table still calls `head(df, 200)`" | Matched the **new comment** saying "not `head(df, 200)`" |
+| 3 | "Zoom to selected requested no fit" | Asserted on `fit_req`, a **one-shot the render consumes** — it had worked and been cleared |
+| 4 | "popup JS has a string split across lines" | Regex spanned from the close-quote of one literal to the open-quote of the next |
+| 5 | "id helper does not encode layer + row" | The comment-stripper cut at the first `#`, **eating the `"##"` inside the string being tested for** |
+| 6 | "multi-step undo is completely broken" | `dataServer` requires `dataset_names`; omitting it threw and **aborted the observer chain** |
+| 7 | "disconnect panel never renders" | My fake `window` had no `location`, which the server probe reads |
+| 8 | "edit mode was not armed" / "only the valid row went" | Test sections **inherited state** from earlier ones — a blind toggle disarmed it, and a layer had already been whittled to one feature so the do-not-empty guard correctly refused |
+
+Two more that failed *silently*: `s.replace(...)` calls in patch scripts that matched nothing and
+reported success anyway.
+
+#### The three root causes
+
+1. **Asserting on TEXT instead of BEHAVIOUR** (1, 2, 4, 5). Every one of these greps source code.
+   Source is prose plus code; a regex cannot tell them apart, and comment-stripping with
+   `sub("#.*$", "")` actively corrupts string literals.
+2. **Incomplete test doubles** (6, 7). A stub built from memory rather than from the real
+   signature. Both threw *inside* the framework, where the error surfaced as "the feature is
+   broken" rather than "your fixture is wrong".
+3. **Shared mutable state across sections** (3, 8). Later assertions depended on earlier ones
+   having left a particular state, so a change anywhere invalidated everything after it.
+
+#### The rules
+
+- **Assert on behaviour. Never on source text** when the behaviour can be observed. Every
+  behaviour assertion this session was correct; nearly every source-grep was not.
+- **If a source check is genuinely unavoidable, PARSE — do not grep.** `node --check` and R's
+  parser were right every time a regex was wrong. **Never strip comments with a regex.**
+- **Build fixtures from the real signature**, not from memory: read `formals()` for an R module
+  server, and let a JS stub throw once and fill in what it asks for.
+- **Every test section establishes its own preconditions.** Use an explicit helper
+  (`arm()`, `reset()`) rather than inheriting. A section that only passes when run after another
+  is not a test, it is a coincidence.
+- **Never assert on state the system legitimately consumes.** Assert on the *effect* — the fit was
+  applied, the row was deleted — not on the request object that was cleared afterwards.
+- **A scripted patch must fail loudly.** Every `replace` needs an `assert` that its anchor exists;
+  several silently no-opped and were only caught by re-reading the file.
+- **A failing check is suspect until the behaviour test agrees with it.** On this evidence the
+  prior probability is strongly that the check is wrong.
+- **Delete stale tests.** `verify_step3.R` asserted hit-testing that v0.10.20 deliberately removed;
+  it failed by design and was noise. A test that fails for a reason nobody will act on is worse
+  than no test.
