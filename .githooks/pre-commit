@@ -1,0 +1,28 @@
+#!/bin/sh
+# Refuse to commit a broken tree. See tools/precommit.R for what and why.
+#
+# Version-controlled rather than living in .git/hooks, so it is shared. Activate
+# once per clone with:   git config core.hooksPath .githooks
+#
+# Passes the STAGED file list, so the checks run on exactly what is being
+# committed rather than on the working tree.
+
+RSCRIPT=""
+for c in \
+  "/c/Program Files/R/R-4.5.3/bin/Rscript.exe" \
+  "/c/Program Files/R/R-4.5.3/bin/Rscript" \
+  "Rscript"
+do
+  if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then RSCRIPT="$c"; break; fi
+done
+
+if [ -z "$RSCRIPT" ]; then
+  echo "pre-commit: no Rscript found; skipping checks." >&2
+  exit 0            # never block a commit just because R is absent
+fi
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$FILES" ] && exit 0
+
+# shellcheck disable=SC2086
+"$RSCRIPT" tools/precommit.R $FILES
