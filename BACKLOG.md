@@ -5026,3 +5026,65 @@ lands in `raster_pool` and draws with the raster symbology just built.
 **Recommendation: build phase 1 and 2 together as one shippable slice**, because phase 1 alone
 gets data in with no way back out, and the pair is what actually answers the question the item
 asks. Phases 3 and 4 follow as a second slice.
+
+---
+
+## RESUME POINT — 2026-08-08
+
+**Paused here deliberately.** Phases 1 and 2 of item 42 are built, shipped as **v0.11.0** and
+verified by 36 automated checks, but **not yet exercised in a browser**. Phase 3 waits on that,
+because it builds directly on this and a fault here would be inherited rather than found.
+
+### Item 42 — where it stands
+
+| Phase | State |
+|---|---|
+| **1 · On-ramp** — `Attributes to Table` | **Built, shipped, automated-verified. Awaiting browser test.** |
+| **2 · Return leg** — `Predictions to map layer` | **Built, shipped, automated-verified. Awaiting browser test.** |
+| 3 · `model_pool` — fits outlive their screen | Not started. **Decided: saved with the project.** |
+| 4 · Predict onto a raster surface | Not started. Impossible without phase 3. |
+
+### The test that unblocks phase 3
+
+One chain, five steps. If it works end to end, the foundation is sound and phase 3 can start.
+
+1. Add a **vector layer with attributes** (a shapefile with its `.dbf`, or a GeoPackage).
+2. Run **Attributes to Table** on it — a dataset appears in the left rail.
+3. Fit **robust regression** (or Poisson / negative binomial / GAM / GLMM) on that dataset:
+   a numeric response and at least one predictor.
+4. Press **Predictions to map layer** in the model panel.
+5. In the **Layers** panel, expand the layer, set symbology to **Graduated**, and colour by `pred`.
+
+**What success looks like:** the message names how many features got values, the layer gains `pred`
+and `resid` columns, and the graduated map shades sensibly.
+
+**What to watch for, in order of importance:**
+
+- **The count in the message.** If the data had missing values it should say *fewer* than the total
+  ("… for 480 of 500 features"). If it says all of them when the model clearly dropped rows,
+  something is wrong with the row tracking and it matters.
+- **Features the model skipped should have NO colour**, not a colour. A fully-shaded map where rows
+  were dropped is the failure mode this whole design exists to prevent.
+- **Spot-check one feature.** Click it on the map and compare `pred` in the popup against the same
+  row in the data table. This is the single most valuable check.
+- **Then edit the layer** (delete a feature) and press the button again — it should **refuse** with
+  an explanation, not write anything.
+
+### Everything else awaiting your verification
+
+Accumulated over this session — all verified functionally, none seen in a browser by anyone:
+
+| Feature | Version | What to look at |
+|---|---|---|
+| Delete features + undo | v0.10.26 | Armed state reads clearly; deletion survives a project reopen |
+| Raster symbology | v0.10.27 | Stretch on real imagery — 2-98% should rescue a washed-out image |
+| Tab-switch fix | v0.10.26 | Switch away for minutes, come back: no disconnect panel |
+| Identify popup | v0.10.19 | Readable on a **dark** theme; the close button dismisses for good |
+| Layer symbology controls | v0.10.22 | Usable at that width; a long category list scrolls |
+| Basemap row, theme picker, Quit veil, app icon | v0.10.6-0.10.11 | Appearance only |
+
+### Also still outstanding, and only you can do it
+
+**The DOI.** `.zenodo.json`, `DOI.md` and the commented `identifiers` block in `CITATION.cff` are
+all staged. It needs a Zenodo login and a published GitHub release — about five minutes. Until then
+the citation resolves to the domain rather than a permanent identifier.
