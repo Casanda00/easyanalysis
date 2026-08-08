@@ -149,6 +149,26 @@ browser (or the whole app) and coming back resumes where the user stopped.
   stubbed in the upload handler); no card previews; the tour button is a placeholder.
 
 ## Hard constraints / gotchas (learned the hard way)
+34. **Never open a file for writing in the same expression that reads it — and run the
+    build check AFTER the release script, not only before.** This shipped an **empty
+    `global.R`** (v0.11.1, fca669d), so the app could not start at all:
+    ```python
+    io.open(p,'w').write(io.open(p).read().replace(...))   # TRUNCATES, then reads ""
+    ```
+    Python evaluates `open(p,'w')` first, which zeroes the file; the read then returns
+    `""`. Read fully into a variable, transform, *then* open for writing.
+    **Why nothing caught it is the more important half:** every check that run — build,
+    regressions, serve — passed **before** the release script, and the script itself
+    reported success because writing an empty file succeeds. A build check after the
+    version bump would have caught it in seconds. **Ordering is what let it reach a
+    commit.**
+    **Related, and mechanised in `tools/testkit.R`:** do not invent a function's
+    arguments. `ea_sig()` prints the real signature, `ea_check_args()` validates a call
+    against `formals()` and states plainly that the fault is in the CHECK rather than the
+    code, and `ea_test_server()` applies that before running — a module server that
+    throws on a missing argument aborts the observer chain and makes every feature look
+    broken. Written because the same mistake happened **twice** after the rule was merely
+    written down (gotcha 33).
 33. **A failing CHECK is more likely wrong than the code — assert on BEHAVIOUR, not on source
     text.** Eight checks in one session reported failures that did not exist, and in every case
     the app was correct. Four grepped source and matched **the comment explaining the code**
