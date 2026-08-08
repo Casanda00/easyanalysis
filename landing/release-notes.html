@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.0.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.1.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,28 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.0</b> · 69 releases ·
+      <p class="meta">Latest: <b>v0.11.1</b> · 70 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-0"><h2><a class="anchor" href="#v0-11-0">v0.11.0</a><span class="when">2026-08-08</span></h2>
+<section class="rel" id="v0-11-1"><h2><a class="anchor" href="#v0-11-1">v0.11.1</a><span class="when">2026-08-08</span></h2>
+<h3>Fixed — the assistant no longer drops figures without saying so</h3>
+<p>When the Co-Analyst ran a model for you, any figure it could not compute simply vanished from its
+answer. Ask for a mixed-effects model and the R² could be missing with no indication why; ask for
+an ANOVA and the post-hoc comparison could be absent as though it had never been requested.</p>
+<p>The assistant answers from what the analysis hands it, so a figure that disappeared silently left
+it unable to tell you it was missing, let alone why. Those figures now come back with a plain
+explanation instead — the model is still reported in full, and the answer states which figure could
+not be computed and the reason.</p>
+<p>Affects the linear model, ANOVA post-hoc comparisons, mixed-effects models and random forest.</p>
+<h3>Changed — the reference page no longer names internal code</h3>
+<p>The Methods reference described model-quality figures by naming an internal function. It now
+describes what is computed, which is the part that is useful. Package functions such as
+<code>MASS::polr()</code> are still named — those you may need to cite.</p>
+</section><section class="rel" id="v0-11-0"><h2><a class="anchor" href="#v0-11-0">v0.11.0</a><span class="when">2026-08-08</span></h2>
 <h3>Added — analyse a map layer, and put the results back on the map</h3>
 <p>Until now the analysis side and the map side could not reach each other. A shapefile&#39;s attributes
 could not be modelled at all without leaving EasyAnalysis, and nothing a model produced could be

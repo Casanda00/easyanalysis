@@ -20,6 +20,27 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.1 — 2026-08-08
+
+### Fixed — the assistant no longer drops figures without saying so
+
+When the Co-Analyst ran a model for you, any figure it could not compute simply vanished from its
+answer. Ask for a mixed-effects model and the R² could be missing with no indication why; ask for
+an ANOVA and the post-hoc comparison could be absent as though it had never been requested.
+
+The assistant answers from what the analysis hands it, so a figure that disappeared silently left
+it unable to tell you it was missing, let alone why. Those figures now come back with a plain
+explanation instead — the model is still reported in full, and the answer states which figure could
+not be computed and the reason.
+
+Affects the linear model, ANOVA post-hoc comparisons, mixed-effects models and random forest.
+
+### Changed — the reference page no longer names internal code
+
+The Methods reference described model-quality figures by naming an internal function. It now
+describes what is computed, which is the part that is useful. Package functions such as
+`MASS::polr()` are still named — those you may need to cite.
+
 ## v0.11.0 — 2026-08-08
 
 ### Added — analyse a map layer, and put the results back on the map

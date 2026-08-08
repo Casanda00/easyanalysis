@@ -125,6 +125,26 @@
 
 .agent_capture <- function(x) paste(utils::capture.output(x), collapse = "\n")
 
+# A metric or post-hoc test that may LEGITIMATELY fail -- a singular fit, an
+# optional package absent, too few groups for Tukey. The model itself is fine,
+# so the whole answer must not fail; but swallowing it to NULL was the wrong
+# trade HERE in particular.
+#
+# This output is what the Co-Analyst answers FROM. A metric that vanishes with
+# no explanation leaves the assistant two bad options: report a model with no R2
+# and no reason, or guess at one. Saying plainly that it could not be computed,
+# and why, is the only version that keeps the answer truthful.
+#
+# Returns list(v = value or NULL, why = NULL or a one-line explanation).
+.agent_soft <- function(expr, what) {
+  tryCatch(list(v = expr, why = NULL),
+           error = function(e)
+             list(v = NULL, why = paste0(what, " could not be computed (",
+                                         conditionMessage(e), ")")))
+}
+# Renders the explanation for the answer, or nothing when it succeeded.
+.agent_why <- function(x) if (is.null(x$why)) "" else paste0("\nNote: ", x$why, ".")
+
 # ---- dispatcher ------------------------------------------------------------
 # Returns a plain-text result block for the model. Never throws.
 .agent_exec_tool <- function(name, args, dataset_pool) {
@@ -240,11 +260,12 @@
   if (method == "lm") {
     if (is.null(response) || !length(predictors)) return(.agent_fail("lm needs response and predictors."))
     m <- stats::lm(stats::reformulate(predictors, response), data = df)
-    ev <- tryCatch(uef_evaluation(stats::fitted(m), df[[response]]), error = function(e) NULL)
+    ev <- .agent_soft(uef_evaluation(stats::fitted(m), df[[response]]), "Model metrics")
     return(paste0("Linear regression ", response, " ~ ", paste(predictors, collapse = " + "), "\n\n",
       .agent_capture(summary(m)),
-      if (!is.null(ev)) paste0("\nModel metrics: RMSE=", round(ev$RMSE, 4), " R2=", round(ev$R2, 4),
-                               " Bias=", round(ev$Bias, 4), " RRMSE=", round(ev$RRMSE, 2), "%") else ""))
+      if (!is.null(ev$v)) paste0("\nModel metrics: RMSE=", round(ev$v$RMSE, 4), " R2=", round(ev$v$R2, 4),
+                               " Bias=", round(ev$v$Bias, 4), " RRMSE=", round(ev$v$RRMSE, 2), "%")
+      else .agent_why(ev)))
   }
 
   if (method == "anova") {
@@ -252,8 +273,9 @@
     for (p in predictors) df[[p]] <- as.factor(df[[p]])
     m <- stats::aov(stats::reformulate(predictors, response), data = df)
     out <- paste0("ANOVA ", response, " ~ ", paste(predictors, collapse = " + "), "\n\n", .agent_capture(summary(m)))
-    tk <- tryCatch(.agent_capture(stats::TukeyHSD(m)), error = function(e) NULL)
-    if (!is.null(tk)) out <- paste0(out, "\n\nTukey HSD:\n", tk)
+    tk <- .agent_soft(.agent_capture(stats::TukeyHSD(m)), "Tukey HSD post-hoc test")
+    out <- if (!is.null(tk$v)) paste0(out, "\n\nTukey HSD:\n", tk$v)
+           else paste0(out, .agent_why(tk))
     return(out)
   }
 
@@ -271,12 +293,14 @@
     df[[group]] <- as.factor(df[[group]])
     m <- nlme::lme(stats::reformulate(predictors, response), random = stats::as.formula(paste0("~ 1 | ", group)),
                    data = df, control = nlme::lmeControl(opt = "optim", msMaxIter = 1000))
-    r2 <- tryCatch(suppressWarnings(MuMIn::r.squaredGLMM(m)), error = function(e) NULL)
-    ev <- tryCatch(uef_evaluation(as.numeric(stats::fitted(m)), df[[response]]), error = function(e) NULL)
+    r2 <- .agent_soft(suppressWarnings(MuMIn::r.squaredGLMM(m)), "Nakagawa R2")
+    ev <- .agent_soft(uef_evaluation(as.numeric(stats::fitted(m)), df[[response]]), "Model metrics")
     return(paste0("Linear mixed effects: ", response, " ~ ", paste(predictors, collapse = " + "),
       ", random = ~1|", group, "\n\n", .agent_capture(summary(m)),
-      if (!is.null(r2)) paste0("\nNakagawa R2: marginal=", round(r2[1, "R2m"], 4), " conditional=", round(r2[1, "R2c"], 4)) else "",
-      if (!is.null(ev)) paste0("\nRMSE=", round(ev$RMSE, 4), " Bias=", round(ev$Bias, 4)) else ""))
+      if (!is.null(r2$v)) paste0("\nNakagawa R2: marginal=", round(r2$v[1, "R2m"], 4), " conditional=", round(r2$v[1, "R2c"], 4))
+      else .agent_why(r2),
+      if (!is.null(ev$v)) paste0("\nRMSE=", round(ev$v$RMSE, 4), " Bias=", round(ev$v$Bias, 4))
+      else .agent_why(ev)))
   }
 
   if (method == "logistic") {
@@ -301,8 +325,10 @@
                   ", ntree=", ntree, ") ", response, " ~ ", paste(predictors, collapse = " + "), "\n\n",
                   .agent_capture(print(m)), "\n\nVariable importance:\n", .agent_capture(round(imp, 3)))
     if (!is.factor(df[[response]])) {
-      ev <- tryCatch(uef_evaluation(m$predicted, df[[response]]), error = function(e) NULL)
-      if (!is.null(ev)) out <- paste0(out, "\n\nOOB metrics: RMSE=", round(ev$RMSE, 4), " R2=", round(ev$R2, 4))
+      ev <- .agent_soft(uef_evaluation(m$predicted, df[[response]]), "OOB metrics")
+      out <- if (!is.null(ev$v))
+        paste0(out, "\n\nOOB metrics: RMSE=", round(ev$v$RMSE, 4), " R2=", round(ev$v$R2, 4))
+        else paste0(out, .agent_why(ev))
     }
     return(out)
   }

@@ -229,9 +229,9 @@ page <- sprintf('<!doctype html>
 
       <section id="metrics">
         <h2>Metrics</h2>
-        <p>Model quality figures are computed by one shared function
-          (<code>uef_evaluation()</code>) wherever they appear, so they are comparable across
-          screens rather than each screen defining its own.</p>
+        <p>Model quality figures are computed the same way on every screen, so a value from one
+          method means the same thing as the value from another and the two can be compared
+          directly. The definitions are below.</p>
         <table>
           <tr><th>Metric</th><th>Meaning</th></tr>
           <tr><td>RMSE</td><td>Root mean squared error — typical size of the prediction error, in
@@ -294,6 +294,23 @@ page <- sprintf('<!doctype html>
 
 </html>
 ', nav, n_stat, n_algo, built, body)
+
+# This page is PUBLIC. Package functions (MASS::polr, lidR::lmf) belong here --
+# a user should know what computed their result, and may need to cite it. The
+# app INTERNAL names must not: uef_evaluation() leaked into the metrics section
+# and means nothing to a reader. Guard the difference rather than notice it.
+# Character classes instead of backslash escapes: this pattern passes through a
+# generator, so every added backslash is one more layer to get wrong.
+.leaks <- unlist(regmatches(page, gregexpr(
+  "[.]?(uef|ea)_[A-Za-z0-9_.]+[(]", page)))
+.leaks <- unique(.leaks)
+if (length(.leaks)) {
+  message("ERROR: internal function names on the public reference page: ",
+          paste(.leaks, collapse = ", "),
+          "
+  Describe what it computes, not what it is called.")
+  quit(status = 1L)
+}
 
 writeLines(page, "landing/reference.html", useBytes = TRUE)
 cat(sprintf("reference.html written — %d statistical methods, %d spatial operations\n",

@@ -22,6 +22,53 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.1 — 2026-08-08
+
+### Item 36 — the silent tryCatch sweep, Co-Analyst half
+
+Five sites in `agent_tools.R` swallowed a failed metric to NULL and rendered `else ""`. The model
+itself was always correct, so this is not wrong numbers -- it is **missing numbers, silently**, and
+that is worse here than anywhere else in the app: this output is what the assistant ANSWERS FROM.
+A metric that vanished without explanation left it two bad options -- report a model with no R2 and
+no reason, or guess.
+
+Sites: `lm` metrics, ANOVA's `TukeyHSD`, LME's `r.squaredGLMM` and metrics, and random forest's OOB
+metrics.
+
+`.agent_soft(expr, what)` returns `list(v, why)`; `.agent_why()` renders a one-line note. The whole
+answer still survives a failed metric -- these legitimately fail (singular fit, absent optional
+package, too few groups for Tukey), so failing the entire response would be the wrong trade. Saying
+so plainly is the only version that keeps the answer truthful.
+
+**Verified, 22 checks.** The one that matters: with `uef_evaluation` forced to fail, the model still
+answers, the metrics are absent, AND the output names which figure failed and why. A **control**
+reproduces the old shape and confirms it left no trace at all.
+
+**Test-harness fault (ninth):** the first run called `.agent_run_analysis(pool, "d", "lm", ...)`;
+the real signature is `(args, dataset_pool)` with args a list. Exactly what gotcha 33 says to avoid
+-- build fixtures from the real signature. Fixed by reading it rather than guessing again.
+
+### Reference page — internal name leaked
+`uef_evaluation()` appeared in the metrics section of the PUBLIC reference page. Package functions
+belong there (a user may need to cite `MASS::polr`); app internals do not -- the name means nothing
+to a reader, and the calculation is the useful part.
+
+Rewritten to describe what is computed, and **guarded**: `tools/build-reference.R` now fails the
+build on any `uef_*`/`ea_*`/`.ea_*` call reaching the page. **Control-tested** -- injecting
+`uef_evaluation()` into a note exits 1 and names it; removing it exits 0. Same class of leak the
+release-notes guard already blocks, in the other generated page.
+
+Note the regex uses character classes (`[.]`, `[(]`) rather than backslash escapes: the pattern
+passes through a generator, and every added backslash is one more layer to get wrong -- the first
+attempt died on exactly that.
+
+### Still open on item 36
+~194 `error = function(e) NULL` sites remain app-wide, but most are legitimate "not available"
+guards where NULL is a true answer. The remaining NAMED priorities are the fold loops in
+`mod_logistic.R`, `mod_classification.R` and `mod_lme.R`, and `mod_timeseries.R`'s decompose -- a CV
+fold that fails silently is dropped from the average, which biases a reported metric rather than
+merely omitting it. That is the more dangerous half and should be swept next.
+
 ## v0.11.0 — 2026-08-08
 
 ### Item 42, phases 1 and 2 — the analysis/map round trip
