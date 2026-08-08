@@ -223,6 +223,12 @@ lmeServer <- function(id, dataset_pool, active_dataset) {
         cat(sprintf("%s RMSE : %.4f\n%s MAE  : %.4f\n%s R²   : %.4f\n",
                     lbl, sqrt(mean(e^2)), lbl, mean(abs(e)), lbl, r2))
         cat(sprintf("(Population-level predictions; %d/%d rows used)\n", sum(keep), n))
+        # State a shortfall rather than leaving it to be inferred from two numbers:
+        # folds fail non-randomly, so the metrics above are optimistic. See
+        # .cv_note() in helpers.R.
+        if (sum(keep) < n) cat(sprintf(
+          "Incomplete: %d of %d rows could not be predicted (fold fits failed) and are NOT included.\n",
+          n - sum(keep), n))
       }, error=function(e) cat("CV error:", e$message, "\n"))
     })
 

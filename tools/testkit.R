@@ -20,13 +20,18 @@
 
 # Print a function's real signature. Use this instead of remembering one.
 ea_sig <- function(f, name = deparse(substitute(f))) {
-  fm <- formals(f)
-  req <- names(fm)[vapply(fm, function(x) identical(x, quote(expr = )), logical(1))]
+  fm  <- formals(f)
+  # A formal with no default IS the empty symbol, and binding that to a local
+  # variable makes the variable itself "missing" -- so `d <- fm[[n]]` then blew up
+  # on the next line that touched `d`. Never bind it: test the flag, and read
+  # fm[[i]] only on the branch where a real default exists.
+  is_req <- vapply(fm, function(x) identical(x, quote(expr = )), logical(1))
+  req <- names(fm)[is_req]
   cat(sprintf("%s(%s)\n", name,
-              paste(vapply(names(fm), function(n) {
-                d <- fm[[n]]
-                if (identical(d, quote(expr = ))) n
-                else paste0(n, " = ", paste(deparse(d), collapse = ""))
+              paste(vapply(seq_along(fm), function(i) {
+                if (is_req[i]) names(fm)[i]
+                else paste0(names(fm)[i], " = ",
+                            paste(deparse(fm[[i]]), collapse = ""))
               }, character(1)), collapse = ", ")))
   cat("  required:", if (length(req)) paste(req, collapse = ", ") else "(none)", "\n")
   invisible(list(all = names(fm), required = req))

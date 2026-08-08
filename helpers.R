@@ -87,7 +87,32 @@
 # Render a .clf_prf() result as a compact DT datatable.
 # prf_or_list: a single data.frame OR a named list of them (one per stage/source).
 # acc_or_list: a single accuracy OR a matching named list of accuracies.
-.prf_dt <- function(prf_or_list, acc_or_list = NULL) {
+# A cross-validation fold that fails must never be silent. Its rows drop out of
+# the pooled prediction, so the metric is computed over LESS data than the label
+# claims -- and folds do not fail at random. A fold fails when its training split
+# is degenerate (a rare class absent, a separable subset), which is exactly the
+# hard case, so dropping it BIASES the reported number upward rather than merely
+# omitting it. A wrong number is worse than a missing one, so say it next to the
+# number. Returns NULL when the run was clean, so a good result stays uncluttered.
+.cv_note <- function(cv) {
+  if (is.null(cv)) return(NULL)
+  bits <- character(0)
+  bf <- cv$bad_folds %||% 0L
+  if (bf > 0) bits <- c(bits, sprintf(
+    "%d of %d folds could not be fitted, so %d row(s) (%.0f%% of the data) are NOT included",
+    bf, cv$k %||% NA_integer_, cv$bad_rows %||% 0L,
+    100 * (cv$bad_rows %||% 0L) / max(1L, cv$n_total %||% 1L)))
+  bm <- cv$bad_models %||% 0L
+  if (bm > 0) bits <- c(bits, sprintf(
+    "%d per-class model(s) could not be fitted and were excluded from the vote", bm))
+  bp <- cv$unpredicted %||% 0L
+  if (bp > 0) bits <- c(bits, sprintf(
+    "%d row(s) had no usable model and are NOT scored", bp))
+  if (!length(bits)) return(NULL)
+  paste0("Incomplete: ", paste(bits, collapse = "; "), ".")
+}
+
+.prf_dt <- function(prf_or_list, acc_or_list = NULL, note = NULL) {
   fmt3 <- function(x) ifelse(is.na(x), "—", sprintf("%.3f", x))
   if (is.data.frame(prf_or_list)) {
     df  <- prf_or_list
@@ -96,6 +121,8 @@
     df$F1        <- fmt3(df$F1)
     cap <- if (!is.null(acc_or_list) && length(acc_or_list) == 1 && !is.na(acc_or_list))
       sprintf("Accuracy: %.1f%%", acc_or_list * 100) else NULL
+    if (!is.null(note) && nzchar(note))
+      cap <- if (is.null(cap)) note else paste0(cap, "  -  ", note)
     tbl <- DT::datatable(df, rownames = FALSE, caption = cap,
       options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
       class = "compact stripe")

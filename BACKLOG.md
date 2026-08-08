@@ -3060,9 +3060,9 @@ in calls like `df[, cols]` raise "argument is missing" when touched.)
 | priority | where | why it matters |
 |---|---|---|
 | ~~1~~ | `mod_da.R:646`, `:653` | **DONE 2026-08-05 — see below.** Its CV was *not* dead, but it validated a different model. |
-| **2** | `mod_logistic.R:197`, `mod_classification.R:272`, `mod_lme.R:214` | Same fold-skip shape; each needs the same two checks — does the CV produce a result, and does it use the user's settings? |
-| **3** | `agent_tools.R:243, :255, :274, :275, :304` | The **Co-Analyst's own** analysis paths. A silent `NULL` here means the agent reports nothing instead of reporting a failure, and the user cannot see the code to know why. |
-| 4 | `mod_timeseries.R:178`, `:219` | `decompose()` swallowed; a series that cannot be decomposed shows an empty panel. |
+| ~~2~~ | `mod_logistic.R:197`, `mod_classification.R:272`, `mod_lme.R:214` | **DONE 2026-08-08 — see below.** Not one shape but two: logistic *omitted* rows, classification *fabricated* predictions. `lme` was already correct. |
+| ~~3~~ | `agent_tools.R:243, :255, :274, :275, :304` | **DONE 2026-08-06.** The Co-Analyst now says what it could not compute (`.agent_soft()` / `.agent_why()`) instead of returning a silent `NULL`. |
+| ~~4~~ | `mod_timeseries.R:178`, `:219` | **DONE 2026-08-08 — see below.** `decompose()` now reports its error; the ADF test says it failed rather than printing nothing. |
 
 **The rule to apply when fixing any of these** — it is what the ported screens now do: a fold
 that fails may be skipped, but **the run as a whole must say so**. Either the result is
@@ -3102,6 +3102,53 @@ LDA to `MASS::lda(CV = TRUE)` instead. Deleted rather than left as misleading co
 passes them. So WLDA's LOOCV still describes an unweighted model. Fixing it needs a decision —
 either pass weights through `lda(CV = TRUE)` (untested whether it honours them) or move WLDA
 onto the k-fold path, which would visibly change its label from LOOCV to k-fold.
+
+#### Priorities 2 and 4 resolved 2026-08-08 — the fold loops
+
+Priority 2 was filed as "same fold-skip shape". **It is not one shape, it is two, and only one
+of them merely omits data.**
+
+**`mod_logistic.R` — the omission.** A fold whose fit or prediction failed was `next`-ed, so
+its rows left the pooled prediction entirely. Accuracy was then computed over a **subset**
+while the caption still read *"5-fold CV"*. Now counted (`bad_folds`, `bad_rows`) and stated.
+
+**`mod_classification.R` — the fabrication, and it is worse.** Each class gets a one-vs-all
+`glm`. A sub-model that failed to fit returned `rep(0.5, nrow(te))` — and **that constant still
+entered `which.max`**. So whenever every fitted class scored below 0.5 on a row, the class
+with *no model at all* won the vote, and that invented label was then counted toward the
+reported accuracy as a real prediction. A failed class now yields `NA`, which withdraws it
+from the vote; a row where every class failed is `NA` and is not scored at all (it is excluded
+from accuracy, not counted as an error).
+
+**Why this is not a cosmetic complaint.** Folds do not fail at random. A fold fails when its
+training split is degenerate — a rare class absent, a separable subset — which is precisely
+the hard case. Dropping it therefore **biases the metric upward** rather than merely making it
+noisier. These were wrong numbers presented with full confidence, not missing ones, which is
+why they outrank the rest of the sweep despite being fewer sites.
+
+**`mod_lme.R` was already correct** — it assigns `NA` to failed folds and prints
+`%d/%d rows used`. Only the wording was strengthened, so a shortfall is *stated* rather than
+left to be inferred by comparing two numbers.
+
+**Priority 4 (`mod_timeseries.R`)** — `decompose()` now reports *why* it failed instead of a
+bare "Decomposition failed", and the optional ADF test says it could not be computed instead
+of printing nothing at all. Printing nothing made a **failed** test indistinguishable from a
+test that was never part of the screen.
+
+**Presentation:** `.cv_note()` (helpers.R) renders the caveat, and `.prf_dt()` gained a `note`
+argument so it travels **in the same caption as the accuracy**. A caveat placed anywhere else
+is a caveat that does not get read. It returns `NULL` on a clean run, so a good result stays
+uncluttered.
+
+**Guarded by `check_cv_folds.R`**, which is control-tested in both directions: it asserts the
+old 0.5 rule *does* predict the unfitted class, and it injects a genuine fold failure and
+requires the caveat to appear — *"Incomplete: 1 of 5 folds could not be fitted, so 18 row(s)
+(20% of the data) are NOT included."* Three attempts were needed to make that injection real,
+and the failures are recorded in the file because each is a harness fault this project keeps
+repeating (see gotcha 33): targeting by call number hit the main fit rather than a fold;
+a one-shot flag was consumed by the module's **first** of two CV evaluations, so the value
+returned came from a second, clean pass; only a **stateless** marker-row stub fired on every
+pass. A guard that passes because the failure never reached the code proves nothing.
 
 ---
 
@@ -4947,144 +4994,3 @@ reported success anyway.
 - **Delete stale tests.** `verify_step3.R` asserted hit-testing that v0.10.20 deliberately removed;
   it failed by design and was noise. A test that fails for a reason nobody will act on is worse
   than no test.
-
----
-
-## Item 42 — INVESTIGATION AND PHASED PLAN (2026-08-08)
-
-> "one goal was to analyze data and map it in the same platform. has the platform truly solved
-> that goal… we should set a multiobjective multi step process"
-
-Investigated before planning. The answer is **no, and for a more specific reason than "the halves
-are not integrated"** — there are exactly **three missing links**, and one of them is not a missing
-feature but a missing piece of shared state.
-
-### What is actually true today (checked, not assumed)
-
-| Fact | Evidence |
-|---|---|
-| **A statistical method cannot see a spatial layer at all.** | `statServer(id, spec, dataset_pool, active_dataset)` — `server.R:1018`. Vector attributes live in `vector_pool` and are invisible to all 14 methods. There is no way to model a shapefile's attributes without leaving the app. |
-| **There is exactly ONE write-back in the whole app**, and it does not reach the map. | GAM's `ea_action("to_pool", …)` — `statistics.R:1197` — writes a **new table**, not columns on a layer. |
-| **The action mechanism is the right seam, but it is starved.** | `ea_action`'s `run(fit, f, pools)` is well-shaped, yet `mod_stat.R:227` passes only `list(table = dataset_pool)`. The vector and raster pools are simply not handed over. |
-| **Nothing predicts onto a raster.** | `predict()` appears only inside a model's own fit and in the legacy standalone scripts (`002 RF Modeling.R` …), never as an app capability. |
-| **A vector→table bridge is already a solved shape.** | `vec_area_length` uses `pool = "table"` (`algorithms.R:751`), so an algorithm CAN emit a table. The bridge is a registry entry, not new machinery. |
-| **Fits are not shared state.** | A fitted model lives in a `reactiveVal` inside the screen that made it. There is no `model_pool`, so nothing outside that screen can ever use a model. **This is the real architectural gap.** |
-
-### The join problem, and why it is already solved
-
-Writing results back onto features needs rows to be traceable to geometries.
-`sf::st_drop_geometry()` **preserves count and order**, so row *i* is feature *i* — the same
-invariant proved for the attribute table in Step 0 and relied on by the selection model. So the
-link is real, but it must be made **explicit** (a carried id column) rather than implicit, because
-an analysis may drop incomplete rows, filter, or reorder, and a positional assumption would then
-silently attach results to the wrong features. **That is the single most dangerous failure mode in
-this whole item** and every phase below is shaped around avoiding it.
-
-### The plan — four phases, each independently useful
-
-**Phase 1 — the on-ramp: spatial attributes into analysis.**
-A registry entry (vector → table) that drops geometry and emits the attributes as a dataset,
-carrying an explicit `.ea_fid` row-id column. Uses the existing `pool = "table"` precedent, so it
-is a list entry and nothing else. **Immediately makes all 14 statistical methods usable on a
-shapefile**, which today is impossible.
-*Verify:* count and order preserved; `.ea_fid` matches feature order; a layer with no attributes
-refuses clearly; round-trips through a model's row-dropping without losing the id.
-
-**Phase 2 — the return leg: results back onto the layer.**
-Give actions the other pools (they already receive `pools`), and add a shared action that writes
-`pred` and `resid` columns onto the source layer, **joined by `.ea_fid`, never by position**.
-The moment this lands, the graduated symbology already built can shade a map by predicted value or
-by residual — which is the literal form of "analyse and map in one place".
-*Verify:* predictions land on the right features after rows were dropped; a layer edited between
-fit and write-back is refused rather than mis-joined; existing columns are not silently
-overwritten; undo covers the write.
-
-**Phase 3 — a model pool: fits become shared state.**
-The architectural piece. A fitted model currently dies with its screen. A `model_pool` (same shape
-as the other four) lets a fit be listed, reused, and consumed by an operation that did not create
-it. Nothing else in phases 1-2 needs it; **phase 4 is impossible without it.**
-*Verify:* a fit survives leaving and returning to the screen; is saved with the project or
-explicitly is not (a decision, not an accident); memory is bounded, since fits can be large.
-
-**Phase 4 — predict to a surface.**
-An algorithm taking a model from the pool plus a raster stack whose band names match the
-predictors, producing a prediction raster. This is the piece people mean by "map the model".
-*Verify:* band names matched by NAME not position; missing predictor refused with which one;
-factor levels in the model that the raster cannot supply refused clearly; NA handling; the output
-lands in `raster_pool` and draws with the raster symbology just built.
-
-### Sequencing and risk
-
-- **Phase 1 is a prerequisite for everything** and carries almost no risk (read-only, one registry
-  entry).
-- **Phase 2 delivers the headline goal** and is where the join-correctness testing must be
-  heaviest — a wrong join produces a map that looks plausible and is wrong, which is worse than an
-  error.
-- **Phase 3 is the only structural change** and should be kept minimal: a pool, not a framework.
-- **Phase 4 is the largest** and is the one to re-plan once 1-3 are real.
-
-**Recommendation: build phase 1 and 2 together as one shippable slice**, because phase 1 alone
-gets data in with no way back out, and the pair is what actually answers the question the item
-asks. Phases 3 and 4 follow as a second slice.
-
----
-
-## RESUME POINT — 2026-08-08
-
-**Paused here deliberately.** Phases 1 and 2 of item 42 are built, shipped as **v0.11.0** and
-verified by 36 automated checks, but **not yet exercised in a browser**. Phase 3 waits on that,
-because it builds directly on this and a fault here would be inherited rather than found.
-
-### Item 42 — where it stands
-
-| Phase | State |
-|---|---|
-| **1 · On-ramp** — `Attributes to Table` | **Built, shipped, automated-verified. Awaiting browser test.** |
-| **2 · Return leg** — `Predictions to map layer` | **Built, shipped, automated-verified. Awaiting browser test.** |
-| 3 · `model_pool` — fits outlive their screen | Not started. **Decided: saved with the project.** |
-| 4 · Predict onto a raster surface | Not started. Impossible without phase 3. |
-
-### The test that unblocks phase 3
-
-One chain, five steps. If it works end to end, the foundation is sound and phase 3 can start.
-
-1. Add a **vector layer with attributes** (a shapefile with its `.dbf`, or a GeoPackage).
-2. Run **Attributes to Table** on it — a dataset appears in the left rail.
-3. Fit **robust regression** (or Poisson / negative binomial / GAM / GLMM) on that dataset:
-   a numeric response and at least one predictor.
-4. Press **Predictions to map layer** in the model panel.
-5. In the **Layers** panel, expand the layer, set symbology to **Graduated**, and colour by `pred`.
-
-**What success looks like:** the message names how many features got values, the layer gains `pred`
-and `resid` columns, and the graduated map shades sensibly.
-
-**What to watch for, in order of importance:**
-
-- **The count in the message.** If the data had missing values it should say *fewer* than the total
-  ("… for 480 of 500 features"). If it says all of them when the model clearly dropped rows,
-  something is wrong with the row tracking and it matters.
-- **Features the model skipped should have NO colour**, not a colour. A fully-shaded map where rows
-  were dropped is the failure mode this whole design exists to prevent.
-- **Spot-check one feature.** Click it on the map and compare `pred` in the popup against the same
-  row in the data table. This is the single most valuable check.
-- **Then edit the layer** (delete a feature) and press the button again — it should **refuse** with
-  an explanation, not write anything.
-
-### Everything else awaiting your verification
-
-Accumulated over this session — all verified functionally, none seen in a browser by anyone:
-
-| Feature | Version | What to look at |
-|---|---|---|
-| Delete features + undo | v0.10.26 | Armed state reads clearly; deletion survives a project reopen |
-| Raster symbology | v0.10.27 | Stretch on real imagery — 2-98% should rescue a washed-out image |
-| Tab-switch fix | v0.10.26 | Switch away for minutes, come back: no disconnect panel |
-| Identify popup | v0.10.19 | Readable on a **dark** theme; the close button dismisses for good |
-| Layer symbology controls | v0.10.22 | Usable at that width; a long category list scrolls |
-| Basemap row, theme picker, Quit veil, app icon | v0.10.6-0.10.11 | Appearance only |
-
-### Also still outstanding, and only you can do it
-
-**The DOI.** `.zenodo.json`, `DOI.md` and the commented `identifiers` block in `CITATION.cff` are
-all staged. It needs a Zenodo login and a published GitHub release — about five minutes. Until then
-the citation resolves to the domain rather than a permanent identifier.

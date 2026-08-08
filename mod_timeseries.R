@@ -216,8 +216,10 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
           show_placeholder("Decomposition requires frequency ≥ 2.\nSet Frequency in Setup and run.")
           return()
         }
-        d <- tryCatch(decompose(y_ts), error = function(e) NULL)
-        if (is.null(d)) { show_placeholder("Decomposition failed."); return() }
+        d <- tryCatch(decompose(y_ts), error = function(e) conditionMessage(e))
+        if (is.character(d)) {
+          show_placeholder(paste0("Decomposition failed:\n", d)); return()
+        }
         plot(d, col = "#2e7d32")
         return()
       }
@@ -298,12 +300,16 @@ timeseriesServer <- function(id, dataset_pool, active_dataset) {
 
       # ADF test via tseries (optional)
       if (requireNamespace("tseries", quietly = TRUE)) {
-        adf <- tryCatch(tseries::adf.test(y_vec), error = function(e) NULL)
-        if (!is.null(adf)) {
+        adf <- tryCatch(tseries::adf.test(y_vec), error = function(e) conditionMessage(e))
+        if (!is.character(adf)) {
           cat(sprintf("Augmented Dickey-Fuller Test\n  Statistic: %.4f\n  p-value:   %.4f\n  %s\n\n",
             adf$statistic, adf$p.value,
             if (adf$p.value < 0.05) "=> Series likely STATIONARY (reject H0)"
             else "=> Series likely NON-STATIONARY (fail to reject H0)"))
+        } else {
+          # Printing nothing made a FAILED test look like a test that was never
+          # part of the screen -- the user cannot tell absence from failure.
+          cat("Augmented Dickey-Fuller Test\n  Could not be computed (", adf, ")\n\n", sep = "")
         }
       } else {
         cat("Note: install 'tseries' for ADF test.\n\n")

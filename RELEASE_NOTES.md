@@ -20,6 +20,46 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.2 — 2026-08-08
+
+### Cross-validation accuracy could be reported too high
+
+**If you have recorded a cross-validated accuracy from Logistic Regression or Classification,
+please re-run it.** On some datasets the figure shown was optimistic.
+
+Cross-validation splits your data into parts, fits the model several times, and pools the
+results. When one of those fits could not be completed, the app used to carry on quietly:
+
+- **Logistic Regression** left those rows out of the pooled result, so the accuracy was
+  calculated from less data than the label suggested — but still presented as a full
+  cross-validation.
+- **Classification** was affected more seriously. It fits one model per class. When a class
+  could not be modelled at all, it was still allowed to compete for the prediction, and could
+  even win it — so some predictions came from a model that never existed, and those counted
+  towards the accuracy as though they were real.
+
+This matters because fits do not fail at random. They fail on the awkward parts of a dataset —
+a rare category, an unusual split — which are exactly the cases a model finds hardest. Leaving
+them out made results look better than they were.
+
+Now:
+
+- A class that could not be modelled takes no part in the prediction.
+- A row that no model could handle is left unscored rather than guessed, and is excluded from
+  the accuracy instead of being counted as a mistake.
+- **Anything left out is stated next to the number it affects**, for example: *"Incomplete:
+  1 of 5 folds could not be fitted, so 18 rows (20% of the data) are NOT included."*
+- A clean run shows no such message, so nothing changes when everything fits.
+
+Mixed-effects models already handled this correctly; their wording is now clearer about how
+many rows were used.
+
+### Time series: failures now explain themselves
+
+Seasonal decomposition said only "Decomposition failed" — it now shows the reason. The
+stationarity test used to print nothing when it could not run, which made a failed test look
+like one the screen never offered; it now says it could not be computed.
+
 ## v0.11.1 — 2026-08-08
 
 ### Fixed — the assistant no longer drops figures without saying so

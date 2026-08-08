@@ -267,6 +267,7 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
         n <- nrow(sub); k <- .cv_k(input, sub); lbl <- .cv_label(k, n)
         set.seed(42); folds <- sample(rep_len(seq_len(k), n))
         all_p <- character(n); all_a <- as.character(sub[[tgt]])
+        bad_models <- 0L
         for (fold in seq_len(k)) {
           tr <- sub[folds != fold, , drop = FALSE]
           te <- sub[folds == fold, , drop = FALSE]
@@ -275,13 +276,25 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
             tr_bin$._target_ <- as.integer(as.character(tr_bin[[tgt]]) == cl)
             fml2 <- as.formula(paste("._target_ ~", paste(pv, collapse = "+")))
             m <- tryCatch(glm(fml2, data = tr_bin, family = binomial), error = function(e) NULL)
-            if (is.null(m)) return(rep(0.5, nrow(te)))
-            tryCatch(predict(m, newdata = te, type = "response"), error = function(e) rep(0.5, nrow(te)))
+            # A class whose model did NOT fit must not compete. Returning 0.5 let
+            # it win the argmax outright whenever every fitted class scored below
+            # 0.5, so a class with no model at all could be PREDICTED -- and that
+            # fabricated label then counted toward the reported accuracy as if it
+            # were real. NA withdraws it from the vote instead.
+            if (is.null(m)) { bad_models <<- bad_models + 1L; return(rep(NA_real_, nrow(te))) }
+            tryCatch(predict(m, newdata = te, type = "response"),
+                     error = function(e) { bad_models <<- bad_models + 1L; rep(NA_real_, nrow(te)) })
           }, numeric(nrow(te)))
-          pred_cls <- classes[apply(probs_mat, 1, which.max)]
+          # vapply drops to a vector when a fold holds a single row; apply() would
+          # then fail on a dimensionless object.
+          probs_mat <- matrix(probs_mat, nrow = nrow(te), dimnames = list(NULL, classes))
+          pred_cls <- apply(probs_mat, 1, function(r)
+            if (all(is.na(r))) NA_character_ else classes[which.max(replace(r, is.na(r), -Inf))])
           all_p[folds == fold] <- pred_cls
         }
-        list(actual = all_a, predicted = all_p, lbl = lbl)
+        list(actual = all_a, predicted = all_p, lbl = lbl,
+             bad_models = bad_models, unpredicted = sum(is.na(all_p)),
+             n_total = n, k = k)
       }, error = function(e) NULL)
     })
 
@@ -289,7 +302,7 @@ classificationServer <- function(id, dataset_pool, active_dataset) {
       cv <- clf_cv_result_r()
       if (is.null(cv)) return(DT::datatable(data.frame(Message = "Awaiting CV...")))
       acc <- mean(cv$predicted == cv$actual, na.rm = TRUE)
-      .prf_dt(.clf_prf(cv$actual, cv$predicted), acc)
+      .prf_dt(.clf_prf(cv$actual, cv$predicted), acc, note = .cv_note(cv))
     })
 
     output$val_conf_plot <- renderPlot({

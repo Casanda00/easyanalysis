@@ -186,6 +186,32 @@ browser (or the whole app) and coming back resumes where the user stopped.
     (a one-shot `fit_req` is cleared by the render that applies it; assert the *effect*).
     Finally: **a scripted patch must `assert` its anchor exists**, or a silent no-op reports
     success.
+35. **A fallback CONSTANT inside a vote is a fabricated prediction, not a safe default.**
+    `mod_classification.R` fitted one `glm` per class and, when a class failed to fit,
+    returned `rep(0.5, nrow(te))` so the loop could continue. That constant still entered
+    `which.max`, so on any row where every *fitted* class scored below 0.5 the class **with
+    no model at all won the vote** — and the invented label was then counted toward the
+    reported accuracy as though it were real. Use `NA` and withdraw the failed option from
+    the comparison (`which.max(replace(r, is.na(r), -Inf))`); if every option failed, the
+    answer is `NA` and the row is **not scored**, which is not the same as scoring it wrong.
+    The sibling fault in `mod_logistic.R` was milder but the same family: a failed fold was
+    `next`-ed, so its rows left the pooled prediction and accuracy was computed over a subset
+    while the caption still said *"5-fold CV"*. **Folds do not fail at random** — a fold fails
+    when its training split is degenerate, i.e. the hard case — so dropping it **biases the
+    number upward** instead of merely adding noise. A wrong number is worse than a missing
+    one. Rule: count what you skip (`bad_folds`/`bad_rows`/`bad_models`), and put the caveat
+    in the **same element as the number** (`.cv_note()` + `.prf_dt(note=)`), because a caveat
+    anywhere else is not read. Guarded by `check_cv_folds.R`.
+    **Testing note — injecting a failure is harder than it looks, and all three of my first
+    attempts silently proved nothing.** A rare factor level does *not* trigger "factor has new
+    levels", because R **retains unused levels when subsetting**, so the training fold still
+    declares the level it never saw. Targeting by call number missed, because the module fits
+    more often than the loop iterates. A one-shot flag missed, because the module evaluates
+    the whole CV **twice** and the returned value came from the second, clean pass — the
+    recurring "fixture consumed by an earlier evaluation" fault (gotcha 33). Only a
+    **stateless** stub (fail whenever a marker row is absent from the training data) fires on
+    every pass. `assignInNamespace()` *does* rebind what `pkg::name` resolves to — unlike
+    shadowing a name in the global env, which `::` ignores (gotcha 27).
 32. **A function that accepts a query proves nothing if no CALL SITE passes one.**
     `ea_search_crs(query, limit)` genuinely queried PROJ's `proj.db` and was signed off as
     "Tested & verified" — but all three CRS pickers called `.ea_crs_choices()`, i.e.

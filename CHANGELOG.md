@@ -22,6 +22,60 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.2 — 2026-08-08
+
+### Item 36 — the cross-validation fold loops (priorities 2 and 4)
+
+Filed as one shape ("same fold-skip"). It was **two**, and only one of them merely omits data.
+
+**`mod_logistic.R` — omission.** A failed fold was `next`-ed, so its rows left the pooled
+prediction. Accuracy was computed over a subset while the caption still said *"5-fold CV"*.
+Now counts `bad_folds` / `bad_rows` and reports them.
+
+**`mod_classification.R` — fabrication.** A one-vs-all sub-model that failed returned
+`rep(0.5, nrow(te))`, and that constant **still entered `which.max`**. On any row where every
+fitted class scored below 0.5, the class with *no model at all* won the vote, and the invented
+label counted toward the reported accuracy. Failed classes now yield `NA` and are withdrawn
+from the vote; a row where all classes failed is `NA` and is **not scored** (excluded from
+accuracy, not counted as an error). Also fixed a latent crash: `vapply` collapses to a
+dimensionless vector when a fold holds a single row, which `apply()` cannot take.
+
+**Why these outrank the rest of the sweep despite being fewer sites:** folds fail
+non-randomly — a fold fails when its training split is degenerate, which is the hard case — so
+dropping it **biases the metric upward**. Wrong numbers, presented with full confidence, not
+missing ones. See gotcha 35.
+
+`mod_lme.R` was **already correct** (NA-fills failed folds, prints `%d/%d rows used`); only the
+wording was strengthened so a shortfall is stated rather than inferred from two numbers.
+
+**Priority 4, `mod_timeseries.R`:** `decompose()` reports its error instead of a bare
+"Decomposition failed"; the optional ADF test says it could not be computed instead of printing
+nothing — which had made a *failed* test indistinguishable from one that was never on the screen.
+
+**Presentation:** new `.cv_note()` in `helpers.R`; `.prf_dt()` gained `note =` so the caveat
+travels in the **same caption as the accuracy**. Returns `NULL` on a clean run.
+
+### `check_cv_folds.R` — new guard, control-tested both ways
+
+Asserts the old 0.5 rule *does* predict the unfitted class, and injects a real fold failure and
+requires the caveat to appear: *"Incomplete: 1 of 5 folds could not be fitted, so 18 row(s)
+(20% of the data) are NOT included."* 24 assertions, no skips.
+
+**Three failed injection attempts are recorded in the file**, because each is a harness fault
+this project repeats (gotcha 33): a rare factor level does not trigger "factor has new levels"
+(R **retains unused levels when subsetting**); targeting by call number hit the main fit, since
+the module fits more often than the loop iterates; a one-shot flag was consumed by the
+module's **first** of two CV evaluations, so the returned value came from a second clean pass.
+Only a stateless marker-row stub fires on every pass. A guard that passes because the failure
+never reached the code proves nothing.
+
+### `tools/testkit.R` — `ea_sig()` was broken
+
+It failed on any function with a required argument. A formal with no default **is the empty
+symbol**, and binding it (`d <- fm[[n]]`) makes the local variable itself "missing", so the next
+line touching `d` threw. Now tests the flag and reads the default only where one exists. Found
+by using it, which is the only reason it was found at all.
+
 ## v0.11.1 — 2026-08-08
 
 ### Item 36 — the silent tryCatch sweep, Co-Analyst half

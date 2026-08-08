@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.1.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.2.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,47 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.1</b> · 70 releases ·
+      <p class="meta">Latest: <b>v0.11.2</b> · 71 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-1"><h2><a class="anchor" href="#v0-11-1">v0.11.1</a><span class="when">2026-08-08</span></h2>
+<section class="rel" id="v0-11-2"><h2><a class="anchor" href="#v0-11-2">v0.11.2</a><span class="when">2026-08-08</span></h2>
+<h3>Cross-validation accuracy could be reported too high</h3>
+<p><strong>If you have recorded a cross-validated accuracy from Logistic Regression or Classification,
+please re-run it.</strong> On some datasets the figure shown was optimistic.</p>
+<p>Cross-validation splits your data into parts, fits the model several times, and pools the
+results. When one of those fits could not be completed, the app used to carry on quietly:</p>
+<ul>
+<li><strong>Logistic Regression</strong> left those rows out of the pooled result, so the accuracy was
+calculated from less data than the label suggested — but still presented as a full
+cross-validation.</li>
+<li><strong>Classification</strong> was affected more seriously. It fits one model per class. When a class
+could not be modelled at all, it was still allowed to compete for the prediction, and could
+even win it — so some predictions came from a model that never existed, and those counted
+towards the accuracy as though they were real.</li>
+</ul>
+<p>This matters because fits do not fail at random. They fail on the awkward parts of a dataset —
+a rare category, an unusual split — which are exactly the cases a model finds hardest. Leaving
+them out made results look better than they were.</p>
+<p>Now:</p>
+<ul>
+<li>A class that could not be modelled takes no part in the prediction.</li>
+<li>A row that no model could handle is left unscored rather than guessed, and is excluded from
+the accuracy instead of being counted as a mistake.</li>
+<li><strong>Anything left out is stated next to the number it affects</strong>, for example: <em>&quot;Incomplete:
+1 of 5 folds could not be fitted, so 18 rows (20% of the data) are NOT included.&quot;</em></li>
+<li>A clean run shows no such message, so nothing changes when everything fits.</li>
+</ul>
+<p>Mixed-effects models already handled this correctly; their wording is now clearer about how
+many rows were used.</p>
+<h3>Time series: failures now explain themselves</h3>
+<p>Seasonal decomposition said only &quot;Decomposition failed&quot; — it now shows the reason. The
+stationarity test used to print nothing when it could not run, which made a failed test look
+like one the screen never offered; it now says it could not be computed.</p>
+</section><section class="rel" id="v0-11-1"><h2><a class="anchor" href="#v0-11-1">v0.11.1</a><span class="when">2026-08-08</span></h2>
 <h3>Fixed — the assistant no longer drops figures without saying so</h3>
 <p>When the Co-Analyst ran a model for you, any figure it could not compute simply vanished from its
 answer. Ask for a mixed-effects model and the R² could be missing with no indication why; ask for

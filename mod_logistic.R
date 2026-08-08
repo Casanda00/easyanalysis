@@ -166,7 +166,8 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
       cv <- cv_result_r()
       if (is.null(cv)) return("")
       acc <- mean(cv$predicted == cv$actual, na.rm = TRUE) * 100
-      paste(cv$lbl, "Accuracy:", round(acc, 2), "%")
+      paste0(cv$lbl, " Accuracy: ", round(acc, 2), "%",
+             if (is.null(.cv_note(cv))) "" else paste0("  (", .cv_note(cv), ")"))
     })
 
     output$prf_dt <- renderDT({
@@ -192,17 +193,24 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
         n <- nrow(df); k <- .cv_k(input, df); lbl <- .cv_label(k, n)
         set.seed(42); folds <- sample(rep_len(seq_len(k), n))
         all_preds <- character(0); all_actual <- character(0)
+        # Count what is skipped rather than skipping it silently: a dropped fold
+        # shrinks the data the accuracy is computed over while the label still
+        # says k-fold. See .cv_note() in helpers.R for why that biases the number.
+        bad_folds <- 0L; bad_rows <- 0L
         for (fold in seq_len(k)) {
           tr <- df[folds!=fold,,drop=FALSE]; te <- df[folds==fold,,drop=FALSE]
           m  <- tryCatch(nnet::multinom(fml, data=tr, trace=FALSE), error=function(e) NULL)
-          if (is.null(m)) next
-          p  <- tryCatch(as.character(predict(m, newdata=te)), error=function(e) NULL)
-          if (is.null(p)) next
+          p  <- if (is.null(m)) NULL else
+            tryCatch(as.character(predict(m, newdata=te)), error=function(e) NULL)
+          if (is.null(p) || length(p) != nrow(te)) {
+            bad_folds <- bad_folds + 1L; bad_rows <- bad_rows + nrow(te); next
+          }
           all_preds  <- c(all_preds,  p)
           all_actual <- c(all_actual, as.character(te[[yv]]))
         }
         if (length(all_preds) == 0) return(NULL)
-        list(actual = all_actual, predicted = all_preds, lbl = lbl)
+        list(actual = all_actual, predicted = all_preds, lbl = lbl,
+             bad_folds = bad_folds, bad_rows = bad_rows, n_total = n, k = k)
       }, error = function(e) NULL)
     })
 
@@ -210,7 +218,7 @@ logisticServer <- function(id, dataset_pool, active_dataset) {
       cv <- cv_result_r()
       if (is.null(cv)) return(DT::datatable(data.frame(Message = "Awaiting CV...")))
       acc <- mean(cv$predicted == cv$actual, na.rm = TRUE)
-      .prf_dt(.clf_prf(cv$actual, cv$predicted), acc)
+      .prf_dt(.clf_prf(cv$actual, cv$predicted), acc, note = .cv_note(cv))
     })
 
     output$val_conf_plot <- renderPlot({
