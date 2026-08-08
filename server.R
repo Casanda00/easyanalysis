@@ -1015,7 +1015,8 @@ server <- function(input, output, session) {
   # One statServer per registry entry, namespaced "stat_<id>" to match the tool
   # key the workspace registers. Adding an analysis needs no change here.
   stat_ctx <- lapply(ea_statistics(), function(s)
-    statServer(paste0("stat_", s$id), s, dataset_pool, active_dataset))
+    statServer(paste0("stat_", s$id), s, dataset_pool, active_dataset,
+               vector_pool = vector_pool, raster_pool = raster_pool))
   names(stat_ctx) <- vapply(ea_statistics(), function(s) s$id, character(1))
   # terrainServer/hydroServer are NOT bound: their operations are algorithms.R
   # entries now (see .ea_terrain_algs / .ea_hydro_algs).

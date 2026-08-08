@@ -20,6 +20,35 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.0 — 2026-08-08
+
+### Added — analyse a map layer, and put the results back on the map
+
+Until now the analysis side and the map side could not reach each other. A shapefile's attributes
+could not be modelled at all without leaving EasyAnalysis, and nothing a model produced could be
+shown on the map. Both directions now work.
+
+**Attributes to Table** takes a vector layer and makes its attribute table an ordinary dataset, so
+any of the statistical methods can model it.
+
+**Predictions to map layer** does the return trip: after fitting, it adds the fitted values and
+residuals to the layer the data came from, as new columns. Colour the layer by one of them in the
+Layers panel and you are looking at your model on the map.
+
+Available on robust regression, Poisson, negative binomial, GAM and GLMM.
+
+**About accuracy.** A model normally leaves out rows with missing values, so results do not line up
+one-to-one with the features. Rather than assume they do, the link between the data and the layer
+is recorded when the attributes are exported and checked again before anything is written:
+
+- results always land on the features they were computed from, and features the model left out are
+  marked as having no value rather than being given someone else's;
+- if the layer has been edited since the attributes were exported, the write is **refused** with an
+  explanation, because attaching results to shifted features would produce a map that looks right
+  and is wrong;
+- renaming a layer is harmless — the link does not depend on the name;
+- existing columns are never overwritten.
+
 ## v0.10.27 — 2026-08-06
 
 ### Added — raster symbology

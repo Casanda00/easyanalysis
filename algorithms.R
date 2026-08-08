@@ -615,6 +615,48 @@ ea_algorithms <- function() {
          output = ea_out(pool, default), run = run)
 
   list(
+    # ---- The ON-RAMP from the map to the analysis side (item 42, phase 1) ---
+    # A statistical method reads dataset_pool only, so a layer's attributes were
+    # unreachable: modelling a shapefile meant leaving the app. This makes them a
+    # dataset.
+    #
+    # It carries the LINK HOME, which is the whole point:
+    #   .ea_fid     -- the row's position in the source layer
+    #   ea_src_fp   -- a digest of that layer's attributes AT THIS MOMENT
+    #
+    # The layer is identified BY FINGERPRINT, not by name. That is deliberate:
+    # renaming a layer does not change its attributes, so the link survives a
+    # rename, and a name that no longer resolves cannot silently match the wrong
+    # layer.
+    #
+    # The fingerprint is also what makes writing results back provably safe
+    # rather than merely likely. An identical digest means the same rows in the
+    # same order, so the positional link still holds; a different one means the
+    # layer was edited and the write-back must refuse. Guessing there would
+    # produce a map that looks plausible and is wrong -- worse than an error.
+    mk("vec_attributes", "Attributes to Table",
+       paste("Makes a vector layer's attribute table available as a dataset, so any",
+             "statistical method can model it. Keeps a link back to the layer so",
+             "results can be written onto the features afterwards."),
+       inputs = list(ea_in("v", "Vector layer", "vector")),
+       default = "Attributes",
+       pool = "table",
+       run = function(inp, p) {
+         v <- inp$v
+         df <- as.data.frame(sf::st_drop_geometry(v))
+         if (!ncol(df))
+           stop("This layer has no attribute columns. A shapefile keeps its ",
+                "attributes in the .dbf file — add the layer again with every ",
+                "part selected (.shp, .dbf, .shx, .prj).")
+         # Dot-prefixed so it is recognisable as ours, and so role pickers can
+         # exclude it -- offering a row id as a predictor invites nonsense.
+         cols <- names(df)              # before .ea_fid is added
+         df$.ea_fid <- seq_len(nrow(df))
+         attr(df, "ea_src_cols") <- cols
+         attr(df, "ea_src_fp")   <- ea_layer_fingerprint(v, cols)
+         df
+       }),
+
     mk("xy_to_sf", "XY Coordinates to Vector", "Converts tabular X and Y coordinate columns to a spatial point layer.",
        inputs = list(ea_in("tbl", "Tabular dataset", "table")),
        params = list(

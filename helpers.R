@@ -162,6 +162,63 @@ ea_dt_len <- function()
   list(lengthMenu = list(c(10, 25, 50, 100, 500, 1000, -1),
                          c("10", "25", "50", "100", "500", "1000", "All")))
 
+# ---- Linking an analysis back to the layer it came from (item 42) ----------
+#
+# The problem: a model is fitted on a COPY of a layer's attributes, and an
+# analysis routinely drops incomplete rows. Writing results back by position
+# would therefore attach predictions to the wrong features -- producing a map
+# that looks entirely plausible and is wrong. That is the worst possible failure
+# for this feature, so the link is made explicit and verified rather than
+# assumed.
+#
+# Two pieces:
+#   ea_layer_fingerprint() proves the layer has not changed since the export.
+#   ea_fit_rows()          recovers WHICH original rows a fit actually used.
+
+# A digest of a layer's attributes. Identical fingerprint => same rows, same
+# order, so the positional link still holds. Geometry is deliberately excluded:
+# moving a vertex does not invalidate a model fitted on attributes, and
+# including it would refuse write-backs that are perfectly valid.
+#
+# `cols` scopes it to the columns the model actually saw. That matters: writing
+# results back ADDS columns to the layer, so a whole-table fingerprint would
+# then refuse a second, perfectly valid write-back — the tool refusing its own
+# previous output. Scoping to the exported columns keeps every real protection
+# (a deleted feature changes the row count, an edited value changes the digest,
+# a renamed column goes missing) while being blind to columns added afterwards.
+ea_layer_fingerprint <- function(v, cols = NULL) {
+  df <- tryCatch(as.data.frame(sf::st_drop_geometry(v)), error = function(e) NULL)
+  if (is.null(df)) return(NA_character_)
+  if (!is.null(cols)) {
+    if (!all(cols %in% names(df))) return(NA_character_)   # a modelled column is gone
+    df <- df[, cols, drop = FALSE]
+  }
+  if (requireNamespace("digest", quietly = TRUE))
+    return(digest::digest(list(nrow(df), names(df), df), algo = "xxhash64"))
+  # digest ships with shiny, so this is belt-and-braces rather than expected.
+  paste(nrow(df), ncol(df), paste(names(df), collapse = "|"), sep = "/")
+}
+
+# Which rows of the ORIGINAL data frame did this fit actually use?
+#
+# R already tracks this: model.frame() keeps the original row names, so a fit
+# that dropped incomplete rows still says which ones it kept. Using R's own
+# bookkeeping is safer than re-deriving complete.cases() here, because each
+# method decides for itself what "usable" means (a factor level with one
+# observation, a zero-variance column, its own na.action).
+#
+# Returns integer row indices, or NULL when the fit does not expose them -- and
+# NULL must be treated as "cannot link", never as "assume 1:n".
+ea_fit_rows <- function(fit, n_expected = NA_integer_) {
+  rn <- tryCatch(rownames(stats::model.frame(fit)), error = function(e) NULL)
+  if (is.null(rn)) rn <- tryCatch(names(stats::fitted(fit)), error = function(e) NULL)
+  if (is.null(rn) || !length(rn)) return(NULL)
+  i <- suppressWarnings(as.integer(rn))
+  if (any(is.na(i))) return(NULL)                    # non-numeric row names
+  if (!is.na(n_expected) && (any(i < 1L) || any(i > n_expected))) return(NULL)
+  i
+}
+
 # Pretty-print .clf_prf() result to console.
 .print_prf <- function(prf_df, acc = NULL) {
   if (!is.null(acc))

@@ -80,6 +80,94 @@ ea_stat_plot <- function(ns, name, height = "400px")
 ea_action <- function(id, label, run, icon = "bolt", hint = NULL)
   list(id = id, label = label, run = run, icon = icon, hint = hint)
 
+# ---- Writing a model's results back onto the map (item 42, phase 2) --------
+#
+# The return leg. `vec_attributes` brings a layer's attributes in as a dataset
+# carrying `.ea_fid` and a fingerprint of the layer; this puts the fitted values
+# and residuals back onto that layer as columns, so the map can then be shaded
+# by prediction or by residual with the graduated symbology.
+#
+# ACCURACY IS THE WHOLE POINT HERE, so every step that could go wrong refuses
+# instead of guessing:
+#
+#   * the dataset must carry a fingerprint  -> otherwise it did not come from a
+#     layer and there is nothing to write to;
+#   * a layer must still match it EXACTLY   -> a layer edited since the export
+#     has different rows, and a positional write would attach predictions to the
+#     wrong features. Matched by fingerprint rather than by name, so a rename is
+#     harmless and a renamed-but-changed layer cannot masquerade;
+#   * the rows the fit USED must be recoverable -> analyses drop incomplete
+#     rows, so `ea_fit_rows()` reads R's own record of which survived. If that
+#     cannot be established the action refuses rather than assuming 1:n;
+#   * existing columns are never silently replaced -> a suffix is added.
+#
+# A wrong join here produces a map that looks entirely plausible and is wrong.
+# That is worse than any error message, which is why none of these are warnings.
+ea_action_to_layer <- function()
+  ea_action("to_layer", "Predictions to map layer", icon = "map-location-dot",
+    hint = "Adds fitted values and residuals to the layer these attributes came from.",
+    run = function(fit, f, pools) {
+      lk <- f$link
+      if (is.null(lk) || is.null(lk$fid))
+        stop("This dataset did not come from a map layer, or its link column was ",
+             "dropped while editing. Run 'Attributes to Table' on a vector layer, ",
+             "then fit the model on that.")
+      fp <- lk$fp
+      if (is.null(fp) || is.na(fp) || !nzchar(fp))
+        stop("The link to the source layer is missing. Re-run 'Attributes to Table' ",
+             "and refit.")
+
+      vp <- pools$vector
+      if (is.null(vp)) stop("No vector layers are available.")
+      nms <- tryCatch(names(reactiveValuesToList(vp)), error = function(e) character(0))
+      nms <- Filter(function(k) !is.null(tryCatch(vp[[k]], error = function(e) NULL)), nms)
+
+      hit <- NULL
+      for (k in nms)
+        if (identical(ea_layer_fingerprint(vp[[k]], lk$cols), fp)) { hit <- k; break }
+      if (is.null(hit))
+        stop("The layer these attributes came from has changed since they were ",
+             "exported (or is no longer in the project), so the results cannot be ",
+             "matched to the right features. Re-run 'Attributes to Table' and refit ",
+             "the model.")
+
+      v <- vp[[hit]]
+      pred <- suppressWarnings(tryCatch(as.numeric(stats::fitted(fit)), error = function(e) NULL))
+      if (is.null(pred) || !length(pred))
+        stop("This model does not expose fitted values, so there is nothing to map.")
+
+      rows <- ea_fit_rows(fit, f$n)
+      if (is.null(rows) || length(rows) != length(pred))
+        stop("Could not establish which rows this model used, so the results cannot ",
+             "be attached to the right features.")
+
+      fid <- lk$fid[rows]
+      if (!length(fid) || any(is.na(fid)) || any(fid < 1L) || any(fid > nrow(v)))
+        stop("The link between the data and the layer is out of range. Re-run ",
+             "'Attributes to Table' and refit.")
+
+      resid <- suppressWarnings(tryCatch(as.numeric(stats::residuals(fit)),
+                                         error = function(e) NULL))
+      if (is.null(resid) || length(resid) != length(pred)) resid <- NULL
+
+      # Never overwrite a column the user already has.
+      uniq <- function(base) {
+        nm <- base; i <- 1L
+        while (nm %in% names(v)) { i <- i + 1L; nm <- paste0(base, "_", i) }
+        nm
+      }
+      pcol <- uniq("pred"); v[[pcol]] <- NA_real_; v[[pcol]][fid] <- pred
+      rcol <- NULL
+      if (!is.null(resid)) { rcol <- uniq("resid"); v[[rcol]] <- NA_real_; v[[rcol]][fid] <- resid }
+      vp[[hit]] <- v
+
+      paste0("Added ", pcol, if (!is.null(rcol)) paste0(" and ", rcol) else "",
+             " to '", hit, "' for ", length(fid), " of ", nrow(v), " features",
+             if (length(fid) < nrow(v))
+               " (the rest were dropped by the model as incomplete)" else "",
+             ". Colour the layer by it in the Layers panel.")
+    })
+
 # Does a column satisfy a role's type filter?
 ea_role_ok <- function(x, types) {
   switch(types,
@@ -208,6 +296,7 @@ ea_statistics <- function() {
                  "Hampel" = "hampel"), "huber")),
       views = c(summary = "Model summary", coefs = "Coefficients",
                 metrics = "Fit quality", weights = "Down-weighted rows"),
+      actions = list(ea_action_to_layer()),
       fit = function(df, r, p) {
         psi <- switch(p$psi %||% "huber", huber = MASS::psi.huber,
                       bisquare = MASS::psi.bisquare, hampel = MASS::psi.hampel)
@@ -246,6 +335,7 @@ ea_statistics <- function() {
         ea_sel("link", "Link function", c("log", "identity", "sqrt"), "log")),
       views = c(summary = "Model summary", coefs = "Coefficients",
                 rates = "Rate ratios", disp = "Overdispersion check"),
+      actions = list(ea_action_to_layer()),
       fit = function(df, r, p) {
         preds <- r$x
         if (isTruthy(r$offset)) {
@@ -302,6 +392,7 @@ ea_statistics <- function() {
       params = list(),
       views = c(summary = "Model summary", coefs = "Coefficients",
                 rates = "Rate ratios", theta = "Dispersion (theta)"),
+      actions = list(ea_action_to_layer()),
       fit = function(df, r, p) MASS::glm.nb(.ea_formula(r$y, r$x), data = df),
       render = function(fit, key, solo) switch(key,
         summary = .ea_v_summary(fit),
@@ -1194,6 +1285,7 @@ ea_statistics <- function() {
                 summary = "GAM summary", cv = "Validation & metrics"),
       views_plot = c("smooths"),
       actions = list(
+        ea_action_to_layer(),
         ea_action("to_pool", "Predictions to data pool", icon = "database",
           hint = "Adds observed / lm_pred / gam_pred as a new table.",
           run = function(fit, f, pools) {
@@ -1755,6 +1847,7 @@ ea_statistics <- function() {
                  "Nested   (1|a/b)" = "nested"), "crossed")),
       views = c(summary = "Model summary", coefs = "Fixed effects",
                 ranef = "Random effects", conv = "Convergence & fit"),
+      actions = list(ea_action_to_layer()),
       fit = function(df, r, p) {
         # Guarded here rather than at the binding: this `::` sits inside a
         # function body that only runs on Run, so it cannot break server

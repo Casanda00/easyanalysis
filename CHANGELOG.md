@@ -22,6 +22,60 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.0 — 2026-08-08
+
+### Item 42, phases 1 and 2 — the analysis/map round trip
+
+Minor bump, not a patch: the first time the two halves of the app can reach each other.
+
+**Phase 1, the on-ramp.** `vec_attributes` ("Attributes to Table") in `algorithms.R`, using the
+existing `pool = "table"` precedent so it is a registry entry and nothing else. All 14 statistical
+methods become usable on a shapefile, previously impossible because `statServer` reads
+`dataset_pool` only.
+
+**Phase 2, the return leg.** `ea_action_to_layer()` in `statistics.R`, attached to robust, poisson,
+negbin, gam and glmm. `statServer` now receives `vector_pool`/`raster_pool` and passes them to
+actions -- `mod_stat.R` previously handed over only `list(table = dataset_pool)`, which is why no
+action could ever touch the map.
+
+**The join is the only part that really matters.** A model drops incomplete rows, so a positional
+write-back attaches predictions to the wrong features and produces a map that looks plausible and
+is wrong. Three mechanisms, none of them guesses:
+
+- **`.ea_fid`** -- the row position in the source layer, carried in the exported table.
+- **`ea_fit_rows()`** -- reads `model.frame(fit)` row names, which are R's OWN record of which
+  original rows survived. Better than re-deriving `complete.cases()`, because each method decides
+  for itself what usable means (its own `na.action`, a singleton factor level, a zero-variance
+  column). Returns NULL when it cannot be established, and NULL means CANNOT LINK -- never
+  "assume 1:n".
+- **`ea_layer_fingerprint(v, cols)`** -- a digest proving the layer is unchanged, **scoped to the
+  exported columns**. A test forced that scoping: a whole-table digest made the tool refuse its own
+  previous write-back, because adding `pred` changed the layer. Scoping keeps every real protection
+  (deleted feature -> row count, edited value -> digest, renamed column -> missing) while ignoring
+  columns added afterwards. Geometry is excluded on purpose: moving a vertex does not invalidate a
+  model fitted on attributes.
+
+**Matched by fingerprint, not by name**, so a rename is harmless and a renamed-but-edited layer
+cannot masquerade as the original.
+
+**The fit record carries a minimal link** (`fid`, `fp`, `cols`) rather than a second copy of the
+data frame, which for a large layer would double memory for a feature most fits never use.
+
+**Verified, 36 checks**, weighted at the join: predictions land on exactly the right features with
+rows 4/9/15 dropped by the model and left NA rather than shifting the rest; a deleted feature is
+REFUSED and the layer left untouched; a rename still works; a second write-back suffixes rather
+than overwrites; a layer with no attributes refuses with the .dbf hint; and an end-to-end run
+(export -> fit -> write back) puts numeric values on the right features, ready for graduated
+symbology.
+
+**Deliberately not attached to the classifiers or ordinal regression:** `polr`'s `fitted()` is a
+probability MATRIX, so there is no single value to map. The action refuses safely there, but a
+button that always refuses is worse than no button.
+
+### Still to come on item 42
+Phase 3 (a `model_pool` so fits outlive their screen -- decided: **saved with the project**) and
+phase 4 (predict onto a raster surface). Phase 4 is impossible without phase 3.
+
 ## v0.10.27 — 2026-08-06
 
 ### Raster symbology — the second half of round-3 item 11

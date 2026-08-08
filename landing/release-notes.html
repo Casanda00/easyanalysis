@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.10.27.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.0.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,37 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.10.27</b> · 68 releases ·
+      <p class="meta">Latest: <b>v0.11.0</b> · 69 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-10-27"><h2><a class="anchor" href="#v0-10-27">v0.10.27</a><span class="when">2026-08-06</span></h2>
+<section class="rel" id="v0-11-0"><h2><a class="anchor" href="#v0-11-0">v0.11.0</a><span class="when">2026-08-08</span></h2>
+<h3>Added — analyse a map layer, and put the results back on the map</h3>
+<p>Until now the analysis side and the map side could not reach each other. A shapefile&#39;s attributes
+could not be modelled at all without leaving EasyAnalysis, and nothing a model produced could be
+shown on the map. Both directions now work.</p>
+<p><strong>Attributes to Table</strong> takes a vector layer and makes its attribute table an ordinary dataset, so
+any of the statistical methods can model it.</p>
+<p><strong>Predictions to map layer</strong> does the return trip: after fitting, it adds the fitted values and
+residuals to the layer the data came from, as new columns. Colour the layer by one of them in the
+Layers panel and you are looking at your model on the map.</p>
+<p>Available on robust regression, Poisson, negative binomial, GAM and GLMM.</p>
+<p><strong>About accuracy.</strong> A model normally leaves out rows with missing values, so results do not line up
+one-to-one with the features. Rather than assume they do, the link between the data and the layer
+is recorded when the attributes are exported and checked again before anything is written:</p>
+<ul>
+<li>results always land on the features they were computed from, and features the model left out are
+marked as having no value rather than being given someone else&#39;s;</li>
+<li>if the layer has been edited since the attributes were exported, the write is <strong>refused</strong> with an
+explanation, because attaching results to shifted features would produce a map that looks right
+and is wrong;</li>
+<li>renaming a layer is harmless — the link does not depend on the name;</li>
+<li>existing columns are never overwritten.</li>
+</ul>
+</section><section class="rel" id="v0-10-27"><h2><a class="anchor" href="#v0-10-27">v0.10.27</a><span class="when">2026-08-06</span></h2>
 <h3>Added — raster symbology</h3>
 <p>Single-band rasters were always drawn the same way: the first band, one fixed colour ramp, the
 full range of values and a fixed transparency. All four are now yours to set, in the same place as

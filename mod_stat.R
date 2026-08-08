@@ -61,7 +61,8 @@ statCanvasUI <- function(id, spec) {
   )
 }
 
-statServer <- function(id, spec, dataset_pool, active_dataset) {
+statServer <- function(id, spec, dataset_pool, active_dataset,
+                      vector_pool = NULL, raster_pool = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -156,7 +157,15 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
                           error = function(e) NULL)
           if (is.null(res)) { fit_obj(NULL); return() }
         } else err_msg(NULL)
-        fit_obj(list(fit = res, roles = r, params = p, n = nrow(df)))
+        # Carry the LINK back to the map layer, if this data came from one.
+        # Deliberately minimal -- the id column and the layer fingerprint, not a
+        # second copy of the whole data frame, which for a large layer would
+        # double memory for a feature most fits never use.
+        fit_obj(list(fit = res, roles = r, params = p, n = nrow(df),
+                     link = if (".ea_fid" %in% names(df))
+                       list(fid  = df$.ea_fid,
+                            fp   = attr(df, "ea_src_fp"),
+                            cols = attr(df, "ea_src_cols")) else NULL))
         showNotification(paste0(spec$label, " fitted."), type = "message")
       })
     })
@@ -224,7 +233,9 @@ statServer <- function(id, spec, dataset_pool, active_dataset) {
         if (is.null(f)) return()
         res <- tryCatch(
           withProgress(message = paste0(a$label, "..."), value = 0.5,
-                       a$run(f$fit, f, list(table = dataset_pool))),
+                       a$run(f$fit, f, list(table  = dataset_pool,
+                                           vector = vector_pool,
+                                           raster = raster_pool))),
           error = function(e) {
             showNotification(paste0(a$label, " failed: ", conditionMessage(e)),
                              type = "error", duration = 8)
