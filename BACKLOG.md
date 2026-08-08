@@ -4947,3 +4947,82 @@ reported success anyway.
 - **Delete stale tests.** `verify_step3.R` asserted hit-testing that v0.10.20 deliberately removed;
   it failed by design and was noise. A test that fails for a reason nobody will act on is worse
   than no test.
+
+---
+
+## Item 42 — INVESTIGATION AND PHASED PLAN (2026-08-08)
+
+> "one goal was to analyze data and map it in the same platform. has the platform truly solved
+> that goal… we should set a multiobjective multi step process"
+
+Investigated before planning. The answer is **no, and for a more specific reason than "the halves
+are not integrated"** — there are exactly **three missing links**, and one of them is not a missing
+feature but a missing piece of shared state.
+
+### What is actually true today (checked, not assumed)
+
+| Fact | Evidence |
+|---|---|
+| **A statistical method cannot see a spatial layer at all.** | `statServer(id, spec, dataset_pool, active_dataset)` — `server.R:1018`. Vector attributes live in `vector_pool` and are invisible to all 14 methods. There is no way to model a shapefile's attributes without leaving the app. |
+| **There is exactly ONE write-back in the whole app**, and it does not reach the map. | GAM's `ea_action("to_pool", …)` — `statistics.R:1197` — writes a **new table**, not columns on a layer. |
+| **The action mechanism is the right seam, but it is starved.** | `ea_action`'s `run(fit, f, pools)` is well-shaped, yet `mod_stat.R:227` passes only `list(table = dataset_pool)`. The vector and raster pools are simply not handed over. |
+| **Nothing predicts onto a raster.** | `predict()` appears only inside a model's own fit and in the legacy standalone scripts (`002 RF Modeling.R` …), never as an app capability. |
+| **A vector→table bridge is already a solved shape.** | `vec_area_length` uses `pool = "table"` (`algorithms.R:751`), so an algorithm CAN emit a table. The bridge is a registry entry, not new machinery. |
+| **Fits are not shared state.** | A fitted model lives in a `reactiveVal` inside the screen that made it. There is no `model_pool`, so nothing outside that screen can ever use a model. **This is the real architectural gap.** |
+
+### The join problem, and why it is already solved
+
+Writing results back onto features needs rows to be traceable to geometries.
+`sf::st_drop_geometry()` **preserves count and order**, so row *i* is feature *i* — the same
+invariant proved for the attribute table in Step 0 and relied on by the selection model. So the
+link is real, but it must be made **explicit** (a carried id column) rather than implicit, because
+an analysis may drop incomplete rows, filter, or reorder, and a positional assumption would then
+silently attach results to the wrong features. **That is the single most dangerous failure mode in
+this whole item** and every phase below is shaped around avoiding it.
+
+### The plan — four phases, each independently useful
+
+**Phase 1 — the on-ramp: spatial attributes into analysis.**
+A registry entry (vector → table) that drops geometry and emits the attributes as a dataset,
+carrying an explicit `.ea_fid` row-id column. Uses the existing `pool = "table"` precedent, so it
+is a list entry and nothing else. **Immediately makes all 14 statistical methods usable on a
+shapefile**, which today is impossible.
+*Verify:* count and order preserved; `.ea_fid` matches feature order; a layer with no attributes
+refuses clearly; round-trips through a model's row-dropping without losing the id.
+
+**Phase 2 — the return leg: results back onto the layer.**
+Give actions the other pools (they already receive `pools`), and add a shared action that writes
+`pred` and `resid` columns onto the source layer, **joined by `.ea_fid`, never by position**.
+The moment this lands, the graduated symbology already built can shade a map by predicted value or
+by residual — which is the literal form of "analyse and map in one place".
+*Verify:* predictions land on the right features after rows were dropped; a layer edited between
+fit and write-back is refused rather than mis-joined; existing columns are not silently
+overwritten; undo covers the write.
+
+**Phase 3 — a model pool: fits become shared state.**
+The architectural piece. A fitted model currently dies with its screen. A `model_pool` (same shape
+as the other four) lets a fit be listed, reused, and consumed by an operation that did not create
+it. Nothing else in phases 1-2 needs it; **phase 4 is impossible without it.**
+*Verify:* a fit survives leaving and returning to the screen; is saved with the project or
+explicitly is not (a decision, not an accident); memory is bounded, since fits can be large.
+
+**Phase 4 — predict to a surface.**
+An algorithm taking a model from the pool plus a raster stack whose band names match the
+predictors, producing a prediction raster. This is the piece people mean by "map the model".
+*Verify:* band names matched by NAME not position; missing predictor refused with which one;
+factor levels in the model that the raster cannot supply refused clearly; NA handling; the output
+lands in `raster_pool` and draws with the raster symbology just built.
+
+### Sequencing and risk
+
+- **Phase 1 is a prerequisite for everything** and carries almost no risk (read-only, one registry
+  entry).
+- **Phase 2 delivers the headline goal** and is where the join-correctness testing must be
+  heaviest — a wrong join produces a map that looks plausible and is wrong, which is worse than an
+  error.
+- **Phase 3 is the only structural change** and should be kept minimal: a pool, not a framework.
+- **Phase 4 is the largest** and is the one to re-plan once 1-3 are real.
+
+**Recommendation: build phase 1 and 2 together as one shippable slice**, because phase 1 alone
+gets data in with no way back out, and the pair is what actually answers the question the item
+asks. Phases 3 and 4 follow as a second slice.
