@@ -1151,6 +1151,10 @@ server <- function(input, output, session) {
   plugins_ctx    <- pluginsServer("plugins",
                     open = reactive(input$plugins_open),
                     on_change = function() plugin_epoch(isolate(plugin_epoch()) + 1))
+  # Help > How to cite. Renders from ea_citation(), so the version can never be
+  # stale -- the landing page's had been frozen at 0.10.16 for eleven releases.
+  observeEvent(input$cite_open, { showModal(ea_cite_modal()) })
+
   # ---- Tool search reaches tools that are NOT enabled (item 77) -------------
   # The menubar search is a client-side index of the RENDERED MENU, so it can
   # only ever find what is already registered -- which is exactly why searching

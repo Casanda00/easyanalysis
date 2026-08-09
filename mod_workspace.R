@@ -714,6 +714,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         .menu("Help", "circle-question", tagList(
           .mi("Documentation", .setTool("docs")),
           .mi("References",    .setTool("references")),
+          # How to cite belongs HERE, next to References: both answer "what do I
+          # put in the paper". It was only on the landing page, which is the one
+          # place someone finishing an analysis is not looking.
+          .mi("How to cite…",
+              "Shiny.setInputValue('cite_open', Date.now(), {priority:'event'})"),
           .msep(),
           .mi("Ask the Co-Analyst", "document.getElementById('chat-panel').classList.add('open')"),
           .mi("Take the tour", "Shiny.setInputValue('ws_tour', Date.now(), {priority:'event'})"),

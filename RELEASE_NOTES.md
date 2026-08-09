@@ -20,6 +20,22 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.22 — 2026-08-10
+
+### How to cite EasyAnalysis, inside the app
+
+**Help ▸ How to cite…** now gives you APA and BibTeX for the exact version you are running. It is
+also in the in-app documentation as section 10, so the guide in the app matches the one on the
+website.
+
+Previously this existed only on the website, and its version number had fallen eleven releases
+behind — which matters, because that text ends up in published work.
+
+### Credit
+
+EasyAnalysis is created and developed by **Tim Casanda Gibson**, now credited in
+**Settings ▸ Acknowledgements** alongside the University of Eastern Finland.
+
 ## v0.11.21 — 2026-08-10
 
 ### Add data from disk — no more waiting for uploads

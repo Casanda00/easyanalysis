@@ -113,10 +113,30 @@ docsCanvasUI <- function(id) {
         .doc_li(.doc_b("Nothing computes until you press Run"), " — so you can set up a screen without",
           "waiting."))),
 
+    # SYNCED WITH THE LANDING PAGE (landing/documentation.html). Citation lived
+    # only there, which is the one place a person finishing an analysis is not
+    # looking. Rendered from ea_citation() so the version tracks APP_VERSION --
+    # the landing copy had been frozen at 0.10.16 for eleven releases, and a
+    # stale citation is the kind that ends up in someone's paper.
+    tags$hr(),
+    tags$h4(id = "doc-cite", "10. How to cite"),
+    tags$p("If EasyAnalysis contributed to your work, please cite it. The version below is the",
+           "one you are running; it is also shown in the status bar."),
+    tags$p(class = "fw-semibold mb-1", "APA"),
+    tags$pre(class = "ea-script", ea_citation()$apa),
+    tags$p(class = "fw-semibold mb-1 mt-2", "BibTeX"),
+    tags$pre(class = "ea-script", ea_citation()$bibtex),
+    tags$p(style = "font-size:12.5px;",
+      "The repository also carries a CITATION.cff, so GitHub's ", tags$em("Cite this repository"),
+      " button gives the same details automatically. Several screens implement published methods;",
+      "where they do, the method's own paper is on the References screen and should be cited",
+      "alongside this one — citing the tool does not replace citing the method."),
+
     tags$hr(),
     tags$p(style = "color:#adb5bd;font-size:11.5px;",
-      "EasyAnalysis is an independent project. See the References screen for the published methods it",
-      "implements, and Acknowledgements (in Settings) for contributors.")
+      "EasyAnalysis is an independent project created by Tim Casanda Gibson. See the References",
+      "screen for the published methods it implements, and Acknowledgements (in Settings) for",
+      "contributors.")
   )
 }
 
@@ -137,6 +157,7 @@ docsToolsUI <- function(id) {
     jump("doc-console",   "7. R Console"),
     jump("doc-privacy",   "8. Privacy"),
     jump("doc-faq",       "9. Tips & FAQ"),
+    jump("doc-cite",      "10. How to cite"),
     tags$hr(),
     tags$p(style = "font-size:12px;color:#adb5bd;",
       "This guide covers the whole app. For the published methods it implements, see References.")

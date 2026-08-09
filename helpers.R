@@ -124,6 +124,58 @@ ea_analysis_script <- function(spec, roles = list(), params = list(),
 }
 
 # ==========================================================================
+# How to cite -- ONE source, every surface
+# ==========================================================================
+# The landing page carried APA and BibTeX; the app carried neither, and the app
+# is where someone actually is when they finish an analysis. Worse, the landing
+# page's version was frozen at 0.10.16 while the app had moved on eleven
+# releases -- a citation is the one piece of text where being quietly out of date
+# is a real problem, because it ends up in someone's paper.
+#
+# So the version is read from APP_VERSION at call time and cannot drift. Both the
+# Help dialog and the in-app documentation render from here.
+#
+# EA_CITE_YEAR is the RELEASE year, not the current year: a citation names when
+# the software was published, so Sys.Date() would silently rewrite history every
+# January. Bump it with CITATION.cff's date-released.
+EA_CITE_YEAR <- "2026"
+
+ea_citation <- function(version = getOption("ea.version", NULL)) {
+  v <- version %||% (if (exists("APP_VERSION")) APP_VERSION else "dev")
+  list(
+    apa = paste0(
+      "Gibson, T. C. (", EA_CITE_YEAR, "). EasyAnalysis: point-and-click ",
+      "statistical, machine-learning\n  and spatial analysis (Version ", v,
+      ") [Computer software].\n  https://easyanalysis.dev"),
+    bibtex = paste0(
+      "@software{gibson_easyanalysis,\n",
+      "  author  = {Gibson, Tim Casanda},\n",
+      "  title   = {{EasyAnalysis: point-and-click statistical, machine-learning and\n",
+      "             spatial analysis}},\n",
+      "  year    = {", EA_CITE_YEAR, "},\n",
+      "  version = {", v, "},\n",
+      "  url     = {https://easyanalysis.dev},\n",
+      "  note    = {Computer software}\n}"))
+}
+
+# The dialog behind Help > How to cite. Uses the shared settings-modal shape so
+# it matches Packages and Plugins rather than being a fourth lookalike.
+ea_cite_modal <- function() {
+  ct <- ea_citation()
+  ea_settings_modal("How to cite EasyAnalysis",
+    hint = paste("If EasyAnalysis contributed to your work, please cite it. The",
+                 "version below is the one you are running."),
+    tags$p(class = "fw-semibold mb-1", "APA"),
+    tags$pre(class = "ea-script", ct$apa),
+    tags$p(class = "fw-semibold mb-1 mt-3", "BibTeX"),
+    tags$pre(class = "ea-script", ct$bibtex),
+    tags$p(class = "text-muted small mt-3",
+      "Several screens implement published methods. Where they do, the method's own ",
+      "paper is listed on the References screen and should be cited alongside this ",
+      "one — citing the tool does not replace citing the method."))
+}
+
+# ==========================================================================
 # Add data from disk -- the local-first route (backlog item 82 / A)
 # ==========================================================================
 # THE DATA RULE, applied at the front door: this app runs on the same machine as

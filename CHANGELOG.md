@@ -22,6 +22,29 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.22 — 2026-08-10
+
+### Item 83 — creator credited; How to cite is in the app
+
+**The app had no citation at all** — APA and BibTeX existed only on the landing page, which is the
+one place someone finishing an analysis is not looking. And that copy's version was **frozen at
+0.10.16 while the app had moved eleven releases**; citation text is where being quietly stale does
+real harm, since it ends up in a paper.
+
+- `ea_citation()` is the single source and reads `APP_VERSION` **at call time**, so it cannot
+  drift. `EA_CITE_YEAR` is a constant, not `Sys.Date()` — a citation names the publication year,
+  and the clock would rewrite it every January.
+- **Help > How to cite…**, built on `ea_settings_modal()` so it matches Packages and Plugins.
+- In-app documentation gained **section 10, How to cite**, with a sidebar entry. That was the gap
+  against the landing page.
+- **Acknowledgements credits Tim Casanda Gibson** as creator and lead developer, above the
+  existing UEF credit; the docs footer names the creator too.
+- Landing page version corrected.
+
+`check_citation.R` — load-bearing assertion is that the version is genuinely a *parameter*
+(`ea_citation("9.9.9")` must yield 9.9.9), since a hardcoded string would pass everything else and
+be wrong the moment `APP_VERSION` moved. It also asserts app and landing page agree.
+
 ## v0.11.21 — 2026-08-10
 
 ### Item 82 step A — Add data from disk

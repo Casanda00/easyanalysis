@@ -3593,6 +3593,8 @@ page_fillable(
       tags$div(class = "settings-section",
         tags$p(class = "settings-section-title", "Acknowledgements"),
         tags$p(style = "font-size:12.5px; color: var(--bark); margin:6px 0 0; line-height:1.5;",
+          tags$b("Tim Casanda Gibson"), " — creator and lead developer."),
+        tags$p(style = "font-size:12.5px; color: var(--bark); margin:6px 0 0; line-height:1.5;",
           tags$b("University of Eastern Finland"),
           " — code contributions, and data for analyses and testing.")
       )

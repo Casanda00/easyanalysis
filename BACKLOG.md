@@ -6518,3 +6518,45 @@ control renders. Position in a concatenation of head and body is not layout orde
   level instead would make display cost independent of file size.
 - **A real multi-GB file through this route, timed.** The transport is gone by construction, but
   the end-to-end number has not been taken here.
+
+
+---
+
+### 83. Credit the creator, and put "How to cite" in the app — DONE v0.11.22
+
+> "I need to be credited by basically adding my name: Tim Casanda Gibson"
+> "make sure the in-app documentation page is synced with the landing page documentation page.
+> there is not how to cite in the app. it should be under Help in the app, right?"
+
+**Yes, under Help — next to References, because both answer "what do I put in the paper".**
+
+#### What was wrong
+
+- **The app had no citation at all.** APA and BibTeX existed only on the landing page, which is
+  the one place a person finishing an analysis is *not* looking.
+- **The landing page's version was frozen at 0.10.16** while the app had moved on **eleven
+  releases**. Citation text is the one place where being quietly out of date does real harm,
+  because it ends up in somebody's paper.
+- **The creator was not credited anywhere in the app.** Acknowledgements named only the
+  University of Eastern Finland.
+
+#### Fixed
+
+- **`ea_citation()` is the single source**, and reads `APP_VERSION` **at call time**, so the
+  version cannot drift again. `EA_CITE_YEAR` is deliberately a constant, not `Sys.Date()`: a
+  citation names when the software was *published*, and the clock would rewrite that every
+  January.
+- **Help > How to cite…** opens a dialog built on `ea_settings_modal()`, so it matches Packages
+  and Plugins rather than being a fourth lookalike.
+- **The in-app documentation gained section 10, "How to cite"**, with a sidebar entry — a section
+  with no nav link is hard to find. This is the sync that was asked for: citation was the piece
+  the in-app guide was missing relative to the landing page.
+- **Acknowledgements now credits Tim Casanda Gibson as creator and lead developer**, above the
+  existing UEF credit, and the documentation footer names the creator too.
+- The landing page's frozen version was corrected.
+
+**Guarded by `check_citation.R`.** The load-bearing assertion is that the version is genuinely a
+*parameter* — `ea_citation(version = "9.9.9")` must produce 9.9.9 — since a hardcoded string
+would pass every other check here and be wrong the moment `APP_VERSION` moved, which is precisely
+what happened for eleven releases. It also asserts the app and the landing page agree, because
+two copies of one fact drift, and this is the thing that notices.
