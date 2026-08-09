@@ -5341,3 +5341,93 @@ filters (gotcha 14) — emptying every pool and collapsing all 17 assertions to 
 
 **Not done:** dragging does not auto-scroll the panel when the list is longer than the viewport,
 which is exactly when dragging is worst. Move to top / bottom covers that case for now.
+
+---
+
+### 73. Ship EasyAnalysis as a QGIS plugin — open-source contribution direction
+
+> "contributing to the open source community is something we want. this is why a part of the
+> future direction is to have our tool as a plugin for qgis and others but qgis first."
+
+Direction, not a task. Recorded now so the decisions below are not re-derived later, and so that
+item 61's plugin SDK is designed with this as a target rather than retrofitted to it.
+
+**Licensing is already right.** The repo is GPL-3 and QGIS core is GPL-2-or-later, so a GPL-3
+plugin is compatible. Nothing to change — worth stating, because getting it wrong later would be
+expensive to unwind.
+
+#### The uncomfortable finding: do NOT port the algorithms
+
+`algorithms.R` was written in the QGIS Processing idiom deliberately — one spec per operation with
+`inputs`, `params`, `output`, `run` — so the obvious move is to expose its 51 operations as a QGIS
+Processing provider. **That is probably the least valuable thing we could contribute.**
+
+Most of those 51 already exist in QGIS, and often as the *same underlying tool*:
+
+| Our group | Already in QGIS via |
+|---|---|
+| Vector — buffer, dissolve, centroids, clip | native Processing algorithms |
+| Raster — reproject, resample, clip, mosaic, band calculator | GDAL provider |
+| Terrain — slope, aspect, hillshade, TPI, TRI, roughness | native + GDAL DEM |
+| Hydrology — fill, flow accumulation, TWI | SAGA / WhiteboxTools providers |
+
+We **already call WhiteboxTools** for depression filling and flow accumulation (`fill_wb`,
+`algorithms.R:429`) — the same engine QGIS ships a provider for. Re-exporting it through a plugin
+adds a layer and no capability.
+
+**This needs a per-operation audit before anyone acts on it.** The table is from knowledge of the
+QGIS ecosystem, not from checking our 51 specs against a real QGIS install. A few will have no
+equivalent — our Zevenbergen & Thorne curvature (which exists because `terra` has no curvature
+variable at all) and the LiDAR surface chain are the likely survivors.
+
+#### What is actually worth contributing
+
+The things QGIS does **not** have:
+
+1. **`statistics.R` — 14 methods with role-based variable declaration.** QGIS has essentially no
+   statistical modelling: no mixed models, no GLMM, no survival, no ordinal or robust regression,
+   no discriminant analysis. A user with an attribute table and a question has to leave QGIS to
+   answer it. **This is the gap, and it is the part of our codebase with no equivalent anywhere in
+   the QGIS ecosystem.**
+2. **The analysis → map round trip** (item 42): fit a model on a layer's attributes and write
+   fitted values and residuals back onto the features, ready to symbolise. That is the whole point
+   of doing statistics *inside* a GIS rather than beside it.
+3. **The AI Co-Analyst**, which runs analyses rather than describing them.
+
+The plugin's pitch is therefore *"statistical modelling for your vector layers"*, not *"more
+geoprocessing"*.
+
+#### The hard constraint: QGIS plugins are Python, our core is R
+
+| Option | What it is | Trade-off |
+|---|---|---|
+| **A. Python provider, R underneath** | Processing algorithms that shell out to `Rscript` against the existing `statistics.R` specs. | Keeps ONE implementation. Requires R on the user's machine — the real adoption question. |
+| **B. Embed the app in a dock** | `QWebEngineView` pointing at a locally-run EasyAnalysis. | Fast to build, but it is our app in a QGIS-shaped window rather than a plugin: no Processing interop, no model-builder support, does not feel native. |
+| **C. Reimplement in Python** | `statsmodels` / `scikit-learn` equivalents of the 14 methods. | No R dependency, but forks the numerical core — two implementations of every method, contradicting the rule that a method has one implementation shared everywhere. |
+
+**Leaning A.** It keeps one implementation and matches item 64's stated policy (R for statistics).
+The R dependency is the thing to solve rather than route around — and there is precedent: SAGA,
+GRASS, WhiteboxTools and OTB are all QGIS providers requiring an external install, so this is
+accepted practice in that ecosystem rather than a novel imposition.
+
+#### Relationship to item 61 — and why 61 comes first
+
+**These are the same abstraction.** If our own tools move onto a plugin SDK, a QGIS Processing
+provider becomes a *second backend* for that SDK rather than a parallel port. Item 72's schematic
+put a number on why that is plausible: **65 of 88 tools already come from the two registries**, so
+capability is mostly data — and data is what can be re-emitted against another host's API.
+
+Building the QGIS plugin first would mean hand-writing the export and then rewriting it when the
+SDK lands.
+
+#### Sequence, when this is picked up
+
+1. **Audit** the 51 operations against a real QGIS install; keep only what has no equivalent.
+2. **Land item 61's SDK**, with "emit a QGIS Processing provider" as an explicit target of the
+   spec format.
+3. **Ship a provider** carrying the *statistics* registry plus item 42's write-back.
+4. Only then consider dock/UI integration, if it is still wanted.
+
+**"and others" — recorded, not scoped.** ArcGIS (Python toolbox), R itself (the methods are
+already R functions and could be a package on their own), and a Python/Jupyter API are all
+plausible second targets. QGIS first, as instructed.
