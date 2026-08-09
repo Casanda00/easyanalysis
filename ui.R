@@ -1274,6 +1274,50 @@ page_fillable(
     .ea-wsx-grip:active { cursor: grabbing; }
     .ea-wsx-lyr2.dragging { opacity: .45; }
     .ea-wsx-lyr2.dropinto { outline: 2px dashed var(--forest); outline-offset: -2px; }
+    /* ---- Plugin menu (item 74 phase 2) --------------------------------
+       Every colour is a token: a fixed light panel looks right in one theme and
+       keeps its cream background under light text on every dark set (gotcha 31). */
+    .ea-plug-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+                  background: var(--panel); margin: 0 0 14px; }
+    .ea-plug-card.on { border-color: var(--forest);
+                  background: color-mix(in srgb, var(--forest) 7%, var(--panel)); }
+    .ea-plug-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .ea-plug-name { font: 600 16px var(--ui); color: var(--ink); }
+    .ea-plug-pill { font: 600 11px var(--ui); padding: 2px 9px; border-radius: 999px;
+                  border: 1px solid var(--line); color: var(--bark); }
+    .ea-plug-pill.on { border-color: var(--forest); color: var(--ink);
+                  background: color-mix(in srgb, var(--forest) 18%, transparent); }
+    .ea-plug-desc { margin: 8px 0 4px; font-size: 13.5px; color: var(--ink); }
+    .ea-plug-cred { margin: 0; font-size: 12px; color: var(--bark); }
+    .ea-plug-cred a { color: var(--forest); }
+    .ea-plug-warn { margin-top: 10px; padding: 8px 10px; border-radius: 6px;
+                  font-size: 12.5px; color: var(--ink);
+                  border: 1px solid var(--warn);
+                  background: color-mix(in srgb, var(--warn) 16%, transparent); }
+    .ea-plug-searchrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .ea-plug-searchrow .form-group { flex: 1 1 auto; margin-bottom: 0; }
+    .ea-plug-count { font: 500 12px var(--mono); color: var(--bark); white-space: nowrap; }
+    .ea-plug-list { display: flex; flex-direction: column; gap: 6px; }
+    .ea-plug-row { display: flex; gap: 11px; align-items: flex-start; padding: 9px 11px;
+                  border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+    .ea-plug-row.on { border-color: var(--forest);
+                  background: color-mix(in srgb, var(--forest) 6%, var(--panel)); }
+    .ea-plug-txt { min-width: 0; }
+    .ea-plug-tool { font: 600 13px var(--mono); color: var(--ink); }
+    .ea-plug-box { font: 500 10.5px var(--ui); color: var(--bark); margin-left: 8px;
+                  text-transform: uppercase; letter-spacing: .06em; }
+    .ea-plug-sum { margin: 2px 0 0; font-size: 12.5px; color: var(--bark); }
+    /* Same switch idiom as the layer visibility toggle, so it reads as the same
+       kind of control rather than a new one. */
+    .ea-plug-sw { flex: 0 0 auto; width: 34px; height: 19px; border-radius: 999px;
+                  border: 1px solid var(--line); background: var(--sunk);
+                  position: relative; cursor: pointer; padding: 0; margin-top: 1px; }
+    .ea-plug-sw .knob { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+                  border-radius: 50%; background: var(--bark); transition: left .14s; }
+    .ea-plug-sw.on { background: color-mix(in srgb, var(--forest) 34%, transparent);
+                  border-color: var(--forest); }
+    .ea-plug-sw.on .knob { left: 17px; background: var(--forest); }
+    @media (prefers-reduced-motion: reduce) { .ea-plug-sw .knob { transition: none; } }
     .ea-wsx-attrbtns { margin-left: auto; display: inline-flex; gap: 2px; }
     .ea-wsx-attrbtn { border: none; background: transparent; color: var(--bark);
                   cursor: pointer; font: 600 13px var(--mono); line-height: 1;

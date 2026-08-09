@@ -20,6 +20,27 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.9 — 2026-08-09
+
+### New: a Plugins screen
+
+Under **More → Plugins**. EasyAnalysis can now offer tools from other open-source projects,
+starting with **WhiteboxTools** and its 484 algorithms for hydrology, terrain, LiDAR and image
+processing.
+
+Nothing is switched on for you. You enable WhiteboxTools yourself, and then enable individual
+tools one at a time — so the app only carries what you actually use. The screen credits the
+people who wrote it: Prof. John Lindsay, with the R package by Qiusheng Wu and Andrew Brown.
+
+**Search finds a tool even before you enable it.** Type what you are looking for, and if it is
+not enabled yet you can switch it on right there in the result.
+
+Building the tool list runs in the background, so you can keep working while it does. Start with
+**Index the common tools** — 31 tools covering the usual hydrology, terrain and LiDAR workflows —
+or index all 484 if you want everything.
+
+One thing to know: after enabling a tool, reload the page to use it.
+
 ## v0.11.8 — 2026-08-09
 
 ### Groundwork for optional tool packs

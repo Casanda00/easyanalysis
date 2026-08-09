@@ -131,5 +131,49 @@ say(length(miss) == 0,
     if (length(miss)) paste("featured tools that DO NOT EXIST:", paste(miss, collapse = ", "))
     else sprintf("all %d featured tools exist in the catalogue", length(EA_WBT_FEATURED)))
 
+# ---- 9. The Plugin menu module ---------------------------------------------
+# The screen is what makes any of the above reachable, so it must render and its
+# toggles must write state. Asserted on BEHAVIOUR, not on markup.
+ea_plugin_set("whitebox", FALSE)
+local({ st <- ea_plugin_state(); st$tools[["whitebox"]] <- character(0)
+        ea_plugin_state_set(st) })
+
+R <- NULL
+suppressWarnings(testServer(pluginsServer, args = list(), {
+  session$setInputs(q = "", filt = "feat")
+  R <<- list(card = !is.null(output$provider_card),
+             res  = !is.null(output$results))
+
+  session$setInputs(toggle_prov = 1)
+  R$prov_on <<- ea_plugin_on("whitebox")
+
+  # The per-tool switch sends {tool, on, n}; it must write through.
+  session$setInputs(tog = list(tool = "Slope", on = TRUE, n = 1))
+  R$tool_on <<- ea_tool_on("whitebox", "Slope")
+  session$setInputs(tog = list(tool = "Slope", on = FALSE, n = 2))
+  R$tool_off <<- !ea_tool_on("whitebox", "Slope")
+
+  session$setInputs(enable_feat = 1)
+  R$feat_n <<- length(ea_plugin_state()$tools[["whitebox"]] %||% character(0))
+  session$setInputs(disable_all = 1)
+  R$cleared <<- length(ea_plugin_state()$tools[["whitebox"]] %||% character(0)) == 0
+}))
+
+say(isTRUE(R$card) && isTRUE(R$res), "the Plugins screen renders its card and tool list")
+say(isTRUE(R$prov_on),  "the Enable button turns the provider on")
+say(isTRUE(R$tool_on),  "a per-tool switch enables that tool")
+say(isTRUE(R$tool_off), "and turns it off again")
+say(identical(R$feat_n, length(EA_WBT_FEATURED)),
+    sprintf("'Enable all common tools' enables exactly the featured set (%s)", R$feat_n))
+say(isTRUE(R$cleared), "'Disable every tool' clears them")
+
+# ---- 10. The screen is reachable --------------------------------------------
+# A screen nobody can open is the item-67 failure in a new place.
+w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = " ")
+say(grepl('plugins        = list(nm = "Plugins"', w, fixed = TRUE),
+    "the Plugins tool is registered in the workspace catalogue")
+s <- paste(readLines("server.R", warn = FALSE), collapse = " ")
+say(grepl('pluginsServer("plugins")', s, fixed = TRUE), "and its server is bound")
+
 cat(if (ok) "\nPLUGIN CHECK: PASS\n" else "\nPLUGIN CHECK: FAIL\n")
 quit(status = if (ok) 0L else 1L)

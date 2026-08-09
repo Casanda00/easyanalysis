@@ -10,7 +10,7 @@
 # matching entry to RELEASE_NOTES.md (public) AND CHANGELOG.md (internal).
 # Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.11.8"
+APP_VERSION <- "0.11.9"
 
 library(shiny)
 library(bslib)
@@ -168,6 +168,7 @@ source("mod_raster.R")
 # style). algorithms.R is the registry, mod_algo.R renders and runs any entry.
 source("algorithms.R")
 source("plugins.R")           # external tool providers (opt-in; see item 74)
+source("mod_plugins.R")       # the Plugin menu (item 74 phase 2)
 # Killable background session, so a heavy algorithm can be stopped from the app
 # instead of Ctrl-C in the terminal (see the note at the top of the file).
 source("compute_worker.R")

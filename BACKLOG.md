@@ -5657,3 +5657,41 @@ matters for speed — provider ON with no tools activated still contributes noth
   the problem the design exists to avoid.
 - **A project that used a now-inactive tool** should say so on open, like the missing-spatial-file
   flag, rather than silently lacking it.
+
+
+---
+
+### 74 phase 2 BUILT v0.11.9 — the Plugin menu
+
+**More -> Plugins.** Built to the design as given: opt-in provider, per-tool activation, and
+search that reaches tools which are not yet enabled.
+
+- **Provider card** naming the authors -- Prof. John Lindsay, R package by Qiusheng Wu and
+  Andrew Brown (MIT) -- and linking out. Enabling somebody else another team wrote should be a
+  visible decision, not a feature that silently appeared.
+- **Per-tool switches** reuse the layer-visibility switch idiom, so it reads as the same kind of
+  control rather than a new one.
+- **Search covers the whole catalogue** regardless of activation, and each row can be switched on
+  from the result. This is the part that keeps the app fast without shrinking it.
+- **Indexing runs in the background** (, ). Shiny is
+  single-threaded, so an in-process build would freeze the app for the whole ~8 minutes
+  (gotcha 29); even the 31 featured tools would block for ~30 s. The child prints one line per
+  tool and the module polls stdout, so progress needs no shared state between processes.
+
+#### The limitation, and why it was not papered over
+
+**A newly enabled tool needs a page reload, and the UI says so.**  is built once at
+workspace construction and  binds at session start, so immediate activation means
+making the tool catalogue reactive and binding modules mid-session. Tools enabled in a *previous*
+session are present at boot, so this only affects the session in which you enable something.
+
+Binding on activation was considered and rejected: at 33 ms each, enabling 50 tools costs 1.7 s
+and reintroduces exactly the cost this design exists to avoid. **The correct fix is binding on
+FIRST OPEN**, which is still open.
+
+#### Still open from this item
+
+- Lazy binding on first open, so no reload is needed.
+- A project that used a now-disabled tool should say so when it opens, like the missing-file flag.
+- Only WhiteboxTools has a provider. The interface is deliberately general -- 
+  concatenates providers -- so a second one is the test of whether this generalises to item 61.

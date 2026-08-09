@@ -121,6 +121,36 @@ ea_wbt_build_manifest <- function(progress = NULL, limit = NULL, only = NULL) {
   invisible(man)
 }
 
+# Build in the BACKGROUND. Indexing all 484 tools takes about 8 minutes, and
+# Shiny is single-threaded -- an in-process build would freeze the entire app for
+# that whole time, which is precisely what gotcha 29 is about. Even the 31
+# featured tools would block for ~30 s.
+#
+# Returns a callr process the caller polls. Deliberately NOT compute_worker.R:
+# that session is shaped around running one algorithm spec, and it preloads a
+# heavy package set this does not need.
+ea_wbt_build_async <- function(wd = getwd(), only = NULL) {
+  if (!requireNamespace("callr", quietly = TRUE))
+    stop("Background indexing needs the 'callr' package.")
+  callr::r_bg(function(wd, home, only) {
+    setwd(wd)
+    Sys.setenv(EASYANALYSIS_HOME = home)
+    suppressMessages({library(shiny); library(jsonlite)})
+    source("helpers.R"); source("project_store.R")
+    source("algorithms.R"); source("plugins.R")
+    n <- 0L
+    ea_wbt_build_manifest(only = only, progress = function(i, tot, nm) {
+      # One line per tool on stdout: the caller reads it as a progress feed
+      # without any shared state between the two processes.
+      cat(sprintf("%d/%d %s
+", i, tot, nm))
+    })
+    "done"
+  }, args = list(wd = normalizePath(wd, winslash = "/"),
+                 home = ea_home(), only = only),
+     stdout = "|", stderr = "|", supervise = TRUE)
+}
+
 # Cached read. Returns NULL when absent or built against a different
 # WhiteboxTools version -- the caller decides whether to rebuild, because
 # rebuilding takes minutes and must never happen behind the user's back.

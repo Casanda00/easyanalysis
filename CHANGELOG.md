@@ -22,6 +22,38 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.9 — 2026-08-09
+
+### Item 74 phase 2 — the Plugin menu (`mod_plugins.R`)
+
+A screen under **More → Plugins**. Provider card names WhiteboxTools' authors (Prof. John
+Lindsay; R package by Qiusheng Wu and Andrew Brown, MIT) and links out — enabling somebody
+else's work should be a visible decision, not a feature that silently appeared.
+
+- **Enable / disable the provider**; disabling hides its tools but remembers the per-tool picks.
+- **Per-tool switches**, same switch idiom as layer visibility so it reads as the same control.
+- **Search covers the whole catalogue**, activated or not, so a tool is findable before it is
+  enabled and can be turned on from the result. Filters: common / enabled / everything.
+- **Indexing runs in the BACKGROUND** via `ea_wbt_build_async()` (`callr::r_bg`). Shiny is
+  single-threaded, so an in-process build would freeze the app for the whole ~8 minutes
+  (gotcha 29) — even the 31 featured tools would block for ~30 s. The background process prints
+  one line per tool and the module polls its stdout, so progress needs no shared state.
+  Deliberately not `compute_worker.R`: that session is shaped around running one algorithm spec
+  and preloads a package set this does not need.
+- All colours are tokens with translucent `color-mix()` tints (gotcha 31).
+
+**Known limitation, stated in the UI:** a newly enabled tool needs a page reload. `MODUI` is
+built once at workspace construction and `server.R` binds at session start, so making activation
+take effect immediately means making the tool catalogue reactive and binding modules mid-session.
+Tools enabled in a *previous* session are present at boot, so this only affects the session in
+which you enable something. Binding on activation was rejected — 33 ms each means enabling 50
+tools costs 1.7 s and reintroduces exactly the cost this design exists to avoid; the correct fix
+is binding on **first open**.
+
+`check_plugins.R` now 34 assertions, covering the screen's behaviour (renders, provider toggle,
+per-tool switch writes through, bulk enable/disable) and that the tool is registered and bound —
+a screen nobody can open is the item-67 failure in a new place.
+
 ## v0.11.8 — 2026-08-09
 
 ### Item 74 — `plugins.R`: WhiteboxTools as an opt-in provider

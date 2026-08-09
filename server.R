@@ -1037,6 +1037,7 @@ server <- function(input, output, session) {
   land_cls_ctx   <- landClassifyServer("land_classify", raster_pool)
   rs_ctx         <- rsSearchServer("rs_search", dataset_pool, active_dataset, raster_pool)
   rec_ctx        <- recommendServer("recommend", dataset_pool, active_dataset)
+  plugins_ctx    <- pluginsServer("plugins")
   # New spatial modeling & analysis modules
   ntl_ctx        <- ntlServer("ntl", dataset_pool, active_dataset, vector_pool)
   climate_ctx    <- climateTrendServer("climate_trend", raster_pool)

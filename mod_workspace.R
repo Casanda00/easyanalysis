@@ -2515,6 +2515,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = NULL, map_based = TRUE),
       metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = NULL, map_based = TRUE),
       # --- Docs (R console is NOT here: it lives in the bottom dock) ---
+      plugins        = list(nm = "Plugins",           grp = "More", tools = pluginsToolsUI,  canvas = pluginsCanvasUI),
       docs           = list(nm = "Documentation",       grp = "More", tools = docsToolsUI,       canvas = docsCanvasUI),
       references     = list(nm = "References",          grp = "More", tools = referencesToolsUI, canvas = referencesCanvasUI)
     )
