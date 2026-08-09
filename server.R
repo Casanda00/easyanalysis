@@ -620,6 +620,11 @@ server <- function(input, output, session) {
         ls[[new]] <- ls[[old]]; ls[[old]] <- NULL
         layer_style(ls)
       }
+      # The stacking order stores NAMES, so a rename that skipped it would drop
+      # the layer out of its own order and silently send it back to the default
+      # position.
+      lo <- layer_order()
+      if (is.character(lo) && old %in% lo) layer_order(replace(lo, lo == old, new))
     })
     ds_refresh(ds_refresh() + 1)
     removeModal()
@@ -636,6 +641,10 @@ server <- function(input, output, session) {
   # ======================================================================
   current_project  <- reactiveVal(NULL)   # project id, or NULL on the Projects screen
   layer_style      <- reactiveVal(list())  # per-layer render settings, persisted
+  # Explicit layer stacking order, TOP FIRST (backlog item 65). Empty means
+  # "never reordered" -- the workspace then derives a default. Persisted next
+  # to layer_style, because a stacking order set once must survive reopening.
+  layer_order      <- reactiveVal(character(0))
 
   # Plot appearance (title / axis labels / colour), per screen. Installed into
   # the helper env so print.ggplot and ea_opt() can reach it from any module
@@ -778,6 +787,8 @@ server <- function(input, output, session) {
     # again — and is never re-guessed.
     ls0 <- st$meta$layer_style
     layer_style(if (is.list(ls0)) ls0 else list())
+    lo0 <- st$meta$layer_order
+    layer_order(if (is.character(lo0)) lo0 else character(0))
     ad <- st$meta$active_dataset
     active_ds(if (isTruthy(ad) && ad %in% .pool_names(dataset_pool)) ad else NULL)
     ds_refresh(ds_refresh() + 1)
@@ -802,7 +813,8 @@ server <- function(input, output, session) {
          vectors = .pool_names(vector_pool),
          active  = active_ds(),
          view    = input$current_view,
-         style   = layer_style())
+         style   = layer_style(),
+         order   = layer_order())
   })
   observe({
     st  <- project_state()
@@ -816,7 +828,7 @@ server <- function(input, output, session) {
     )
     try(ea_project_save_data(pid, tables = st$tables, spatial = spatial,
                              last_view = st$view, active_dataset = st$active,
-                             layer_style = st$style), silent = TRUE)
+                             layer_style = st$style, layer_order = st$order), silent = TRUE)
     project_refresh(isolate(project_refresh()) + 1)
   })
 
@@ -1044,7 +1056,7 @@ server <- function(input, output, session) {
     )
     try(ea_project_save_data(pid, tables = st$tables, spatial = spatial,
                              last_view = st$view, active_dataset = st$active,
-                             layer_style = st$style), silent = TRUE)
+                             layer_style = st$style, layer_order = st$order), silent = TRUE)
   }
 
   # ---- Workspace File menu (ids are app-level, not module-namespaced) ----
@@ -1124,7 +1136,8 @@ server <- function(input, output, session) {
   workspace_ctx  <- workspaceServer("workspace", dataset_pool, raster_pool,
                                     las_pool, vector_pool, active_dataset,
                                     tool_request = reactive(input$current_view),
-                                    layer_style = layer_style, src_paths = src_paths,
+                                    layer_style = layer_style, layer_order = layer_order,
+                                    src_paths = src_paths,
                                     plot_opts = plot_opts)
 
   # Opening a tool re-arms the module selector population (see active_dataset).

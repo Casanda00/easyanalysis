@@ -291,7 +291,7 @@ ea_project_prune_files <- function(id, keep = character(0)) {
 # tables: named list of data.frames. spatial: list of {name, kind, path}.
 ea_project_save_data <- function(id, tables = list(), spatial = list(),
                                  last_view = NULL, active_dataset = NULL,
-                                 layer_style = NULL) {
+                                 layer_style = NULL, layer_order = NULL) {
   if (!dir.exists(ea_project_path(id))) return(invisible(FALSE))
   .ea_atomic(.ea_data_path(id), function(tmp) saveRDS(tables, tmp))
   meta <- ea_project_meta(id) %||% list(id = id, name = id)
@@ -301,6 +301,9 @@ ea_project_save_data <- function(id, tables = list(), spatial = list(),
   # Per-layer render settings (e.g. a raster's R/G/B band mapping). Kept in the
   # project so a mapping the user had to choose once is not asked for again.
   if (!is.null(layer_style)) meta$layer_style <- layer_style
+  # Layer stacking order, top first. Stored as a plain character vector of
+  # names; unknown names are ignored on load and new layers are appended.
+  if (!is.null(layer_order)) meta$layer_order <- as.character(layer_order)
   meta$n_datasets     <- length(tables)
   meta$n_spatial      <- length(spatial)
   ea_project_write_meta(id, meta)

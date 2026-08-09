@@ -4909,7 +4909,7 @@ the rest), rule-based vector styling, and labels.
 
 **Next:** item 42's integration work — the GIS side is now done.
 
-### 65. Drag layers up and down to reorder them — **OPEN, documented not built**
+### 65. Drag layers up and down to reorder them — **DONE v0.11.6**
 > "make layers draggable: up and down"
 
 **This is not only a panel affordance — it is draw order.** `.draw_layers()` iterates `layers()`
@@ -5307,3 +5307,37 @@ Not built here — recorded so the dependency is not re-litigated later. The rem
 question is narrower than it was: whether a cell edit joins the same undo stack as a delete
 (it should) and whether adding a *column* belongs on that stack at all, since it is a schema
 change rather than a data change.
+
+
+---
+
+### 65 built v0.11.6 — and the panel turned out to be upside down
+
+Every piece the entry asked for shipped: an explicit stored order, persisted in the project,
+`.draw_layers()` following it, and an HTML5 drag firing one event with the new order. Plus the
+"related, worth doing in the same visit" move to top / bottom.
+
+**But the entry's own premise was wrong in a way that mattered.** It said *"the order in the
+panel IS the stacking order"*. It was the **inverse**. The panel listed pool order and
+`.draw_layers()` added in that same order, and leaflet stacks the last overlay on top — so
+vectors sat at the BOTTOM of the panel and on TOP of the map. Confirmed by checking that no
+overlay sets a pane or `zIndex` (only the basemap does, at 0), so insertion order alone governs.
+
+Fixed shipping the drag handle over it: dragging a row "up" would have pushed the layer **down**
+the map. `layers()` is now top-first and `.draw_layers()` walks it in reverse. **The default is
+the pool order reversed, so existing maps are pixel-identical** — only the panel's reading order
+changed.
+
+**Deliberate detail:** the automatic first-layer choice still reads `layers_pool()`, not
+`layers()`. Correcting the panel should not change which layer opens active — that would be an
+unrelated behaviour change smuggled in behind a reordering feature.
+
+**Guarded by `check_layer_order.R`.** Its load-bearing assertion is the CONTROL that
+`rev(layers())` still equals the historical pool order — the only thing between a future refactor
+and every map silently restacking. Two harness faults were hit writing it, both recorded in the
+file: a helper leaked `environment()` out of the `testServer` body (module internals live in its
+PARENT, so `e$layers` was NULL), and the pools were fixtured with NULL values, which `.names()`
+filters (gotcha 14) — emptying every pool and collapsing all 17 assertions to one table.
+
+**Not done:** dragging does not auto-scroll the panel when the list is longer than the viewport,
+which is exactly when dragging is worst. Move to top / bottom covers that case for now.

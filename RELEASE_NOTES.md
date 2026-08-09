@@ -20,6 +20,27 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.6 — 2026-08-09
+
+### Drag layers to reorder them
+
+Grab the handle at the left of any layer row and drag it up or down. The order you set is the
+**drawing order on the map** — put a vector outline above a raster, or one raster above another.
+Right-click a layer for **Move to top** and **Move to bottom**, which are quicker in a long list.
+
+Your order is saved with the project, so it is still there when you reopen it.
+
+**The layers panel now reads the way every GIS reads: the top row is the top of the map.** It
+used to be the other way round — the list was effectively upside down, so vectors appeared at
+the bottom of the panel while drawing on top of everything. Nothing looked wrong while the order
+was fixed, but it would have meant dragging a layer "up" pushed it down.
+
+**Your existing maps look exactly the same.** Only the panel's reading order changed; nothing
+restacks.
+
+The basemap stays pinned at the bottom and cannot be dragged — it is background tiles rather
+than one of your layers.
+
 ## v0.11.5 — 2026-08-09
 
 ### The attribute table now has proper window controls

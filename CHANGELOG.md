@@ -22,6 +22,56 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.6 — 2026-08-09
+
+### Item 65 — draggable layer reordering
+
+**The panel was upside down relative to the map, and that had to be fixed first.** It listed pool
+order (tables, rasters, lidar, vectors) and `.draw_layers()` added them in that same order —
+leaflet stacks the LAST overlay on top, so vectors sat at the BOTTOM of the panel and on TOP of
+the map. Verified there are no panes or `zIndex` on the overlays; only the basemap gets
+`zIndex = 0`, so insertion order alone governs. Nothing exposed the inversion while the order was
+fixed, but shipping a drag handle over it would have made "up" mean "down".
+
+`layers()` is now top-first (GIS convention) and `.draw_layers()` walks `rev(layers())`. **The
+default order is the pool order reversed, so every existing project's map is pixel-identical** —
+only the panel's reading order changes.
+
+- `layers_pool()` keeps the raw pool order. The automatic first-layer choice deliberately uses
+  it, so correcting the panel does not change which layer opens active.
+- Unlisted layers are prepended (new layers arrive on top, as every GIS does); names in the order
+  with no live layer are dropped, so a deleted layer cannot be resurrected.
+- `layer_order` is a `reactiveVal` persisted beside `layer_style` through
+  `ea_project_save_data()`. The rename observer rewrites it too — it stores names, so a rename
+  that skipped it would drop the layer out of its own order.
+- Only the grip is `draggable`. The row already carries a visibility toggle, a name, a delete
+  button and a context menu; a whole-row drag makes all of them feel sticky.
+- The drop handler sends the **complete new order**, not a move instruction, so the server never
+  reconstructs the gesture and the DOM is never the source of truth. A drop that fails to save
+  snaps back.
+- The basemap row has no `data-lyr`, so it is neither draggable nor a drop target.
+- Move to top / bottom added to the layer context menu — nearly free once order is explicit, and
+  better than dragging in a list that scrolls while you drag.
+
+### `check_layer_order.R` — new guard
+
+The load-bearing assertion is **not** the new feature: it is the CONTROL that
+`rev(layers())` still equals the historical pool order, which is the only thing standing between
+a future refactor and every map silently restacking.
+
+**Two harness faults on the way, both mine:**
+
+1. A helper passed `environment()` out of the `testServer` body so cases could share setup. The
+   module's internals live in the **parent** of that environment, so `e$layers` was `NULL` and
+   the failure read as a defect in `layers()`. Rewritten inline — duller and cannot lie.
+2. The pools were fixtured as `reactiveValues(Ras1 = NULL, ...)`. `.names()` filters NULL-valued
+   keys because a `reactiveValues` key assigned `NULL` keeps its name (gotcha 14), so every pool
+   was **empty** and all 17 assertions collapsed to the single table. Non-NULL placeholders fixed
+   it.
+
+Persistence round-trip verified separately: `layer_order` saves as a character vector, reloads
+identically, and an omitted argument preserves the stored value rather than clearing it.
+
 ## v0.11.5 — 2026-08-09
 
 ### Item 52 — attribute table window controls

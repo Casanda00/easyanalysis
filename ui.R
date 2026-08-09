@@ -1265,6 +1265,15 @@ page_fillable(
        A class set on the dock itself is therefore lost at the first interaction,
        which is why the old collapse button kept springing back open. The root
        element survives all of it. Same reason the height is a variable there. */
+    /* Drag handle for layer reordering (item 65). Its own grip zone on the left:
+       the row already carries a visibility toggle, a name, a delete button and a
+       context menu, so a whole-row drag would make all of them feel sticky. */
+    .ea-wsx-grip { cursor: grab; color: var(--bark); font: 700 11px var(--mono);
+                  padding: 0 3px; user-select: none; flex: 0 0 auto; opacity: .55; }
+    .ea-wsx-grip:hover { opacity: 1; color: var(--forest); }
+    .ea-wsx-grip:active { cursor: grabbing; }
+    .ea-wsx-lyr2.dragging { opacity: .45; }
+    .ea-wsx-lyr2.dropinto { outline: 2px dashed var(--forest); outline-offset: -2px; }
     .ea-wsx-attrbtns { margin-left: auto; display: inline-flex; gap: 2px; }
     .ea-wsx-attrbtn { border: none; background: transparent; color: var(--bark);
                   cursor: pointer; font: 600 13px var(--mono); line-height: 1;
@@ -2272,6 +2281,13 @@ page_fillable(
         }
         add('Zoom to layer', function(){
           Shiny.setInputValue('workspace-ws_zoom_layer', name, {priority:'event'}); });
+        /* Move to top/bottom: nearly free once the order is explicit, and easier
+           than dragging in a long list -- which is exactly where a drag handle is
+           worst, because the panel scrolls while you drag. */
+        add('Move to top', function(){
+          Shiny.setInputValue('workspace-ws_lyr_top', name, {priority:'event'}); });
+        add('Move to bottom', function(){
+          Shiny.setInputValue('workspace-ws_lyr_bottom', name, {priority:'event'}); });
         add('Rename…', function(){
           Shiny.setInputValue('layer_rename_request', name, {priority:'event'}); });
         add(visible ? 'Hide layer' : 'Show layer', function(){
@@ -2288,6 +2304,62 @@ page_fillable(
         m.style.left = Math.max(4, x) + 'px';
         m.style.top  = Math.max(4, y) + 'px';
       };
+
+      /* Layer reordering by drag (backlog item 65) -------------------------
+         Only the grip starts a drag; the row keeps its click targets. The drop
+         handler sends the COMPLETE new order rather than a move instruction, so
+         the server never reconstructs what the drag did, and the rows are then
+         rebuilt from the stored order -- the DOM is never the source of truth.
+         A drop that fails to save simply snaps back, which is honest.
+         The basemap row carries no data-lyr, so it can neither be dragged nor
+         dropped onto: it is tiles pinned under everything, not a project layer. */
+      var eaDragLyr = null;
+      document.addEventListener('dragstart', function(e){
+        var g = e.target.closest && e.target.closest('.ea-wsx-grip');
+        if (!g) return;
+        var row = g.closest('[data-lyr]');
+        if (!row) return;
+        eaDragLyr = row.getAttribute('data-lyr');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', eaDragLyr);
+        if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 12, 12);
+        row.classList.add('dragging');
+      });
+      var eaDragClear = function(){
+        eaDragLyr = null;
+        document.querySelectorAll('.ea-wsx-lyr2.dragging, .ea-wsx-lyr2.dropinto')
+          .forEach(function(r){ r.classList.remove('dragging', 'dropinto'); });
+      };
+      document.addEventListener('dragend', eaDragClear);
+      document.addEventListener('dragover', function(e){
+        if (!eaDragLyr) return;
+        var row = e.target.closest && e.target.closest('[data-lyr]');
+        if (!row) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.ea-wsx-lyr2.dropinto')
+          .forEach(function(r){ r.classList.remove('dropinto'); });
+        if (row.getAttribute('data-lyr') !== eaDragLyr) row.classList.add('dropinto');
+      });
+      document.addEventListener('drop', function(e){
+        if (!eaDragLyr) return;
+        var row = e.target.closest && e.target.closest('[data-lyr]');
+        if (!row) { eaDragClear(); return; }
+        e.preventDefault();
+        var box = row.closest('[data-reorder-input]');
+        var target = row.getAttribute('data-lyr');
+        if (!box || target === eaDragLyr) { eaDragClear(); return; }
+        var names = [].map.call(box.querySelectorAll('[data-lyr]'), function(r){
+          return r.getAttribute('data-lyr'); });
+        var rect = row.getBoundingClientRect();
+        var after = (e.clientY - rect.top) > rect.height / 2;
+        var moved = eaDragLyr;
+        names = names.filter(function(n){ return n !== moved; });
+        names.splice(names.indexOf(target) + (after ? 1 : 0), 0, moved);
+        Shiny.setInputValue(box.getAttribute('data-reorder-input'),
+                            {order: names, nonce: Date.now()}, {priority:'event'});
+        eaDragClear();
+      });
       document.addEventListener('click', function(e){
         var m = document.getElementById('ea-ctxmenu');
         if (m && !e.target.closest('#ea-ctxmenu')) m.remove();

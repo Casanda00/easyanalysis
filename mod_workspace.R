@@ -75,7 +75,7 @@ workspaceToolsUI <- function(id) {
 
 workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool, active_dataset,
                             tool_request = reactive(NULL), layer_style = NULL,
-                            src_paths = NULL, plot_opts = NULL) {
+                            layer_order = NULL, src_paths = NULL, plot_opts = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     wsview <- reactiveVal("map")
@@ -93,7 +93,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     .vis <- function(nm) { v <- lvis[[nm]]; if (is.null(v)) TRUE else isTRUE(v) }
 
     # unified layer list across the four pools
-    layers <- reactive({
+    # POOL order -- the order layers happen to arrive in. Used only as the seed
+    # for the stacking order and for the automatic first-layer choice, so that
+    # neither changes behaviour for a project that has never been reordered.
+    layers_pool <- reactive({
       mk <- function(nms, type, kind, col) lapply(nms, function(n)
         list(nm = n, type = type, kind = kind, col = col))
       c(mk(.names(dataset_pool), "table",  "table",  "var(--sky)"),
@@ -101,7 +104,45 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         mk(.names(las_pool),     "lidar",  "lidar",  "var(--earth)"),
         mk(.names(vector_pool),  "vector", "vector", "#B07CC6"))
     })
-    observe({ ls <- layers(); if (is.null(activeLayer()) && length(ls)) activeLayer(ls[[1]]$nm) })
+
+    # Stored stacking order (backlog item 65). Persisted with the project via
+    # layer_order; NULL = tests/standalone use, where reordering is a no-op.
+    .order_get <- function()
+      if (is.null(layer_order)) character(0) else (layer_order() %||% character(0))
+    .order_set <- function(v) {
+      if (is.null(layer_order)) return(invisible(NULL))
+      layer_order(as.character(v))
+    }
+
+    # PANEL / STACKING order, TOP FIRST -- the GIS convention.
+    #
+    # THE PANEL USED TO BE UPSIDE DOWN relative to the map. It listed pool order
+    # (tables, rasters, lidar, vectors) and .draw_layers() added them in that
+    # same order -- and leaflet puts the LAST overlay on top. So vectors sat at
+    # the BOTTOM of the list and on TOP of the map. Nothing exposed it while the
+    # order was fixed, but the moment a row can be dragged, "up" would have meant
+    # "down". .draw_layers() now walks this list in REVERSE, so row one really is
+    # the layer drawn last.
+    #
+    # Reversing the DEFAULT keeps every existing project's map pixel-identical:
+    # only the panel's reading order changes.
+    layers <- reactive({
+      base <- layers_pool()
+      nms  <- vapply(base, function(l) l$nm, character(1))
+      ord  <- .order_get()
+      ord  <- ord[ord %in% nms]                     # drop layers since removed
+      # Anything not in the stored order is NEW, and goes on top -- what every
+      # GIS does when a layer is added. With no stored order at all this is the
+      # whole list reversed, which is the default described above.
+      rest <- rev(setdiff(nms, ord))
+      base[match(c(rest, ord), nms)]
+    })
+    # Deliberately layers_pool(), not layers(): the automatic first-layer choice
+    # must not change just because the panel's reading order was corrected.
+    observe({
+      ls <- layers_pool()
+      if (is.null(activeLayer()) && length(ls)) activeLayer(ls[[1]]$nm)
+    })
 
     # CANVAS FOLLOWS THE DATA: a project holding spatial layers opens on the Map
     # view; a tables-only project (e.g. just CSVs) opens on the Data view. Only
@@ -130,6 +171,40 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     }, ignoreInit = TRUE)
 
     observeEvent(input$ws_vis,    { nm <- input$ws_vis; lvis[[nm]] <- !.vis(nm) })
+
+    # ---- Layer reordering (backlog item 65) --------------------------------
+    # The browser sends the COMPLETE new order rather than a move instruction, so
+    # the server never has to reconstruct what the drag did. The rows are rebuilt
+    # by renderUI from the stored order, so the DOM is never the source of truth
+    # -- a dropped row that failed to save simply snaps back, which is the honest
+    # outcome.
+    #
+    # Names are filtered against the live pools: an order carrying a layer that
+    # has since been removed must not resurrect it, and one missing a new layer
+    # must not hide it (layers() appends whatever is unlisted).
+    .reorder_to <- function(nms) {
+      live <- vapply(layers_pool(), function(l) l$nm, character(1))
+      nms  <- unique(as.character(nms))
+      .order_set(c(nms[nms %in% live], setdiff(live, nms)))
+    }
+    observeEvent(input$ws_reorder, {
+      o <- input$ws_reorder$order
+      if (is.null(o) || !length(o)) return()
+      .reorder_to(o)
+    })
+    # Move to top / bottom. Nearly free once the order is explicit, and easier
+    # than dragging in a long list -- which is the case the drag handle is worst
+    # at, since the list scrolls while you drag.
+    observeEvent(input$ws_lyr_top, {
+      nm <- input$ws_lyr_top
+      cur <- vapply(layers(), function(l) l$nm, character(1))
+      .reorder_to(c(nm, setdiff(cur, nm)))
+    })
+    observeEvent(input$ws_lyr_bottom, {
+      nm <- input$ws_lyr_bottom
+      cur <- vapply(layers(), function(l) l$nm, character(1))
+      .reorder_to(c(setdiff(cur, nm), nm))
+    })
     observeEvent(input$ws_active, { activeLayer(input$ws_active) })
     observeEvent(input$ws_exp,    { nm <- input$ws_exp; lexp[[nm]] <- !isTRUE(lexp[[nm]]) })
 
@@ -364,10 +439,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!length(ls)) return(tagList(
         div(class = "ea-hint", "No data yet. Add data to the project."),
         .basemap_row()))
-      div(lapply(ls, function(l) {
+      div(`data-reorder-input` = ns("ws_reorder"), lapply(ls, function(l) {
         vis <- .vis(l$nm); ex <- isTRUE(lexp[[l$nm]])
         div(class = paste("ea-wsx-lyr2", if (identical(l$nm, act)) "active" else "",
                           if (vis) "" else "off", if (ex) "exp" else ""),
+          `data-lyr` = l$nm,
           # Right-click the row for the per-layer actions: zoom to it, rename it,
           # hide it, remove it. The row keeps its left-click behaviour (select).
           oncontextmenu = sprintf("eaLayerMenu(event, %s, %s, %s)",
@@ -375,6 +451,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             jsonlite::toJSON(l$kind, auto_unbox = TRUE),
             if (vis) "true" else "false"),
           div(class = "ea-wsx-lyrtop",
+            # Drag handle. ONLY the grip is draggable: the row already has three
+            # click targets (visibility, name, delete) plus a context menu, and
+            # making the whole row draggable makes every one of them feel sticky.
+            tags$span(class = "ea-wsx-grip", draggable = "true",
+                      title = "Drag to reorder", "⠿"),
             # visibility = a real toggle switch (was a ◉/○ glyph)
             tags$span(class = paste("ea-wsx-sw-toggle", if (vis) "on" else ""),
                       onclick = .fire("ws_vis", l$nm),
@@ -1999,8 +2080,10 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # Tiles, view and data are now built in one pass, in that order, so the map
     # can never end up half-drawn or with data underneath the basemap.
     .draw_layers <- function(m) {
+      # REVERSE: layers() is top-first (panel order), and leaflet stacks the last
+      # overlay added on top -- so the panel's first row must be added last.
       for (l in Filter(function(x) x$kind %in% c("raster", "vector", "lidar") && .vis(x$nm),
-                       layers())) {
+                       rev(layers()))) {
         m <- tryCatch({
           if (identical(l$kind, "raster")) {
             src <- raster_pool[[l$nm]]
