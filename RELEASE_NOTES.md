@@ -20,6 +20,13 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.11 — 2026-08-09
+
+### Plugins now has its own menu
+
+It was buried under Analysis → More, where nobody would look for it. It now sits in the top menu
+bar next to **Packages**, which is where you would expect to find it.
+
 ## v0.11.10 — 2026-08-09
 
 ### Enabling a tool now works straight away

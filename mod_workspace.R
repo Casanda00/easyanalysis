@@ -679,8 +679,21 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Installed packages…", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("pkg_list_ui"))),
           .msep(),
           tags$div(class = "gm-grp", "Optional engines"),
-          .mi("Earth Engine (needs Python + GEE)", NULL, disabled = TRUE),
-          .mi("Whitebox tools", NULL, disabled = TRUE)
+          .mi("Earth Engine (needs Python + GEE)", NULL, disabled = TRUE)
+          # "Whitebox tools" was a DISABLED placeholder here. It is a real,
+          # enableable provider now, so it lives in the Plugins menu below --
+          # leaving a greyed-out entry beside a working one is how a user
+          # concludes the feature does not exist.
+        )),
+        # Top level, beside Packages, because that is where a user looks for
+        # "what else can this app do". It was reachable only through
+        # Analysis > More > Plugins, which is the item-67 failure again: built,
+        # tested, and effectively invisible.
+        .menu("Plugins", "puzzle-piece", tagList(
+          .mi("Manage plugins…", .setTool("plugins")),
+          .msep(),
+          tags$div(class = "gm-grp", "Available"),
+          .mi("WhiteboxTools — 484 spatial tools", .setTool("plugins"))
         )),
         .menu("Settings", "gear", tagList(
           .mi("Preferences…", "openSettings('set-display')"),

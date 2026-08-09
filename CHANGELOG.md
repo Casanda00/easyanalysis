@@ -22,6 +22,35 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.11 — 2026-08-09
+
+### Plugins is now a top-level menu, beside Packages
+
+It was registered as a workspace tool under group `More`, so the only route to it was
+**Analysis → More → Plugins** — a nested fly-out. Built, tested, and effectively unreachable:
+**item 67 repeating in a new place.** My own check made it worse by asserting the tool was
+*registered* and its server *bound*, but never that anyone could find it. Registration is not
+reachability.
+
+Also removed the dead **Packages → Optional engines → "Whitebox tools" (disabled)** placeholder.
+A greyed-out entry beside a working one is how a user concludes the feature does not exist.
+
+**Still open (item 76b):** Plugins should be a *dialog* like Packages, not a full canvas screen
+occupying the tool sidebar — managing plugins is a settings action, not an analysis. Plus a
+reusable settings-dialog pattern so Packages / Plugins / Preferences are one implementation.
+
+### Round 8 documented (items 76–80)
+
+Recorded from testing, not built: Plugins-as-dialog; search reaching unactivated provider tools
+with inline Activate and visible provenance; R Console as its own menu and the `More` group
+deleted; the upload cap; and slow large-file loading.
+
+**Verified while documenting, not assumed:** `global.R:46` sets
+`shiny.maxRequestSize = 3 * 1024^3` — **3 GiB** — so a 4 GB file (3.73 GiB) is rejected, and the
+handler is `observeEvent(…, { req(input$upload_files); … })`, which halts **silently** when the
+input never populates. The file vanishes with no error. Same family as the self-deleting error
+messages, and worse: there is not even a message to miss.
+
 ## v0.11.10 — 2026-08-09
 
 ### Item 74 phase 2b — enabling a tool no longer needs a page reload

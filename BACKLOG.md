@@ -5805,3 +5805,155 @@ If the provider interface survives GeoAI, it is the plugin SDK of item 61 in all
 
 **Not started.** Recorded so the distinction between a provider and a feature is settled before
 anyone builds the wrong one.
+
+---
+
+## Round 8 — plugin surfacing, menu cleanup, and large files (2026-08-09)
+
+Reported together after testing v0.11.10. Item 76 is partly fixed already; the rest are recorded
+only, as instructed.
+
+---
+
+### 76. Plugins must behave like Packages — a dialog, not a screen
+
+> "plugins should have the same behavior as packages. not a full screen just the pop up that
+> shows up. learn from packages screen. … not in the sidebar too."
+> Also: "plugins should be in the menu. same position as Packages." / "I think it is only
+> positioning."
+
+**Two faults, one fixed.**
+
+**(a) It was invisible — FIXED v0.11.11.** `Plugins` was registered as a workspace *tool* under
+group `More`, so the only route to it was **Analysis → More → Plugins**, a nested fly-out. Built,
+tested, and effectively unreachable — **item 67 repeating in a new place**, and my own check made
+it worse: it asserted the tool was *registered* and its server *bound*, never that anyone could
+find it. Now a top-level `.menu("Plugins", …)` beside Packages. The dead
+**Packages → Optional engines → "Whitebox tools" (disabled)** placeholder was removed in the same
+change: a greyed-out entry next to a working one is how a user concludes the feature does not
+exist.
+
+**(b) It is still the wrong KIND of surface — OPEN.** Packages opens a **modal dialog**
+(`Install a package…`, `Optional packages…`, `Installed packages…`); Plugins opens a full canvas
+screen and occupies the tool sidebar. Managing plugins is a *settings* action, not an analysis —
+it should not displace the map or the tool panel.
+
+**What to build:** convert `mod_plugins.R` from the canvas+tools contract to a modal, modelled on
+the Packages handlers in `mod_workspace.R` (`pkg_install_ui`, `pkg_optional_ui`, `pkg_list_ui`).
+The provider list, search box and per-tool switches all fit a dialog; nothing about them needs a
+canvas.
+
+**And the general form, explicitly asked for:** *"i hope we can have a general settings for this
+for future use"* — a reusable **settings-dialog pattern**, so Packages, Plugins, Preferences and
+whatever follows are one implementation rather than three lookalikes. Packages is the existing
+example to extract from, not a fourth thing to copy.
+
+---
+
+### 77. Search must reach tools that are not activated, and show provenance
+
+> "you search a command, and it opens in the sidebar (that is established already). if not
+> activated, have the activate there for whitebox. if its not from whitebox, no need to activate."
+> "search isn't finding whiteboxtools at all. i searched a simple one lastoshapefile and nothing
+> returned."
+> "when it starts to work, we dont know if we are using whitebox tools or not. we need some way
+> to show it."
+
+**The report is correct, and there are two separate reasons for it.**
+
+1. **The app's tool search only searches `MODUI`** — the registered tools. An unactivated
+   WhiteboxTools tool is deliberately not in `MODUI` (that is what keeps the app fast), so it can
+   never appear. `ea_wbt_catalogue()` exists and searches the full 484, but **nothing calls it
+   except the Plugins screen** — the same "a function nobody calls proves nothing" fault as
+   gotcha 32.
+2. **`LasToShapefile` would not have been found even by the Plugins screen**, because the
+   catalogue has to be indexed first and indexing had almost certainly never been run. An
+   un-indexed catalogue searching to zero results is indistinguishable from a broken search.
+
+**What to build:**
+- The workspace search queries `MODUI` **and** `ea_wbt_catalogue()`, merging results.
+- A result for an inactive tool opens in the sidebar as normal but shows an **Activate** control
+  in place of Run. Activation already takes effect without a reload (v0.11.10), so the tool
+  becomes usable in-place.
+- **Non-provider tools show no activation control at all** — as specified.
+- If the catalogue is not indexed, the search must **say so and offer to index**, never return an
+  empty list. Empty results are how a user concludes a feature is broken.
+
+**Provenance — "we need some way to show it".** The generated label already carries
+`(WhiteboxTools)`, but that is not enough: it must be visible **on the tool panel while running**
+and **on the resulting layer**, so it is obvious at the moment of use which engine produced a
+result. Proposed: a small provider badge in the tool header, and provider recorded on the output
+layer so it survives into the project.
+
+---
+
+### 78. Menu cleanup — R Console standalone, and delete "More"
+
+> "Put R console in the top menu by itself and remove it from other places."
+> "'More' must be deleted. it adds no value. the options under More are already positioned in
+> other places in the app."
+
+- **R Console** currently hangs off the View menu (`.mi("R Console", …)` toggling
+  `#<ns>-console`). It should be its own top-level menu item, and every other entry point
+  removed, so there is exactly one way to reach it.
+- **The `More` group** holds Documentation, References and (until item 76) Plugins. Documentation
+  and References are reachable elsewhere; Plugins is now a top-level menu. So the group is a
+  container with nothing that needs containing. Delete it — and delete the *group*, not just its
+  members, or an empty fly-out remains.
+
+**Care:** the group is derived from each entry's `grp` field, so deleting it means re-homing
+`mod_docs.R` and `references.R` rather than dropping them.
+
+---
+
+### 79. Uploads are capped at 3 GiB and the rejection is SILENT — verified
+
+> "I loaded a 4gb file for testing large rasters and no failure but i did not see it. did you cap
+> data upload size and allows it fail silently? there should be no cap."
+
+**Both halves confirmed by reading the code — this is not a guess.**
+
+- `global.R:46` sets `options(shiny.maxRequestSize = 3 * 1024^3)` — **3 GiB**. A 4 GB file is
+  3.73 GiB, so it is **over the cap and rejected**.
+- The handler is `observeEvent(input$upload_files, { req(input$upload_files); … })`. When Shiny
+  rejects an oversized upload the input never populates, so **`req()` halts the observer with no
+  message at all**. The file vanishes with no error, which is exactly what was described.
+
+**This is the worst failure shape in the app**: not a wrong answer, not a visible error — nothing
+at all. It is the same family as the self-deleting error messages fixed in v0.11.3, and worse,
+because there is not even a message to miss.
+
+**What to do:**
+- **Remove the cap** as instructed (`Inf`, or a number far beyond any plausible file).
+- **Surface a rejection regardless.** Even uncapped, a browser or disk limit can refuse a file, so
+  the upload path must report "this file was not accepted" rather than silently doing nothing.
+  A cap that is never hit is not a fix if the silence remains.
+- **Reconsider the browser upload route for very large rasters entirely.** A multi-GB file is
+  copied through the browser into a temp file before anything reads it. The app is local-first and
+  already has a native folder picker (Tcl/Tk, pre-warmed in `global.R`) — **pointing at a file on
+  disk** avoids the copy completely and is the right answer for this size class. Related to
+  item 41 (data source manager).
+
+---
+
+### 80. Loading large files is painfully slow
+
+> "loading large files is painfully slow."
+
+Recorded with the measurement not yet taken, deliberately: "slow" spans several distinct costs
+and fixing the wrong one wastes the effort. The candidates, in the order they are likely to
+dominate for a multi-GB raster:
+
+1. **The browser upload copy** (item 79) — the file is transferred and written to a temp
+   directory before any code sees it. For multi-GB inputs this alone can dominate.
+2. **Reading the whole raster into memory.** `terra` is lazy by default, but any operation that
+   materialises values pays for all of it. LiDAR already has a read-time cap
+   (`.read_las_capped`, 5 M points); rasters have no equivalent.
+3. **Display preparation.** `.disp_raster()` already downsamples *before* reprojecting — a fix
+   worth 18.1 s → 3.2 s when it was made — so this path is already optimised and is probably not
+   the culprit.
+
+**Next step is measurement, not optimisation:** time upload / read / first-draw separately for a
+large file and fix whichever dominates. A progress indication is needed either way — the global
+"Running…" pill covers server-side work but **not** the browser-side upload, which is precisely
+the phase that feels like a hang.
