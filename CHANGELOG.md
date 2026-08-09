@@ -22,6 +22,29 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.17 — 2026-08-10
+
+### Item 80 — measured: the app is not what is slow
+
+Test raster 10,000 x 10,000 (100 M cells, 0.37 GB):
+
+- `terra::rast(path)` — the ingest path's only raster call — **0.06 s** (lazy, reads no values)
+- metadata, `minmax`, `setMinMax` — 0.00 s
+- display prep: aggregate 0.65 s + project 0.26 s
+- **total app-side work under 1 second**
+- projecting at full resolution first, the order fixed earlier: **50.00 s** (the 55x win, confirmed)
+
+Disk is not it either — a plain copy ran at **1,277 MB/s**, so a 4 GB temp write is ~3 s. **By
+elimination the cost is the browser upload transport** (HTTP multipart + chunked writes), which
+restates item 79's argument with numbers: pointing at a path beats copying the bytes.
+
+### Removed a dead 1.61 s from every boot
+
+`global.R` pre-warmed Tcl/Tk for native file dialogs that were **deleted on 2026-07-27**. The
+pre-warm was by then the only reference to tcltk left in the live codebase — warming a feature
+that no longer exists, at a measured **1.61 s per boot**, while startup was being reported as
+slow. If a native picker returns, pre-warm it next to the code that uses it.
+
 ## v0.11.16 — 2026-08-10
 
 ### Item 79 — the upload cap is gone, and the silence is explained

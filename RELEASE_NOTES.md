@@ -20,6 +20,22 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.17 — 2026-08-10
+
+### Faster startup
+
+The app was spending about 1.6 seconds of every startup preparing native file dialogs that were
+removed some time ago. That work is gone.
+
+### On slow loading of large files
+
+We measured where the time actually goes. Opening a large raster takes well under a second, and
+preparing it for the map takes under one more — the app itself is not the slow part. Nearly all
+of the wait is the file being uploaded through the browser.
+
+The real fix is to let you point at a file already on your computer instead of copying it through
+the browser, and that is being worked on.
+
 ## v0.11.16 — 2026-08-10
 
 ### There is no upload size limit any more

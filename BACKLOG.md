@@ -5936,7 +5936,7 @@ because there is not even a message to miss.
 
 ---
 
-### 80. Loading large files is painfully slow
+### 80. Loading large files is painfully slow — **MEASURED v0.11.17; one fix shipped**
 
 > "loading large files is painfully slow."
 
@@ -6158,3 +6158,56 @@ and a 10 TB file as the controls, plus a CONTROL that the old 3 GiB line is real
 **Not verified, and it cannot be here:** an actual multi-GB browser upload end to end. There is
 no browser in this environment. The cap and the plumbing are proven; the round trip needs a real
 file. That is worth doing before external testers, and it overlaps item 80.
+
+
+---
+
+### 80 measured v0.11.17 — it is not the reading, and one dead boot cost is gone
+
+Measured before optimising, as the entry insisted. Test raster: **10,000 x 10,000 = 100 M cells,
+0.37 GB GeoTIFF**, on this machine.
+
+| Phase | Time |
+|---|---|
+| `terra::rast(path)` — the ingest path's only raster call | **0.06 s** (lazy; it reads no values) |
+| `ncell` / `ext` / `crs` / `nlyr` metadata | 0.00 s |
+| `minmax` / `setMinMax` | 0.00 s |
+| Display prep: aggregate to <=400k cells | 0.65 s |
+| Display prep: project to WGS84 | 0.26 s |
+| **Total app-side work** | **under 1 second** |
+| For comparison: project at FULL resolution first — the order that was fixed earlier | **50.00 s** |
+
+**So the app is not what is slow.** Reading is lazy, display prep is already optimised, and the
+55x win from the earlier downsample-before-reproject fix is confirmed rather than assumed.
+
+**Disk is not it either: a plain file copy ran at 1,277 MB/s**, so writing a 4 GB upload to a temp
+file costs about **3 seconds** on this machine.
+
+**By elimination, the cost is the browser upload transport** — HTTP multipart plus Shiny's
+chunked write, which is far slower than the 3 s the disk alone would take. That is item 79's
+closing argument restated with numbers: for a local-first app, pushing a multi-GB file **through
+a browser** to reach a file that is already on disk is the wrong route. The fix is to point at
+the path, not copy the bytes, which needs the native picker.
+
+#### Shipped now: a dead 1.61 s on every boot
+
+`global.R` pre-warmed Tcl/Tk so "the native folder/file dialogs open instantly on first click".
+**Those dialogs were deleted on 2026-07-27** in favour of the browser picker — and the pre-warm
+was, by then, **the only reference to tcltk left anywhere in the live codebase**. It was warming
+a feature that no longer existed, at a **measured 1.61 s per boot**, while startup was one of the
+things being reported as slow.
+
+Removed. If a native picker returns — and item 79 argues it should — pre-warm it again *then*,
+next to the code that uses it.
+
+#### Still open
+
+- **The native path-based route** for large local files. This is the actual fix for the reported
+  slowness, and it belongs with item 41 (data source manager) rather than being bolted onto the
+  uploader.
+- **Progress during the upload itself.** The `#ea-busy` pill covers server work, and the
+  selection notice added in v0.11.16 covers the start, but the minutes in between still show only
+  Shiny's thin progress bar.
+- **A real multi-GB browser upload has still not been timed end to end** — there is no browser
+  here. The reporter is testing one; that measurement will confirm or refute the elimination
+  above, and it is the only piece of this that is guesswork rather than measurement.

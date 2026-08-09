@@ -10,7 +10,7 @@
 # matching entry to RELEASE_NOTES.md (public) AND CHANGELOG.md (internal).
 # Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.11.16"
+APP_VERSION <- "0.11.17"
 
 library(shiny)
 library(bslib)
@@ -55,16 +55,19 @@ library(DT)
 library(zip)          # portable .eap (zipped project) export/import
 library(rhandsontable)
 
-# Pre-warm Tcl/Tk at BOOT so the native folder/file dialogs open instantly on
-# first click. Tk's first init is the slow part (~1-2 s); paying it here (boot
-# is already slow) makes the dialogs feel snappy. Local desktop only — guarded,
-# so a headless/browser build where Tk is unavailable just skips it.
-try(suppressWarnings({
-  if (capabilities("tcltk") && requireNamespace("tcltk", quietly = TRUE)) {
-    loadNamespace("tcltk")
-    tcltk::tclRequire("Tk", warn = FALSE)   # boots the Tcl interpreter + Tk
-  }
-}), silent = TRUE)
+# REMOVED 2026-08-10: the Tcl/Tk pre-warm (item 80).
+#
+# It existed so the native folder/file dialogs would open instantly on first
+# click. Those dialogs were deleted on 2026-07-27 in favour of the browser file
+# picker (see the note in helpers.R), and nothing has called tcltk since -- the
+# pre-warm was the ONLY reference to it left in the whole live codebase.
+#
+# It cost a MEASURED 1.61 s on every single boot, warming a feature that no
+# longer exists. Startup was one of the things reported as slow.
+#
+# If a native picker returns -- and item 79 argues it should, because pushing a
+# multi-GB file through a browser upload is the wrong route for a local-first
+# app -- pre-warm it again THEN, next to the code that uses it.
 library(readxl)
 library(tools)
 library(nnet)    # multinom() -> Logistic Regression

@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.16.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.17.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,24 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.16</b> · 85 releases ·
+      <p class="meta">Latest: <b>v0.11.17</b> · 86 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-16"><h2><a class="anchor" href="#v0-11-16">v0.11.16</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-17"><h2><a class="anchor" href="#v0-11-17">v0.11.17</a><span class="when">2026-08-10</span></h2>
+<h3>Faster startup</h3>
+<p>The app was spending about 1.6 seconds of every startup preparing native file dialogs that were
+removed some time ago. That work is gone.</p>
+<h3>On slow loading of large files</h3>
+<p>We measured where the time actually goes. Opening a large raster takes well under a second, and
+preparing it for the map takes under one more — the app itself is not the slow part. Nearly all
+of the wait is the file being uploaded through the browser.</p>
+<p>The real fix is to let you point at a file already on your computer instead of copying it through
+the browser, and that is being worked on.</p>
+</section><section class="rel" id="v0-11-16"><h2><a class="anchor" href="#v0-11-16">v0.11.16</a><span class="when">2026-08-10</span></h2>
 <h3>There is no upload size limit any more</h3>
 <p>Files above about 3 GB were being rejected, and — worse — rejected <strong>silently</strong>: the file simply
 never appeared, with no error anywhere in the app. A 4 GB raster vanished exactly this way.</p>
