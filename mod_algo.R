@@ -38,6 +38,16 @@ algoToolsUI <- function(id, spec) {
   }
   static <- Filter(function(p) !.ea_is_dyn(p), spec$params)
   tagList(
+    # PROVENANCE. A generated tool must say whose engine is about to run, at the
+    # moment of use -- "we don't know if we are using whitebox tools or not" was
+    # the report, and a suffix in the tool's name is not enough once the panel is
+    # open. Built-in tools carry no badge: there is nothing to disclose.
+    if (!is.null(spec$provider))
+      div(class = "ea-prov",
+          tags$span(class = "ea-prov-dot"),
+          tags$span(class = "ea-prov-nm",
+                    switch(spec$provider, whitebox = "WhiteboxTools", spec$provider)),
+          if (!is.null(spec$tool)) tags$code(class = "ea-prov-tool", spec$tool)),
     tags$p(class = "text-muted small mb-2", spec$summary),
     uiOutput(ns("inputs_ui")),
     if (length(spec$params)) tagList(

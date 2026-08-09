@@ -67,6 +67,15 @@ ea_tool_on <- function(provider, tool) {
 ea_tool_set <- function(provider, tool, on = TRUE) {
   st <- ea_plugin_state()
   cur <- st$tools[[provider]] %||% character(0)
+  # Refuse to enable something that cannot become a tool. Hiding the button is
+  # not enough: any other path here would otherwise store an activation that
+  # silently produces nothing, which is indistinguishable from a broken app.
+  if (on && identical(provider, "whitebox")) {
+    e <- Filter(function(x) identical(x$name, tool), (ea_wbt_manifest() %||% list())$tools)
+    if (length(e) && is.null(tryCatch(ea_wbt_spec(e[[1]]), error = function(err) NULL)))
+      stop("'", tool, "' cannot be used here: it declares no output that can be ",
+           "loaded as a layer.")
+  }
   st$tools[[provider]] <- if (on) union(cur, tool) else setdiff(cur, tool)
   ea_plugin_state_set(st)
 }
@@ -349,7 +358,15 @@ ea_wbt_catalogue <- function(query = "", limit = 40L) {
   i <- utils::head(i, limit)
   on <- ea_plugin_state()$tools[["whitebox"]] %||% character(0)
   tb <- vapply(man$tools, function(e) e$toolbox %||% "", character(1))
+  # USABLE = the mapper can express it as a spec. Not everything can be: some
+  # WhiteboxTools tools declare no output parameter at all and write a file
+  # implicitly beside their input (LasToShapefile is one), so there is nothing to
+  # put in a pool. Those must still APPEAR in search -- a user who looks for a
+  # tool deserves to learn it exists and why it is unavailable, rather than get
+  # silence -- but they must never be offered an Activate that would do nothing.
+  usable <- vapply(man$tools[i], function(e)
+    !is.null(tryCatch(ea_wbt_spec(e), error = function(err) NULL)), logical(1))
   data.frame(tool = nm[i], toolbox = tb[i], description = ds[i],
              active = nm[i] %in% on, featured = nm[i] %in% EA_WBT_FEATURED,
-             stringsAsFactors = FALSE)
+             usable = usable, stringsAsFactors = FALSE)
 }

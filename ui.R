@@ -684,6 +684,16 @@ page_fillable(
       color: var(--bark); white-space: nowrap;
     }
     .ea-toolsearch-results .none { padding: 11px; color: var(--bark); font-size: 12.5px; }
+    .ea-ts-head { padding: 7px 11px 4px; font: 700 9.5px var(--ui); letter-spacing: .12em;
+                  text-transform: uppercase; color: var(--bark);
+                  border-top: 1px solid var(--line); }
+    .ea-ts-act { margin-left: auto; font: 600 10px var(--ui); padding: 1px 8px;
+                  border-radius: 999px; border: 1px solid var(--forest);
+                  color: var(--forest);
+                  background: color-mix(in srgb, var(--forest) 12%, transparent); }
+    .ea-toolsearch-results .ea-ts-extra a { display: flex; align-items: center; gap: 8px; }
+    .ea-ts-act.off { border-color: var(--line); color: var(--bark); background: none; }
+    .ea-toolsearch-results a.ea-ts-dim { opacity: .62; cursor: default; }
 
     /* ---- Body layout ---- */
     .app-main {
@@ -1279,6 +1289,15 @@ page_fillable(
        keeps its cream background under light text on every dark set (gotcha 31). */
     /* Plugins is a DIALOG, not a screen (item 76b): the list scrolls inside the
        modal so the modal itself never grows past the viewport. */
+    /* Provider badge on a generated tool's panel (item 77). Says whose engine is
+       about to run, while the panel is open -- not only in the tool's name. */
+    .ea-prov { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 8px;
+                  padding: 3px 9px; border-radius: 999px; font: 500 11px var(--ui);
+                  border: 1px solid var(--line); color: var(--bark);
+                  background: color-mix(in srgb, var(--forest) 8%, transparent); }
+    .ea-prov-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--forest); }
+    .ea-prov-nm { color: var(--ink); font-weight: 600; }
+    .ea-prov-tool { font: 500 10.5px var(--mono); color: var(--bark); }
     .ea-plug-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
                   margin: 12px 0 8px; }
     .ea-plug-bar .form-group { margin-bottom: 0; }
@@ -2949,9 +2968,16 @@ page_fillable(
             return t.label.toLowerCase().indexOf(q) > -1 ||
                    (t.group && t.group.toLowerCase().indexOf(q) > -1);
           }).slice(0, 14);
+          /* Ask the server for tools that are NOT in the menu -- provider tools
+             the user has not enabled yet. The menu index can only ever find what
+             is already registered, which is why searching for a WhiteboxTools
+             tool returned nothing at all. */
+          if (window.Shiny && Shiny.setInputValue)
+            Shiny.setInputValue('tool_search_q', q, {priority:'event'});
           if(!hits.length){
             var none = document.createElement('div'); none.className = 'none';
-            none.textContent = 'No tools match: ' + q; b.appendChild(none);
+            none.textContent = 'Searching…'; none.id = 'ea-ts-none';
+            b.appendChild(none);
             b.classList.add('open'); return;
           }
           hits.forEach(function(h){
@@ -2973,6 +2999,80 @@ page_fillable(
           b.classList.add('open');
         };
         document.addEventListener('click', function(){ var b = box(); if(b) b.classList.remove('open'); });
+
+        /* Extra results: provider tools that are not enabled yet. They are shown
+           under their own heading with an Activate action, because enabling one
+           is a decision -- it is somebody else's engine -- not a side effect of
+           searching. Non-provider tools never reach this path and so never show
+           an activation control. */
+        /* Open a tool by key after the server has enabled it. Binding and the
+           catalogue rebuild both happen on the same flush, so by the time this
+           arrives the tool exists. */
+        if (window.Shiny && Shiny.addCustomMessageHandler)
+          Shiny.addCustomMessageHandler('ea_open_tool', function(m){
+            if (m && m.key) Shiny.setInputValue('workspace-tool_pick', m.key,
+                                                {priority:'event'});
+          });
+        if (window.Shiny && Shiny.addCustomMessageHandler)
+          Shiny.addCustomMessageHandler('ea_tool_search_extra', function(m){
+            var b = box(); if(!b) return;
+            var none = document.getElementById('ea-ts-none'); if(none) none.remove();
+            var old = b.querySelector('.ea-ts-extra'); if(old) old.remove();
+            if(!m || (!m.items || !m.items.length) && !m.needs_index){
+              if(!b.children.length){
+                var n2 = document.createElement('div'); n2.className='none';
+                n2.textContent = 'No tools match: ' + (m && m.q ? m.q : '');
+                b.appendChild(n2);
+              }
+              b.classList.add('open'); return;
+            }
+            var wrap = document.createElement('div'); wrap.className = 'ea-ts-extra';
+            var h = document.createElement('div'); h.className = 'ea-ts-head';
+            h.textContent = m.needs_index ? 'WhiteboxTools' : 'Not enabled yet';
+            wrap.appendChild(h);
+            if(m.needs_index){
+              var a0 = document.createElement('a'); a0.href = '#';
+              a0.appendChild(document.createTextNode(
+                'Index WhiteboxTools to search its 484 tools'));
+              a0.addEventListener('click', function(e){
+                e.preventDefault(); e.stopPropagation();
+                b.classList.remove('open'); b.innerHTML = '';
+                Shiny.setInputValue('plugins_open', Date.now(), {priority:'event'});
+              });
+              wrap.appendChild(a0);
+            }
+            (m.items||[]).forEach(function(it){
+              var a = document.createElement('a'); a.href = '#';
+              a.appendChild(document.createTextNode(it.label));
+              var g = document.createElement('span'); g.className = 'grp';
+              g.textContent = it.group || 'WhiteboxTools'; a.appendChild(g);
+              var act = document.createElement('span');
+              if (it.usable === false){
+                /* Shown, but never offered. A tool that declares no output cannot
+                   become a layer, so an Activate here would do nothing at all --
+                   and a dead button is worse than an honest explanation. */
+                act.className = 'ea-ts-act off';
+                act.textContent = 'Not supported';
+                act.title = 'This tool writes its result beside its input rather ' +
+                            'than returning a layer, so it cannot run here yet.';
+                a.classList.add('ea-ts-dim');
+              } else {
+                act.className = 'ea-ts-act'; act.textContent = 'Activate';
+                a.addEventListener('click', function(e){
+                  e.preventDefault(); e.stopPropagation();
+                  b.classList.remove('open'); b.innerHTML = '';
+                  var inp = document.getElementById('tool_search'); if(inp) inp.value = '';
+                  Shiny.setInputValue('tool_activate',
+                    {provider: it.provider, tool: it.tool, n: Date.now()},
+                    {priority:'event'});
+                });
+              }
+              a.appendChild(act);
+              wrap.appendChild(a);
+            });
+            b.appendChild(wrap);
+            b.classList.add('open');
+          });
       })();
     "))
   ),

@@ -253,5 +253,67 @@ ea_tool_set("whitebox", "FillDepressions", TRUE)
 third <- take()
 say(third == 1L, sprintf("enabling one more tool binds exactly one (%d)", third))
 
+# ---- 13. Search reaches tools that are NOT enabled (item 77) ----------------
+# The reported failure: searching "lastoshapefile" returned nothing. The menubar
+# search is a client-side index of the RENDERED MENU, so an unenabled tool is
+# structurally invisible to it. The server now answers from the catalogue.
+ea_plugin_set("whitebox", TRUE)
+local({ st <- ea_plugin_state(); st$tools[["whitebox"]] <- character(0)
+        ea_plugin_state_set(st) })
+invisible(ea_wbt_build_manifest(only = c("LasToShapefile", "Slope")))
+ea_wbt_manifest_clear()
+
+d <- ea_wbt_catalogue("lastoshapefile")
+say(nrow(d) >= 1, sprintf("the reported query now finds a tool (%d hit)", nrow(d)))
+say(nrow(d) >= 1 && identical(d$tool[1], "LasToShapefile"),
+    "and it is the right one, case-insensitively")
+say(nrow(d) >= 1 && isFALSE(d$active[1]),
+    "CONTROL: it reports as NOT active, so the result can offer Activate")
+
+# Case and partial matching, since a user types neither exactly nor fully.
+say(nrow(ea_wbt_catalogue("LasTo")) >= 1, "a partial name matches")
+say(nrow(ea_wbt_catalogue("shapefile")) >= 1, "a word from the description matches")
+
+# LasToShapefile turns out NOT to be expressible: it declares no output parameter
+# at all and writes a .shp beside its input, so there is nothing to put in a pool.
+# It must still be FOUND -- a user who searches for it deserves to learn it exists
+# -- but never offered an Activate that would silently do nothing.
+say(isFALSE(d$usable[1]),
+    "a tool with no output parameter is reported as NOT usable")
+refused <- tryCatch({ ea_tool_set("whitebox", "LasToShapefile", TRUE); FALSE },
+                    error = function(e) grepl("no output", conditionMessage(e)))
+say(isTRUE(refused),
+    "CONTROL: activating it is REFUSED with a reason, not silently stored")
+say(!("LasToShapefile" %in% (ea_plugin_state()$tools[["whitebox"]] %||% character(0))),
+    "and nothing was written to the activation state")
+
+# A tool that IS expressible must still activate and register normally.
+ea_tool_set("whitebox", "Slope", TRUE)
+ids <- vapply(ea_algorithms(), function(a) a$id, character(1))
+key <- "wbt_slope"
+say(key %in% ids, sprintf("an expressible tool activates and registers (%s)", key))
+say(isTRUE(ea_wbt_catalogue("slope")$active[1]),
+    "and then reports as active, so Activate is not offered again")
+
+# ---- 14. Provenance is visible while the tool is open -----------------------
+spec <- Filter(function(a) identical(a$id, key), ea_algorithms())
+if (!length(spec)) {
+  say(FALSE, "the activated tool is missing from the registry")
+} else {
+  spec <- spec[[1]]
+  say(identical(spec$provider, "whitebox") && identical(spec$tool, "Slope"),
+      "the spec carries provider and tool name")
+  ui_html <- paste(as.character(htmltools::renderTags(algoToolsUI("x", spec))$html),
+                   collapse = " ")
+  say(grepl("ea-prov", ui_html, fixed = TRUE) &&
+      grepl("WhiteboxTools", ui_html, fixed = TRUE),
+      "the tool panel shows a WhiteboxTools badge while it is open")
+}
+builtin <- Filter(function(a) identical(a$id, "dtm"), ea_algorithms())[[1]]
+b_html  <- paste(as.character(htmltools::renderTags(algoToolsUI("y", builtin))$html),
+                 collapse = " ")
+say(!grepl("ea-prov", b_html, fixed = TRUE),
+    "CONTROL: a built-in tool shows NO badge -- there is nothing to disclose")
+
 cat(if (ok) "\nPLUGIN CHECK: PASS\n" else "\nPLUGIN CHECK: FAIL\n")
 quit(status = if (ok) 0L else 1L)

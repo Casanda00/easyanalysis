@@ -20,6 +20,27 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.13 — 2026-08-09
+
+### Search now finds WhiteboxTools tools you have not enabled
+
+Searching for a WhiteboxTools tool used to return nothing, because the search only looked at
+tools already in your menus. It now searches the whole WhiteboxTools catalogue as well. A tool
+you have not enabled appears under **Not enabled yet** with an **Activate** button — one click
+enables it and opens it.
+
+If the catalogue has not been indexed yet, the search now tells you and offers to do it, instead
+of quietly finding nothing.
+
+A few WhiteboxTools tools cannot run here, because they write their result next to the input file
+rather than returning a layer. Those still appear in search so you can see they exist, marked
+**Not supported**, rather than offering a button that would do nothing.
+
+### You can now see when a WhiteboxTools tool is running
+
+Any tool that comes from WhiteboxTools shows a badge in its panel naming the engine and the
+underlying tool, so it is clear which results came from where.
+
 ## v0.11.12 — 2026-08-09
 
 ### Plugins now opens as a dialog

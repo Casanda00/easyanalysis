@@ -1068,6 +1068,45 @@ server <- function(input, output, session) {
   plugins_ctx    <- pluginsServer("plugins",
                     open = reactive(input$plugins_open),
                     on_change = function() plugin_epoch(isolate(plugin_epoch()) + 1))
+  # ---- Tool search reaches tools that are NOT enabled (item 77) -------------
+  # The menubar search is a client-side index of the RENDERED MENU, so it can
+  # only ever find what is already registered -- which is exactly why searching
+  # for a WhiteboxTools tool returned nothing at all. This answers with the
+  # provider catalogue, covering all 484 whether or not they are enabled.
+  observeEvent(input$tool_search_q, {
+    q <- trimws(as.character(input$tool_search_q %||% ""))
+    if (!nzchar(q)) return()
+    # An un-indexed catalogue searching to zero is indistinguishable from a
+    # broken search, so say which it is and offer the remedy.
+    if (is.null(ea_wbt_manifest())) {
+      session$sendCustomMessage("ea_tool_search_extra",
+        list(q = q, needs_index = TRUE, items = list()))
+      return()
+    }
+    d <- tryCatch(ea_wbt_catalogue(q, limit = 8L), error = function(e) data.frame())
+    if (nrow(d)) d <- d[!d$active, , drop = FALSE]  # enabled ones are already in the menu
+    items <- if (!nrow(d)) list() else lapply(seq_len(nrow(d)), function(i) list(
+      provider = "whitebox", tool = d$tool[i],
+      label = paste0(d$tool[i], " (WhiteboxTools)"),
+      group = d$toolbox[i], usable = isTRUE(d$usable[i])))
+    session$sendCustomMessage("ea_tool_search_extra",
+      list(q = q, needs_index = FALSE, items = items))
+  })
+
+  # Activating from a search result enables the tool AND opens it. Enabling alone
+  # would leave the user exactly where they started, having asked for the tool
+  # twice.
+  observeEvent(input$tool_activate, {
+    a <- input$tool_activate
+    if (is.null(a$tool) || is.null(a$provider)) return()
+    ea_plugin_set(a$provider, TRUE)
+    ea_tool_set(a$provider, a$tool, TRUE)
+    plugin_epoch(isolate(plugin_epoch()) + 1)
+    showNotification(sprintf("%s enabled.", a$tool), type = "message", duration = 4)
+    session$sendCustomMessage("ea_open_tool",
+      list(key = paste0("algo_wbt_", tolower(gsub("[^A-Za-z0-9]+", "_", a$tool)))))
+  })
+
   # Activation takes effect immediately: bind whatever became active, and the
   # workspace rebuilds its catalogue off the same epoch.
   observeEvent(plugin_epoch(), {

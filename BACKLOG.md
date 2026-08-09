@@ -5850,7 +5850,7 @@ example to extract from, not a fourth thing to copy.
 
 ---
 
-### 77. Search must reach tools that are not activated, and show provenance
+### 77. Search must reach tools that are not activated, and show provenance — **DONE v0.11.13**
 
 > "you search a command, and it opens in the sidebar (that is established already). if not
 > activated, have the activate there for whitebox. if its not from whitebox, no need to activate."
@@ -5991,3 +5991,52 @@ must **not** appear in `MODUI`. The reachability assertion was also retargeted �
 assert the tool was *registered and bound*, which passed while Plugins sat buried in an
 `Analysis → More` fly-out nobody found. It now asserts the top-level menu exists. **Registration
 is not reachability**, and that was the lesson of v0.11.11.
+
+
+---
+
+### 77 built v0.11.13 — search reaches unenabled tools, and provenance is visible
+
+**Root cause of "search isn't finding whiteboxtools at all".** `eaToolSearch` is a **client-side
+index of the rendered menu DOM** — it scrapes menu anchors and clicks the match. An unenabled
+provider tool is not in the menu, so it was *structurally* invisible. No amount of typing would
+have found `LasToShapefile`.
+
+**What changed:**
+
+- The search still indexes the menu (fast, unchanged for the 88 registered tools) and now also
+  asks the server, which answers from `ea_wbt_catalogue()` — all 484, enabled or not. Results
+  appear under their own **"Not enabled yet"** heading with an **Activate** control.
+- **Non-provider tools never reach that path**, so they never show an activation control — as
+  specified.
+- Activating from a result **enables and then opens** the tool. Enabling alone would leave the
+  user where they started, having asked for the tool twice.
+- **An un-indexed catalogue now says so** and offers to index, instead of returning "No tools
+  match". Zero results and an empty catalogue are indistinguishable to a user, and the second one
+  is not a search failure.
+
+#### The finding: not every WhiteboxTools tool can be a tool here
+
+`LasToShapefile` — the very example reported — **declares no output parameter at all.**
+WhiteboxTools writes the `.shp` beside its input, so there is nothing to put in a pool. The
+mapper already refused to build a spec for it, correctly. But search would then have offered an
+**Activate button that did nothing**, which is worse than not finding it.
+
+So the catalogue gained a `usable` column, and:
+
+- unusable tools are **still shown in search** — a user looking for one deserves to learn it
+  exists — but marked **"Not supported"** with the reason on hover, and not clickable;
+- `ea_tool_set()` **refuses** to enable one, with a message. Hiding the button is not enough:
+  any other path would otherwise store an activation that silently produces nothing, which is
+  indistinguishable from a broken app.
+
+**This is a whole class**, not one tool: any WhiteboxTools tool with an implicit output is
+affected. Supporting them properly means teaching the runner about "output written beside the
+input", which is worth doing later and is recorded here rather than half-done now.
+
+#### Provenance
+
+`algoToolsUI()` shows a **WhiteboxTools badge** with the underlying tool name whenever
+`spec$provider` is set — visible *while the panel is open*, not just in the tool's title, which
+was the ask ("we don't know if we are using whitebox tools or not"). Built-in tools show no
+badge: there is nothing to disclose. Both directions are asserted, the second as a CONTROL.

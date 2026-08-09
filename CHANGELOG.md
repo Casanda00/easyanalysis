@@ -22,6 +22,31 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.13 — 2026-08-09
+
+### Item 77 — search reaches unenabled tools; provenance is visible
+
+**Root cause:** `eaToolSearch` is a client-side index of the **rendered menu DOM**. An unenabled
+provider tool is not in the menu, so it was structurally invisible — no amount of typing would
+have found `LasToShapefile`.
+
+- Menu index unchanged; the server now also answers from `ea_wbt_catalogue()` (all 484). Extra
+  hits render under a "Not enabled yet" heading with **Activate**.
+- Non-provider tools never reach that path, so never show an activation control.
+- Activating **enables and opens** — enabling alone leaves the user where they started.
+- An un-indexed catalogue **says so and offers to index** rather than returning "No tools match".
+  Empty results and an empty catalogue are indistinguishable to a user.
+
+**Finding — not every tool is expressible.** `LasToShapefile` declares **no output parameter**;
+WhiteboxTools writes the `.shp` beside its input. The mapper already refused it, but search would
+have offered a dead Activate. So the catalogue gained `usable`: unusable tools are still shown
+(marked "Not supported", with the reason) and `ea_tool_set()` **refuses** to enable one — hiding
+the button is not enough, since any other path would store an activation that silently produces
+nothing. This is a class, not one tool; supporting implicit outputs is recorded, not half-done.
+
+**Provenance:** `algoToolsUI()` renders a WhiteboxTools badge with the underlying tool name
+whenever `spec$provider` is set. Built-in tools show none — asserted as a CONTROL.
+
 ## v0.11.12 — 2026-08-09
 
 ### Item 76b — Plugins is a dialog, not a screen
