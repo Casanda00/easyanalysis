@@ -3494,6 +3494,12 @@ the database question at all.
 ### 42. Big question — has the platform actually met its founding goal?
 > "big question: one goal was to analyze data and map it in the same platform. has the platform truly solved that goal. we should set a multiobjective multi step process cus it does not look entire fixd and clear that this moment."
 
+**UPDATE 2026-08-09 — phases 1–2 shipped and then failed their first real use.** The chain
+works and is tested, but the reporter could not complete it while holding the instructions.
+**See item 67.** Phases 3–4 are on hold: there is no point extending a round trip that cannot
+be found. The original observation — *"it does not look entirely fixed and clear"* — turned out
+to be about discoverability, and it was right.
+
 Not a defect. The reporter is questioning whether "analyse **and** map in one platform" has been
 achieved, and observing that the current state "does not look entirely fixed and clear". The ask
 is for a **multi-objective, multi-step process** — i.e. an explicit plan with stated objectives
@@ -4994,3 +5000,105 @@ reported success anyway.
 - **Delete stale tests.** `verify_step3.R` asserted hit-testing that v0.10.20 deliberately removed;
   it failed by design and was noise. A test that fails for a reason nobody will act on is worse
   than no test.
+
+---
+
+### 67. The analysis-to-map round trip is not discoverable — REPORTED 2026-08-09, documented only
+
+> Reported after trying the documented five-step chain: could not bring the predictions back
+> to the map, and found the buttons and the flow unintuitive. A second opinion is being sought.
+> **No code changed. This is the write-up, not the fix.**
+
+The chain built in item 42 works — the logic is tested — but **the reporter could not complete
+it while holding the instructions.** That is a design failure, not a user failure, and it is
+worth more than the feature: a round trip nobody can find is a round trip nobody has.
+
+**The flow as built:**
+
+1. Add a vector layer that has attributes (shapefile *with* its `.dbf`, or a GeoPackage).
+2. Run the **Attributes to Table** algorithm → a dataset appears in the left rail.
+3. Fit a model on that dataset (robust regression, GLMM, GAM, Poisson, negative binomial).
+4. Press **Predictions to map layer** in the tools panel.
+5. Layers panel → expand the layer → Graduated → colour by `pred`.
+
+**Five steps, three screens, and every one of them has to be known in advance.** Nothing in the
+app announces that the chain exists.
+
+#### Specific faults, in the order they bite
+
+1. **Nothing offers the entry point.** Step 2 is an entry in the processing-algorithm list. A
+   user looking at a map layer and wanting to model it has no reason to search a
+   *processing* list for the word "Attributes", and the layer's own right-click menu — which is
+   where they *do* look, since that is where symbology lives — does not offer it.
+2. **The name describes the mechanism, not the intent.** "Attributes to Table" says what it
+   does internally. It does not say *"this is how you start modelling a map layer"*, which is
+   the only reason to press it.
+3. **The return button does not exist until it does.** `Predictions to map layer` is rendered
+   by `actions_ui`, which returns `NULL` until a fit succeeds. So a user exploring the screen
+   *before* running the model sees no evidence the capability exists — and after the run it
+   appears at the bottom of the tools panel, below everything else.
+4. **The refusal is the thing most likely to be seen, and it is transient.** Every refusal path
+   in `ea_action_to_layer()` throws, and `mod_stat.R` reports it with
+   `showNotification(..., duration = 8)`. The messages themselves are specific and good — they
+   name the cause and the remedy — but they **vanish after eight seconds**. The single moment a
+   user most needs the explanation is the moment it disappears. This is the same complaint
+   already made about attribute pop-ups, in a new place.
+5. **The refusal is also the most likely outcome for a first attempt.** The link is deliberately
+   strict (a decision taken on purpose: *the best decision for the job and tool always wins*),
+   so fitting on a dataset that did **not** come from step 2 refuses — which is exactly what a
+   user does when they have not yet been told step 2 is mandatory.
+6. **Step 5 is a second undiscoverable hop.** Even on success, the new `pred` column changes
+   nothing visible; the user must know to open symbology and switch to Graduated. The layer does
+   not redraw, and nothing says a new column arrived.
+
+#### What this suggests (not decided — awaiting the second opinion)
+
+- Offer the entry point **where the user already is**: an item on the layer's right-click menu
+  (*Model this layer* / *Attributes to table*), next to symbology.
+- **Show the return button always**, disabled with the reason on it, rather than hiding it until
+  a fit exists. A disabled control teaches; an absent one cannot.
+- **Make refusals persistent** — inline in the panel, not an 8-second toast. Reuse whatever
+  fixes the pop-up complaint.
+- On success, **say what happened and where** ("added `pred` and `resid` to *Plots*"), and
+  consider switching the layer to Graduated on `pred` automatically, since that is the only
+  reason anyone pressed the button.
+- Reconsider the name.
+
+**Blocked on the second opinion before building anything.** The reporter is right that a fix
+chosen from one person's confusion may be the wrong fix.
+
+---
+
+### 68. Two v0.11.2 changes are UNVERIFIED VISUALLY — no browser test has been done
+
+Recorded so it is not mistaken for tested work. The **logic** of both is covered by
+`check_cv_folds.R`; what has **not** happened is anyone looking at them on screen. There is no
+browser automation in this environment, so these need eyes.
+
+**a) The cross-validation caveat, and it is weaker than intended.** The message
+(*"Incomplete: 1 of 5 folds could not be fitted, so 18 row(s) (20% of the data) are NOT
+included."*) is appended to the accuracy caption of the results table.
+
+Traced end to end, without a browser: `DT` stores the caption as a raw `<caption>` element in
+its JSON payload and injects it client-side, so the rendered element carries **no class**;
+Bootstrap styles bare `caption` with `color: var(--bs-secondary-color)`; `ui.R:272` maps that to
+`var(--bark)`, the per-theme *secondary* text colour.
+
+So the caveat is **legible in every theme — but rendered in the lowest-emphasis text style the
+table has**, with no warning colour and no weight, separated from the accuracy by a plain
+dash. A statement that the number above it is unreliable is currently styled as a footnote.
+That is a real weakness even though nothing is invisible. **Traced, not seen** — the cascade is
+determinate but no one has looked at it.
+
+**Likely follow-up:** give the caveat its own element with a warning tone (a translucent
+`color-mix()` of a semantic token, per the fixed-light-panel rule) rather than leaving it in
+the caption. Not done, because it should be *looked at* first.
+
+**b) The time-series failure text.** `decompose()` now shows its underlying error inside
+`show_placeholder()`, and the stationarity test prints a failure line. Neither has been seen
+rendered. A long engine message may overflow or wrap badly in the placeholder, which is sized
+for a short sentence.
+
+**Neither is a correctness risk** — the numbers and the guard are proven. Both are presentation
+risks, and both are the kind of thing that is obvious in one second of looking and invisible
+from a test suite.
