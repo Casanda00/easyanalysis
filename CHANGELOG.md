@@ -22,6 +22,19 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.15 — 2026-08-09
+
+### Item 77 complete — and the "open gap" was my misreading
+
+Clarified: the sidebar shows a tool's options once **selected**; the **search popup** is where
+activation happens and where the source is disclosed. That is what was built, so there was no
+gap. I had inferred a sidebar-preview requirement from "opens in the sidebar", when that clause
+was describing existing behaviour rather than asking for anything.
+
+One change from the clarification: the popup heading now reads **"WhiteboxTools - not enabled
+yet"** instead of "Not enabled yet". The popup is where the decision to enable someone else's
+engine is taken, so whose engine it is should be unmistakable there, not only in each row label.
+
 ## v0.11.14 — 2026-08-09
 
 ### Item 78 — one R Console, and the "More" group deleted

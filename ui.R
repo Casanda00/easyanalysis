@@ -3028,7 +3028,11 @@ page_fillable(
             }
             var wrap = document.createElement('div'); wrap.className = 'ea-ts-extra';
             var h = document.createElement('div'); h.className = 'ea-ts-head';
-            h.textContent = m.needs_index ? 'WhiteboxTools' : 'Not enabled yet';
+            /* Name the source in the heading, not only in each label: the popup is
+               where the decision to enable someone else's engine is taken, so it
+               must be unmistakable whose engine it is. */
+            h.textContent = m.needs_index ? 'WhiteboxTools'
+                                          : 'WhiteboxTools - not enabled yet';
             wrap.appendChild(h);
             if(m.needs_index){
               var a0 = document.createElement('a'); a0.href = '#';

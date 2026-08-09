@@ -20,6 +20,14 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.15 — 2026-08-09
+
+### Search results say where a tool comes from
+
+When a search turns up a WhiteboxTools tool you have not enabled, the results are now headed
+**WhiteboxTools - not enabled yet**, so it is clear whose tools you are being offered before you
+enable anything.
+
 ## v0.11.14 — 2026-08-09
 
 ### Tidier menus

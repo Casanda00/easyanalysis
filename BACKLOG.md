@@ -5850,7 +5850,7 @@ example to extract from, not a fourth thing to copy.
 
 ---
 
-### 77. Search must reach tools that are not activated, and show provenance — **DONE v0.11.13**
+### 77. Search must reach tools that are not activated, and show provenance — **DONE v0.11.15**
 
 > "you search a command, and it opens in the sidebar (that is established already). if not
 > activated, have the activate there for whitebox. if its not from whitebox, no need to activate."
@@ -6053,7 +6053,23 @@ about to run, but three layers later nothing said which engine made which. The o
 now stamped with `attr(res, "ea_provider")` (provider, tool, timestamp), and the completion
 notification names the engine: *"Slope complete — added layer 'Slope' (via WhiteboxTools)."*
 
-**Gap 2, STILL OPEN and a deliberate design difference, not an oversight.** The request was:
+**Gap 2 was NOT a gap — I misread the request.** Clarified: *"sidebar is not for previewing the
+options. its for when you select the tool. the search popup is where you activate the type of
+tool but it shows that it is from whitebox."*
+
+The sidebar shows a tool's options once **selected**; the **popup** is where activation happens
+and where the source is disclosed. That is exactly what was built. **Item 77 is complete.**
+
+The only change following the clarification: the popup heading now reads
+**"WhiteboxTools - not enabled yet"** rather than just "Not enabled yet" — the popup is where the
+decision to enable someone else's engine is taken, so whose engine it is should be unmistakable
+there, not only in each row's label.
+
+Kept below for the record, because the reasoning was wrong in an instructive way — I inferred a
+sidebar-preview requirement from "opens in the sidebar" when that clause was simply describing
+existing behaviour, not asking for anything:
+
+> **What I wrongly believed was still open.** The request was:
 *"you search a command, and it opens in the sidebar (that is established already). if not
 activated, have the activate there for whitebox."* — i.e. the tool **opens in the sidebar** and
 Activate lives **there**.
@@ -6071,7 +6087,7 @@ Previewing one means adding a single transient `preview_tool` entry to the catal
 bounded and doable; it was not smuggled in unasked after already substituting one design for
 another once.
 
-**Decision needed:** keep the one-click dropdown flow, or build the sidebar preview.
+**Resolved: no decision needed.** The dropdown flow was the requirement all along.
 
 ---
 
