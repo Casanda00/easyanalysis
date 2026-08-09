@@ -10,7 +10,7 @@
 # matching entry to RELEASE_NOTES.md (public) AND CHANGELOG.md (internal).
 # Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.11.15"
+APP_VERSION <- "0.11.16"
 
 library(shiny)
 library(bslib)
@@ -41,9 +41,16 @@ try(suppressWarnings({
   solve(matrix(c(2, 1, 1, 3), 2))
 }), silent = TRUE)
 
-# Allow large file uploads (LiDAR .laz point clouds can be hundreds of MB).
-# Default Shiny cap is 5 MB; raise to 3 GB.
-options(shiny.maxRequestSize = 3 * 1024^3)
+# NO UPLOAD CAP. Shiny's default is 5 MB; this app was raised to 3 GiB, which was
+# still a cap -- and the way it failed was the real problem. A file over the limit
+# never populates `input$upload_files`, so the handler's `req()` halted with no
+# message at all: the file simply vanished. A 4 GB raster (3.73 GiB) did exactly
+# that during testing.
+#
+# Inf, not a large number: any finite value is a cliff someone eventually walks
+# off, and it fails silently when they do. Sizes are compared with `>` in Shiny's
+# upload route, and nothing is ever greater than Inf.
+options(shiny.maxRequestSize = Inf)
 library(DT)
 library(zip)          # portable .eap (zipped project) export/import
 library(rhandsontable)

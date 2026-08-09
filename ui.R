@@ -112,6 +112,17 @@ page_fillable(
       "var g=el.closest('.shiny-input-container,.input-group,.form-group');",
       "if(g){var t=g.querySelector('input[type=text].form-control'); if(t)t.value='';",
       "var pb=g.querySelector('.progress-bar'); if(pb){pb.style.width='0%';pb.textContent='';}}}});}",
+      # Report a file selection the moment it happens. A multi-GB upload takes
+      # minutes, during which Shiny shows only a thin progress bar -- and the
+      # report was "no failure but i did not see it". Silence is indistinguishable
+      # from a hang, so say what was picked, and how big, before the wait starts.
+      "if(window.Shiny){var fi=document.getElementById('upload_files');",
+      "if(fi){fi.addEventListener('change',function(){",
+      "var fs=this.files; if(!fs||!fs.length) return;",
+      "var tot=0, nm=[]; for(var i=0;i<fs.length;i++){tot+=fs[i].size; nm.push(fs[i].name);}",
+      "Shiny.setInputValue('upload_selected',",
+      "{n:fs.length, bytes:tot, names:nm.slice(0,6), t:Date.now()},{priority:'event'});",
+      "});}}",
       "})();"))),
     # Browser-tab icon. Shiny serves www/ at the app root, so these resolve
     # without any extra resource handler. The app had no favicon at all, so the

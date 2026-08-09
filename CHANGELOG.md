@@ -22,6 +22,33 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.16 — 2026-08-10
+
+### Item 79 — the upload cap is gone, and the silence is explained
+
+`shiny.maxRequestSize = Inf`. Not a larger number: any finite value is a cliff somebody
+eventually walks off, and this report is what that looks like.
+
+Verified Shiny tolerates `Inf` rather than assuming it. `ShinySession$@uploadInit` does
+`if (maxSize > 0 && any(sizes > maxSize)) stop(...)` — `Inf > 0` keeps uploads enabled (**0 would
+disable them**) and `any(sizes > Inf)` is FALSE. `HandlerManager$createHttpuvApp`'s
+`if (maxSize <= 0) return(NULL)` does not trigger.
+
+**Why it was silent, now known precisely:** Shiny rejects with `stop("Maximum upload size
+exceeded")` **inside an RPC handler**, so the error surfaces in the browser console rather than
+the app — and the app's own handler never ran, because `req(input$upload_files)` halts on an
+input that never populated. Two layers of silence stacked; neither could have produced a message.
+
+**Feedback, the other half:** removing the cap fixes rejection, not the minutes-long wait. The
+file input now reports its selection on the browser `change` event, before any bytes move, and
+the server answers *"Reading 1 file (3.7 GB)… large files can take a while."*
+
+`check_upload.R` asserts against Shiny's real expressions, with the reported 4 GB file and a
+10 TB file as controls.
+
+**Not verified here:** an actual multi-GB browser upload end to end — there is no browser in this
+environment. Plumbing proven; the round trip needs a real file.
+
 ## v0.11.15 — 2026-08-09
 
 ### Item 77 complete — and the "open gap" was my misreading

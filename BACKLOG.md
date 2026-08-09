@@ -5906,7 +5906,7 @@ layer so it survives into the project.
 
 ---
 
-### 79. Uploads are capped at 3 GiB and the rejection is SILENT — verified
+### 79. Uploads are capped at 3 GiB and the rejection is SILENT — **FIXED v0.11.16**
 
 > "I loaded a 4gb file for testing large rasters and no failure but i did not see it. did you cap
 > data upload size and allows it fail silently? there should be no cap."
@@ -6111,3 +6111,50 @@ empty, so `More` disappears rather than becoming an empty fly-out.
 is precisely the distinction v0.11.11 got wrong. Assertions: `More` absent, `Data` present as a
 control that the test works at all, Documentation still reachable, and `R Console` appearing
 **exactly once**.
+
+
+---
+
+### 79 fixed v0.11.16 — no cap, and the silence explained exactly
+
+> "did you cap data upload size and allows it fail silently? there should be no cap."
+
+**The cap is gone: `shiny.maxRequestSize = Inf`.** Not a larger number — any finite value is a
+cliff somebody eventually walks off, and this report is what walking off it looks like.
+
+Verified that Shiny tolerates `Inf` rather than assuming it: both places that read the option
+compare with `>`, and `Inf` survives both guards.
+
+- `ShinySession$@uploadInit`: `if (maxSize > 0 && any(sizes > maxSize)) stop(...)` — `Inf > 0`
+  is TRUE (so uploads stay enabled; **0 would disable them entirely**) and `any(sizes > Inf)` is
+  FALSE.
+- `HandlerManager$createHttpuvApp`'s `onHeaders`: `if (maxSize <= 0) return(NULL)` — not
+  triggered.
+
+#### Why it was silent — now known precisely, not guessed
+
+**Shiny rejects an oversized upload with `stop("Maximum upload size exceeded")` inside
+`ShinySession$@uploadInit`, which is an RPC handler.** That error goes back over the websocket
+and surfaces in the **browser console** — not in the app. The app's own handler never runs at
+all, because `req(input$upload_files)` halts on an input that never populated.
+
+So there were two layers of silence stacked: Shiny's rejection was invisible, and the app's guard
+was a no-op. Neither could have produced a message.
+
+#### The other half: a long upload must not look like a hang
+
+Removing the cap fixes rejection, not **feedback**. A multi-GB file still takes minutes during
+which Shiny shows only a thin progress bar — and the report was *"no failure but i did not see
+it"*, which is as much about silence as about the cap.
+
+The file input now reports its selection on the browser's `change` event, **before any bytes
+move**, and the server answers with *"Reading 1 file (3.7 GB)… large files can take a while."*
+It costs nothing and turns a silent wait into a stated one.
+
+**Guarded by `check_upload.R`**, which asserts against Shiny's real expressions — the `> 0` guard,
+the `any(sizes > maxSize)` comparison and the `<= 0` early return — with the reported 4 GB file
+and a 10 TB file as the controls, plus a CONTROL that the old 3 GiB line is really gone.
+
+**Not verified, and it cannot be here:** an actual multi-GB browser upload end to end. There is
+no browser in this environment. The cap and the plumbing are proven; the round trip needs a real
+file. That is worth doing before external testers, and it overlaps item 80.

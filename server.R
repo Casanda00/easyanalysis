@@ -271,8 +271,29 @@ server <- function(input, output, session) {
   }
 
   # Left rail upload -> shared ingestion.
+  # A selection is reported the instant it is made, before any bytes move. This
+  # is the other half of removing the upload cap: a 4 GB file previously vanished
+  # with no message at all, because Shiny rejects an oversized upload by throwing
+  # inside an RPC handler -- which surfaces in the browser console, not the app.
+  # There is no cap now, but a long upload still needs to look like something is
+  # happening, or silence reads as a hang.
+  upload_expect <- reactiveVal(NULL)
+  observeEvent(input$upload_selected, {
+    s <- input$upload_selected
+    if (is.null(s$n) || !isTRUE(s$n > 0)) return()
+    gb <- as.numeric(s$bytes %||% 0) / 1024^3
+    upload_expect(list(n = as.integer(s$n), names = as.character(s$names %||% character(0))))
+    showNotification(
+      sprintf("Reading %d file%s (%s)… large files can take a while.",
+              s$n, if (s$n == 1) "" else "s",
+              if (gb >= 1) sprintf("%.1f GB", gb)
+              else sprintf("%.0f MB", as.numeric(s$bytes %||% 0) / 1024^2)),
+      type = "message", duration = 8)
+  })
+
   observeEvent(input$upload_files, {
     req(input$upload_files)
+    upload_expect(NULL)
     .ingest_files(input$upload_files)
   })
 

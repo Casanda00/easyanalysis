@@ -20,6 +20,21 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.16 — 2026-08-10
+
+### There is no upload size limit any more
+
+Files above about 3 GB were being rejected, and — worse — rejected **silently**: the file simply
+never appeared, with no error anywhere in the app. A 4 GB raster vanished exactly this way.
+
+The limit is removed entirely. There is no size cap on what you can add.
+
+### Large uploads now say they have started
+
+Adding a very large file takes minutes, and until now nothing said so, which made it look like
+nothing was happening. You now get an immediate note — *"Reading 1 file (3.7 GB)… large files can
+take a while."* — as soon as you choose the file.
+
 ## v0.11.15 — 2026-08-09
 
 ### Search results say where a tool comes from
