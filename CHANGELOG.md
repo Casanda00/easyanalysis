@@ -22,6 +22,33 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.21 — 2026-08-10
+
+### Item 82 step A — Add data from disk
+
+THE DATA RULE at the front door: a file the user already has is **opened**, not uploaded. No HTTP
+transfer, no temp copy, no size that matters.
+
+- `ea_pick_files()` — native `tkgetOpenFile` with per-type filters. Returns paths,
+  `character(0)` on cancel, `NULL` when no OS dialog exists. Three distinct outcomes on purpose:
+  conflating cancel with unavailable would swallow a cancel or show a spurious error.
+- `ea_files_from_paths()` shapes paths like `fileInput`'s data.frame, so **`.ingest_files()` is
+  reused verbatim** — every type, the shapefile grouping and project bookkeeping unchanged.
+- **Tk warms on first use, not at boot.** The old pre-warm cost 1.61 s per start and was removed
+  in v0.11.17; restoring it at boot would repeat that mistake.
+- Local button is primary; the uploader is now *"Upload instead"*.
+
+**Also fixes what the uploader could not:** `.keep_source()` stores a real path, so a project
+reopens against the user's own file instead of a temp path that is gone next session.
+
+`check_local_ingest.R` guards **no copy**, not speed: `datapath` must equal the original path. A
+staging "optimisation" would pass every other check and silently restore the cost. Ordering
+(local before upload) is asserted too — the rule made visible.
+
+Harness fault recorded: the ordering assertion first searched head+body and failed against
+correct code, because `upload_files` appears in head JavaScript long before either control
+renders.
+
 ## v0.11.20 — 2026-08-10
 
 ### CSV reading is ~60x faster (item 82, step C)

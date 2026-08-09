@@ -124,6 +124,75 @@ ea_analysis_script <- function(spec, roles = list(), params = list(),
 }
 
 # ==========================================================================
+# Add data from disk -- the local-first route (backlog item 82 / A)
+# ==========================================================================
+# THE DATA RULE, applied at the front door: this app runs on the same machine as
+# the data, so a file the user already has should be OPENED, not uploaded.
+#
+# The browser route copies the bytes through an HTTP multipart transfer into a
+# temp file and then opens that. Measured, the app is never the cost -- a
+# 100 M-cell raster opens in 0.09 s because terra is lazy, and disk runs at
+# 1,277 MB/s. The transport is the whole wait, and this removes it rather than
+# hiding it behind a progress bar.
+#
+# It also fixes something the upload route could not: `.keep_source()` records
+# where a layer came from, and an uploaded file's temp path is gone by the next
+# session. A real path persists, so a project reopens against the user's own file.
+#
+# Tk is warmed on FIRST USE, not at boot. The old pre-warm cost a measured 1.61 s
+# on every start and was removed in v0.11.17 precisely because the dialogs it
+# warmed had been deleted; bringing it back at boot for a dialog most sessions
+# never open would repeat that mistake.
+.ea_tk_ready <- local({ done <- FALSE; function() {
+  if (done) return(TRUE)
+  ok <- tryCatch({
+    if (!capabilities("tcltk") || !requireNamespace("tcltk", quietly = TRUE)) FALSE
+    else { loadNamespace("tcltk"); tcltk::tclRequire("Tk", warn = FALSE); TRUE }
+  }, error = function(e) FALSE)
+  done <<- isTRUE(ok); done
+} })
+
+# Returns full paths, or character(0) on cancel, or NULL when no OS dialog is
+# available (browser/wasm build) so the caller can fall back to the uploader.
+#
+# tcltk semantics the cancel handling depends on: tkgetOpenFile returns "" when
+# the user CANCELS -- a normal outcome, not an error -- and only throws on a real
+# failure. So "" must mean "handled, nothing chosen", never "try something else".
+ea_pick_files <- function(caption = "Add data") {
+  if (!.ea_tk_ready()) return(NULL)
+  types <- paste0(
+    "{{Data files} {.csv .txt .tsv .xlsx .xls .tif .tiff .img .asc .nc .grd ",
+    ".las .laz .gpkg .geojson .json .shp}} ",
+    "{{Tables} {.csv .txt .tsv .xlsx .xls}} ",
+    "{{Rasters} {.tif .tiff .img .asc .nc .grd}} ",
+    "{{Point clouds} {.las .laz}} ",
+    "{{Vectors} {.gpkg .geojson .json .shp}} ",
+    "{{All files} *}")
+  sel <- tryCatch(
+    as.character(tcltk::tkgetOpenFile(title = caption, multiple = TRUE,
+                                      filetypes = types)),
+    error = function(e) NULL)
+  if (is.null(sel)) return(NULL)
+  sel <- sel[nzchar(sel)]
+  if (!length(sel)) return(character(0))          # cancelled
+  # Tcl hands back a single brace-wrapped string when several files are picked.
+  if (length(sel) == 1 && grepl("^\\{.*\\}$", sel))
+    sel <- tryCatch(as.character(tcltk::tclvalue(tcltk::.Tcl(paste0("return ", sel)))),
+                    error = function(e) sel)
+  normalizePath(sel, winslash = "/", mustWork = FALSE)
+}
+
+# Shape a set of real paths like Shiny's fileInput data.frame, so `.ingest_files`
+# needs no change at all: the ONLY difference is that `datapath` points at the
+# user's own file instead of a temp copy.
+ea_files_from_paths <- function(paths) {
+  paths <- paths[file.exists(paths)]
+  if (!length(paths)) return(NULL)
+  data.frame(name = basename(paths), size = file.info(paths)$size,
+             type = "", datapath = paths, stringsAsFactors = FALSE)
+}
+
+# ==========================================================================
 # Reading delimited text -- fread, with read.csv as the fallback
 # ==========================================================================
 # MEASURED, not assumed: on a 14 MB CSV, read.csv takes 2.42 s and

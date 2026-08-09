@@ -6474,3 +6474,47 @@ Types and dimensions matched throughout; it was only ever the names.
 **The equivalence is now asserted in `check_perf.R`**, not just fixed: names, types and class are
 compared against `read.csv` on that awkward fixture, so removing `check.names` as apparent noise
 fails immediately. A performance suite that only measured speed would have shipped this.
+
+
+---
+
+### 82 step A built v0.11.21 — Add data from disk, the local-first route
+
+**THE DATA RULE applied at the front door.** The app runs on the same machine as the data, so a
+file the user already has is now **opened**, not uploaded. No HTTP transfer, no temp copy, and
+therefore no size that matters.
+
+- **`ea_pick_files()`** — a native multi-select dialog via `tcltk::tkgetOpenFile`, with filters
+  per data type. Returns paths, `character(0)` on cancel, or `NULL` when no OS dialog exists
+  (browser build) so the caller can fall back to the uploader. Those three outcomes are
+  deliberately distinct: conflating cancel with unavailable would either swallow a cancel or show
+  a spurious error.
+- **`ea_files_from_paths()`** shapes real paths like Shiny's `fileInput` data.frame, so
+  **`.ingest_files()` is reused verbatim**. Every file type, the shapefile grouping and the
+  project bookkeeping behave identically; the only difference is that `datapath` is the user's
+  own file.
+- **Tk is warmed on FIRST USE, not at boot.** The old pre-warm cost a measured 1.61 s on every
+  start and was removed in v0.11.17 exactly because the dialogs it warmed had been deleted.
+  Restoring it at boot for a dialog most sessions never open would repeat that mistake.
+- The local button is **first and primary**; the uploader is relabelled *"Upload instead"*.
+
+**A second problem it fixes, which the uploader could not.** `.keep_source()` records where a
+layer came from, and an uploaded file's temp path is gone by the next session. A real path
+persists, so a project now reopens against the user's own file.
+
+**Guarded by `check_local_ingest.R`, and the property guarded is NOT speed.** It is that **no
+copy happens**: `datapath` must equal the original path. A future "optimisation" that staged
+files to a temp directory would look harmless, pass every other check, and silently reinstate the
+cost this route exists to remove. The check also asserts the local route appears **before** the
+uploader, since the ordering is the rule made visible.
+
+**One harness fault worth recording:** the ordering assertion first searched head **and** body and
+failed against correct code — `upload_files` is named in the head JavaScript long before either
+control renders. Position in a concatenation of head and body is not layout order.
+
+#### Still open on item 82
+
+- **Overviews for display** (rule 3). `.disp_raster()` aggregates the full grid; reading a pyramid
+  level instead would make display cost independent of file size.
+- **A real multi-GB file through this route, timed.** The transport is gone by construction, but
+  the end-to-end number has not been taken here.

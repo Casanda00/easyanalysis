@@ -310,6 +310,35 @@ server <- function(input, output, session) {
       type = "message", duration = 8)
   })
 
+  # THE LOCAL ROUTE. Opens the user's own file in place -- no HTTP transfer, no
+  # temp copy. `.ingest_files` is reused verbatim: ea_files_from_paths() hands it
+  # the same shape fileInput produces, so every type, the shapefile grouping and
+  # the project bookkeeping all behave identically. The only thing that changes
+  # is that `datapath` is the real file.
+  observeEvent(input$add_from_disk, {
+    paths <- tryCatch(ea_pick_files("Add data to the project"),
+                      error = function(e) NULL)
+    if (is.null(paths)) {
+      showNotification(
+        paste("A file browser is not available in this build. Use 'Upload instead'",
+              "below."), type = "warning", duration = 8)
+      return()
+    }
+    if (!length(paths)) return()                       # cancelled: say nothing
+    files <- ea_files_from_paths(paths)
+    if (is.null(files)) {
+      showNotification("Those files could not be read from disk.", type = "error")
+      return()
+    }
+    gb <- sum(files$size, na.rm = TRUE) / 1024^3
+    showNotification(sprintf("Opening %d file%s (%s) from disk…", nrow(files),
+                             if (nrow(files) == 1) "" else "s",
+                             if (gb >= 1) sprintf("%.1f GB", gb)
+                             else sprintf("%.0f MB", sum(files$size, na.rm = TRUE)/1024^2)),
+                     type = "message", duration = 5)
+    .ingest_files(files)
+  })
+
   observeEvent(input$upload_files, {
     req(input$upload_files)
     upload_expect(NULL)

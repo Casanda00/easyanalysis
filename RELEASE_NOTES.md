@@ -20,6 +20,20 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.21 — 2026-08-10
+
+### Add data from disk — no more waiting for uploads
+
+There is a new **Add data from disk** button at the top of the Datasets panel. It opens a normal
+file browser and reads the file **straight from your computer**.
+
+Nothing is copied, so file size no longer affects how long adding data takes — a multi-gigabyte
+raster opens as quickly as a small one. This is the recommended way to add data; the old upload
+button is still there as **Upload instead**.
+
+It also means a project remembers your actual file. Previously an uploaded file lived in a
+temporary location that was gone by the next session.
+
 ## v0.11.20 — 2026-08-10
 
 ### CSV files load dramatically faster

@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.20.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.21.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.20</b> · 89 releases ·
+      <p class="meta">Latest: <b>v0.11.21</b> · 90 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-20"><h2><a class="anchor" href="#v0-11-20">v0.11.20</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-21"><h2><a class="anchor" href="#v0-11-21">v0.11.21</a><span class="when">2026-08-10</span></h2>
+<h3>Add data from disk — no more waiting for uploads</h3>
+<p>There is a new <strong>Add data from disk</strong> button at the top of the Datasets panel. It opens a normal
+file browser and reads the file <strong>straight from your computer</strong>.</p>
+<p>Nothing is copied, so file size no longer affects how long adding data takes — a multi-gigabyte
+raster opens as quickly as a small one. This is the recommended way to add data; the old upload
+button is still there as <strong>Upload instead</strong>.</p>
+<p>It also means a project remembers your actual file. Previously an uploaded file lived in a
+temporary location that was gone by the next session.</p>
+</section><section class="rel" id="v0-11-20"><h2><a class="anchor" href="#v0-11-20">v0.11.20</a><span class="when">2026-08-10</span></h2>
 <h3>CSV files load dramatically faster</h3>
 <p>Reading a CSV is now roughly <strong>60 times faster</strong>. A large file that previously froze the app for
 about fifteen seconds now loads in well under a second.</p>

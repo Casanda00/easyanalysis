@@ -3339,13 +3339,21 @@ page_fillable(
         projectLeftUI("project"),
         tags$div(class = "rail-body",
           tags$h6("Datasets"),
+          # The LOCAL route comes first and is the primary button. The app runs
+          # on the same machine as the data, so opening a path is the normal
+          # case; uploading is the exception (see THE DATA RULE in CLAUDE.md).
+          actionButton("add_from_disk", "Add data from disk",
+                       icon = icon("folder-open"),
+                       class = "btn-success w-100 mb-1"),
+          tags$p(class = "text-muted", style = "font-size:10px; margin:-2px 0 6px;",
+                 "Opens the file directly - nothing is copied, so size does not matter."),
           fileInput("upload_files", NULL, multiple = TRUE,
             accept = c(".csv", ".txt", ".xlsx", ".xls",
                        ".tif", ".tiff", ".img", ".asc", ".nc", ".grd",
                        ".las", ".laz",
                        ".gpkg", ".geojson", ".json",
                        ".shp", ".shx", ".dbf", ".prj", ".cpg"),
-            buttonLabel = "Upload Data", placeholder = "no file"),
+            buttonLabel = "Upload instead", placeholder = "no file"),
           tags$p(class = "text-muted",
             style = "font-size:10px; margin-top:-8px;",
             "CSV/Excel • GeoTIFF • LAS/LAZ • Shapefile/GeoPackage"),

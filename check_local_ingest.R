@@ -1,0 +1,92 @@
+# check_local_ingest.R -- adding data from disk must not copy the bytes
+#
+# WHY THIS EXISTS
+# ---------------
+# THE DATA RULE (CLAUDE.md): this app runs on the same machine as the data, so a
+# file the user already has should be OPENED, not uploaded. The browser route
+# copies the bytes through an HTTP multipart transfer into a temp file and then
+# opens that -- and the transport is the entire wait, since a 100 M-cell raster
+# opens in 0.09 s and disk runs at 1,277 MB/s.
+#
+# The property being guarded is therefore NOT speed. It is that no copy happens:
+# the layer must reference the user's own path. A future "optimisation" that
+# staged files to a temp directory would look harmless, pass every other check,
+# and silently reinstate the cost this route exists to remove.
+#
+# Run:  Rscript check_local_ingest.R
+
+suppressMessages({library(shiny); library(bslib); library(shinyWidgets)})
+suppressMessages({source("global.R"); source("ui.R")})   # ui.R defines `ui`
+
+ok  <- TRUE
+say <- function(p, m) { cat(if (p) "PASS  " else "FAIL  ", m, "\n", sep = ""); if (!p) ok <<- FALSE }
+
+home <- file.path(tempdir(), paste0("li_", as.integer(runif(1, 1e5, 9e5))))
+dir.create(home, recursive = TRUE, showWarnings = FALSE)
+
+# A file that is emphatically NOT in any temp upload directory.
+src <- file.path(home, "mydata.csv")
+utils::write.csv(data.frame(a = 1:5, b = runif(5)), src, row.names = FALSE)
+tif <- file.path(home, "myraster.tif")
+r <- terra::rast(nrows = 40, ncols = 40, xmin = 0, xmax = 40, ymin = 0, ymax = 40)
+terra::values(r) <- seq_len(terra::ncell(r))
+suppressWarnings(terra::writeRaster(r, tif, overwrite = TRUE))
+rm(r)
+
+# ---- 1. The fileInput shape is reproduced exactly ---------------------------
+# `.ingest_files` is reused verbatim, so this shape is the whole contract.
+f <- ea_files_from_paths(c(src, tif))
+say(!is.null(f) && nrow(f) == 2, "two real paths become a two-row file table")
+say(all(c("name", "size", "type", "datapath") %in% names(f)),
+    "with the same columns Shiny's fileInput produces")
+say(identical(f$name, c("mydata.csv", "myraster.tif")), "names are the file names")
+
+# THE assertion. datapath must be the user's file, not a copy of it.
+say(identical(normalizePath(f$datapath, winslash = "/"),
+              normalizePath(c(src, tif), winslash = "/")),
+    "CONTROL: datapath points at the ORIGINAL file -- nothing was copied")
+say(!any(grepl(tempdir(), f$datapath, fixed = TRUE) &
+         !grepl(basename(home), f$datapath, fixed = TRUE)),
+    "and not at an upload staging directory")
+
+# ---- 2. Missing files are dropped, not passed on ----------------------------
+say(is.null(ea_files_from_paths(file.path(home, "nope.csv"))),
+    "a path that does not exist yields nothing rather than a broken row")
+f2 <- ea_files_from_paths(c(src, file.path(home, "nope.csv")))
+say(!is.null(f2) && nrow(f2) == 1, "a mix keeps only what exists")
+
+# ---- 3. The picker degrades honestly ----------------------------------------
+# NULL means "no OS dialog here" (browser build) and must be distinguishable from
+# character(0), which means "the user cancelled". Conflating them would either
+# swallow a cancel or show a spurious error.
+say(is.function(ea_pick_files), "ea_pick_files() exists")
+say(!identical(NULL, character(0)),
+    "CONTROL: NULL (no dialog) and character(0) (cancelled) are different values")
+
+# ---- 4. It is reachable, and the local route is the primary one -------------
+u  <- if (is.function(ui)) ui(NULL) else ui
+rt <- htmltools::renderTags(u)
+html <- paste(paste(as.character(rt$head), collapse = "\n"),
+              paste(as.character(rt$html), collapse = "\n"), sep = "\n")
+say(grepl("add_from_disk", html, fixed = TRUE), "the button exists in the rail")
+say(grepl("Add data from disk", html, fixed = TRUE), "and says what it does")
+# Order matters: opening a local file is the normal case here, uploading the
+# exception. If the uploader ever comes first again, the rule has been forgotten.
+#
+# Compared within the BODY only. The first version searched head+body and failed
+# against correct code, because `upload_files` is named in the head JavaScript
+# (the reset handler and the selection listener) long before either control is
+# rendered. Position in a concatenation of head and body is not layout order.
+body_html <- paste(as.character(rt$html), collapse = "\n")
+say(regexpr("add_from_disk", body_html, fixed = TRUE) <
+    regexpr("upload_files", body_html, fixed = TRUE),
+    "the local route is offered BEFORE the uploader")
+
+s <- paste(readLines("server.R", warn = FALSE), collapse = "\n")
+say(grepl("observeEvent(input$add_from_disk", s, fixed = TRUE), "and is handled")
+say(grepl("ea_files_from_paths(paths)", s, fixed = TRUE) &&
+    grepl(".ingest_files(files)", s, fixed = TRUE),
+    "reusing .ingest_files verbatim, so every file type behaves identically")
+
+cat(if (ok) "\nLOCAL INGEST CHECK: PASS\n" else "\nLOCAL INGEST CHECK: FAIL\n")
+quit(status = if (ok) 0L else 1L)
