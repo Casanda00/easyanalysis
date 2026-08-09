@@ -10,7 +10,7 @@
 # matching entry to RELEASE_NOTES.md (public) AND CHANGELOG.md (internal).
 # Shown in the status bar + About panel, and
 # stamped into the browser build's service-worker cache key by webapp_export.R.
-APP_VERSION <- "0.11.22"
+APP_VERSION <- "0.11.23"
 
 library(shiny)
 library(bslib)

@@ -22,6 +22,33 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.23 — 2026-08-10
+
+### Item 84 — the upload feedback was dead code
+
+v0.11.16's selection notice never ran. The script is inside `tags$head`, so it executes **before
+the body is parsed**: `getElementById('upload_files')` returned `null`, the `if (fi)` guard
+skipped, and no listener was ever attached. A 4 GB upload therefore produced no message at all,
+exactly as reported.
+
+**And `check_upload.R` let it through** by asserting the string `upload_selected` appeared in the
+HTML — which it did, inside code that never executed. **Presence is not function.** Now delegated
+on `document` (immune to head/body order), with the check asserting delegation and a CONTROL that
+the `getElementById` form is gone.
+
+This explains "no error message" completely; it does not explain "no file". The cap is `Inf` and
+was verified against Shiny's own expressions, so nothing rejected the transfer — a 4 GB browser
+upload likely stalled in httpuv's chunked write, which cannot be reproduced without a browser.
+**For files that size the answer is not to upload at all:** `Add data from disk` opens in place,
+lazily, in ~0.09 s regardless of size.
+
+### Item 85 — colour dots before layer names removed
+
+The row already names the layer type, so the dot repeated it. Scoped to the layer and basemap
+rows; `ea-wsx-sw` is also used for placeholder and header dots, which stay. The first attempt
+asserted a bare count of the class, matched all six uses, and failed against a correct edit — the
+same over-broad-control mistake as v0.11.5's.
+
 ## v0.11.22 — 2026-08-10
 
 ### Item 83 — creator credited; How to cite is in the app

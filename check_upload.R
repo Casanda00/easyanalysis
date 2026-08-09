@@ -47,8 +47,20 @@ html <- paste(paste(as.character(rt$head), collapse = "\n"),
               paste(as.character(rt$html), collapse = "\n"), sep = "\n")
 say(grepl("upload_selected", html, fixed = TRUE),
     "the page reports a file selection the moment it is made")
-say(grepl("addEventListener('change'", html, fixed = TRUE),
-    "...from the file input's change event, before any bytes move")
+
+# THE assertion this check was missing, and it shipped a dead feature because of
+# it. The first version asserted only that "upload_selected" appeared in the HTML
+# -- which it did, inside code that never ran. The script lives in <head>, so it
+# executes BEFORE the body is parsed; getElementById('upload_files') returned
+# null, `if(fi)` skipped, and no listener was ever attached. A 4 GB upload
+# therefore produced no message at all, exactly as reported.
+#
+# Presence is not function. What must be true is that the handler does not depend
+# on the element existing at script time.
+say(grepl("document.addEventListener('change'", html, fixed = TRUE),
+    "the selection handler is DELEGATED on document, so head/body order cannot break it")
+say(!grepl("var fi=document.getElementById('upload_files')", html, fixed = TRUE),
+    "CONTROL: it no longer grabs the element at script time (that was the dead version)")
 
 s <- paste(readLines("server.R", warn = FALSE), collapse = "\n")
 say(grepl("observeEvent(input$upload_selected", s, fixed = TRUE),

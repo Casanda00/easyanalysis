@@ -116,13 +116,18 @@ page_fillable(
       # minutes, during which Shiny shows only a thin progress bar -- and the
       # report was "no failure but i did not see it". Silence is indistinguishable
       # from a hang, so say what was picked, and how big, before the wait starts.
-      "if(window.Shiny){var fi=document.getElementById('upload_files');",
-      "if(fi){fi.addEventListener('change',function(){",
-      "var fs=this.files; if(!fs||!fs.length) return;",
+      # DELEGATED on document, NOT getElementById. This script lives in <head>, so
+      # it runs BEFORE the body is parsed -- getElementById('upload_files')
+      # returned null, `if(fi)` skipped, and the listener never attached. The
+      # feedback shipped in v0.11.16 was dead code, which is exactly why a 4 GB
+      # upload produced no message at all. Delegation cannot have that bug.
+      "if(window.Shiny){document.addEventListener('change',function(e){",
+      "var el=e.target; if(!el||el.id!=='upload_files') return;",
+      "var fs=el.files; if(!fs||!fs.length) return;",
       "var tot=0, nm=[]; for(var i=0;i<fs.length;i++){tot+=fs[i].size; nm.push(fs[i].name);}",
       "Shiny.setInputValue('upload_selected',",
       "{n:fs.length, bytes:tot, names:nm.slice(0,6), t:Date.now()},{priority:'event'});",
-      "});}}",
+      "});}",
       "})();"))),
     # Browser-tab icon. Shiny serves www/ at the app root, so these resolve
     # without any extra resource handler. The app had no favicon at all, so the

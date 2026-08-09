@@ -20,6 +20,21 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.23 — 2026-08-10
+
+### Fixed: choosing a large file gave no feedback at all
+
+The message that was meant to appear as soon as you pick a file — *"Reading 1 file (3.7 GB)…"* —
+never actually appeared, because of a bug in how it was wired up. It now works.
+
+**For very large files, use *Add data from disk* rather than uploading.** It opens the file
+straight from your computer with no copying, so a multi-gigabyte file opens as fast as a small
+one. Uploading a file of several gigabytes through the browser can still stall.
+
+### Layer list is cleaner
+
+The coloured dot before each layer name is gone — the row already tells you the layer type.
+
 ## v0.11.22 — 2026-08-10
 
 ### How to cite EasyAnalysis, inside the app

@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.22.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.23.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.22</b> · 91 releases ·
+      <p class="meta">Latest: <b>v0.11.23</b> · 92 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-22"><h2><a class="anchor" href="#v0-11-22">v0.11.22</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-23"><h2><a class="anchor" href="#v0-11-23">v0.11.23</a><span class="when">2026-08-10</span></h2>
+<h3>Fixed: choosing a large file gave no feedback at all</h3>
+<p>The message that was meant to appear as soon as you pick a file — <em>&quot;Reading 1 file (3.7 GB)…&quot;</em> —
+never actually appeared, because of a bug in how it was wired up. It now works.</p>
+<p><strong>For very large files, use <em>Add data from disk</em> rather than uploading.</strong> It opens the file
+straight from your computer with no copying, so a multi-gigabyte file opens as fast as a small
+one. Uploading a file of several gigabytes through the browser can still stall.</p>
+<h3>Layer list is cleaner</h3>
+<p>The coloured dot before each layer name is gone — the row already tells you the layer type.</p>
+</section><section class="rel" id="v0-11-22"><h2><a class="anchor" href="#v0-11-22">v0.11.22</a><span class="when">2026-08-10</span></h2>
 <h3>How to cite EasyAnalysis, inside the app</h3>
 <p><strong>Help ▸ How to cite…</strong> now gives you APA and BibTeX for the exact version you are running. It is
 also in the in-app documentation as section 10, so the guide in the app matches the one on the

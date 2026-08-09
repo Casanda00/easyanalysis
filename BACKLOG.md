@@ -6560,3 +6560,52 @@ control renders. Position in a concatenation of head and body is not layout orde
 would pass every other check here and be wrong the moment `APP_VERSION` moved, which is precisely
 what happened for eleven releases. It also asserts the app and the landing page agree, because
 two copies of one fact drift, and this is the thing that notices.
+
+
+---
+
+### 84. The 4 GB upload was still silent — the feedback I added was DEAD CODE — FIXED v0.11.23
+
+> "the 4gb file did not upload. nothing happened, whatsoever. no error message, no file."
+
+**My bug, and my check let it through.**
+
+v0.11.16 added a selection notice so a long upload could not look like a hang. It never ran. The
+script lives inside `tags$head`, so it executes **before the body is parsed** —
+`document.getElementById('upload_files')` returned `null`, the `if (fi) { … }` guard skipped, and
+**no listener was ever attached**. The feature was dead from the moment it shipped.
+
+**The check made it worse.** `check_upload.R` asserted that the string `upload_selected` appeared
+in the rendered HTML. It did — inside code that never executed. **Presence is not function**, and
+that is the whole lesson: an assertion that a feature is *mentioned* proves nothing about whether
+it *runs*.
+
+**Fixed by delegating on `document`**, which cannot have this bug regardless of head/body order.
+The check now asserts delegation and carries a CONTROL that the `getElementById` form is gone.
+
+#### What this does and does not explain
+
+It fully explains **"no error message"** — there was no code left to produce one.
+
+It does **not** explain "no file". The cap is `Inf` and was verified against Shiny's own
+expressions, so the transfer was not rejected. A 4 GB browser upload may simply have failed or
+stalled somewhere in httpuv's chunked write, which cannot be reproduced without a browser here.
+
+**The honest answer for a file that size is not to upload it at all.** `Add data from disk`
+(v0.11.21) opens the file in place: no transfer, no temp copy, and `terra` opens it lazily in
+about 0.09 s regardless of size. The upload route remains for small files and for the browser
+build, where there is no local path to point at.
+
+---
+
+### 85. Colour dots before layer names removed — v0.11.23
+
+> "can you remove those icon colors that are before the name of the layers?"
+
+Removed from the layer row and the basemap row. The row already states the layer type in its own
+label, so the dot repeated information rather than adding any.
+
+Scoped carefully: `ea-wsx-sw` is also used for placeholder and header dots elsewhere in the
+workspace, and those stay. The first removal attempt asserted on a bare count of that class,
+which matched all six uses and failed against a correct edit — the same over-broad-control
+mistake as the `classList.toggle('collapsed')` check in v0.11.5.

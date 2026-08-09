@@ -428,7 +428,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                     onclick = .fire("ws_base_vis", "toggle"),
                     title = if (on) "Hide basemap" else "Show basemap",
                     tags$span(class = "knob")),
-          tags$span(class = "ea-wsx-sw", style = "background:#9AA5B1;"),
           tags$span(class = "ea-wsx-nm", title = "Background map tiles", "Basemap"),
           tags$span(class = "ea-wsx-ty", if (on) (nm %||% "on") else "off")))
     }
@@ -462,7 +461,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                       onclick = .fire("ws_vis", l$nm),
                       title = if (vis) "Hide layer" else "Show layer",
                       tags$span(class = "knob")),
-            tags$span(class = "ea-wsx-sw", style = paste0("background:", l$col, ";")),
             # Clicking a TABLE also sets the app-level active dataset. Setting only
             # the workspace's own activeLayer left every model screen, the status
             # bar and the data view pointing at the previous dataset -- the click
