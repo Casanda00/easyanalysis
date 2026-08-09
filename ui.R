@@ -3344,23 +3344,18 @@ page_fillable(
         projectLeftUI("project"),
         tags$div(class = "rail-body",
           tags$h6("Datasets"),
-          # The LOCAL route comes first and is the primary button. The app runs
-          # on the same machine as the data, so opening a path is the normal
-          # case; uploading is the exception (see THE DATA RULE in CLAUDE.md).
-          actionButton("add_from_disk", "Add data from disk",
-                       icon = icon("folder-open"),
-                       class = "btn-success w-100 mb-1"),
-          tags$p(class = "text-muted", style = "font-size:10px; margin:-2px 0 6px;",
-                 "Opens the file directly - nothing is copied, so size does not matter."),
-          fileInput("upload_files", NULL, multiple = TRUE,
-            accept = c(".csv", ".txt", ".xlsx", ".xls",
-                       ".tif", ".tiff", ".img", ".asc", ".nc", ".grd",
-                       ".las", ".laz",
-                       ".gpkg", ".geojson", ".json",
-                       ".shp", ".shx", ".dbf", ".prj", ".cpg"),
-            buttonLabel = "Upload instead", placeholder = "no file"),
+          # ONE way to add data. There is no second route and no choice to make:
+          # the app runs on the same machine as the data, so a file is OPENED,
+          # never copied through the browser. Offering both was complexity with
+          # no upside -- the user should not have to know which is faster.
+          #
+          # Rendered server-side because only the server knows whether a native
+          # dialog exists. Where it does not (the browser build) the same button
+          # is replaced by a file input, so the control is always present and
+          # always called the same thing.
+          uiOutput("add_data_ui"),
           tags$p(class = "text-muted",
-            style = "font-size:10px; margin-top:-8px;",
+            style = "font-size:10px; margin-top:-4px;",
             "CSV/Excel • GeoTIFF • LAS/LAZ • Shapefile/GeoPackage"),
           actionButton("new_dataset", "Create Dataset",
             class = "btn-sm btn-outline-secondary w-100 mb-2", icon = icon("plus")),

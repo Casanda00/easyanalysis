@@ -63,6 +63,54 @@ showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE
 #
 # The two internal helpers the bodies rely on are emitted too, so the script
 # stands alone in a plain R session.
+# --- the UNIFIED path: any fitted model, no spec required --------------------
+# The registry tools get their script from the spec body. The ~23 hand-written
+# screens have no spec -- and one of them is Linear regression, the most-used
+# screen in the app, so "registry only" is not a boundary a user would accept.
+#
+# Most R model objects carry the call that made them. Verified across the types
+# these screens actually fit: lm, glm, MASS::rlm, nnet::multinom, randomForest,
+# nlme::lme and aov all return one. prcomp and kmeans do not (they store no
+# call), so those two report honestly rather than guessing.
+#
+# LIMITATION, stated in the script itself rather than implied away: a call shows
+# what was fitted, NOT any preparation the screen did first -- dropping
+# incomplete rows, coercing a column to a factor. Item 57 is explicit that hidden
+# steps must be visible, and a call alone cannot show them. Saying so is the
+# difference between an honest artefact and a misleading one.
+ea_script_from_fit <- function(fit, label = "Analysis", data_name = "your_data") {
+  cl <- tryCatch(stats::getCall(fit), error = function(e) NULL)
+  if (is.null(cl)) return(NULL)
+  call_txt <- paste(deparse(cl), collapse = "\n")
+  pkgs <- .ea_script_pkgs(call_txt)
+  # A call names its function but not its package. Map the ones these screens use
+  # so the script's library() lines are right even when the call is unqualified.
+  fn <- tryCatch(as.character(cl[[1]])[1], error = function(e) "")
+  known <- c(rlm = "MASS", lda = "MASS", qda = "MASS", glm.nb = "MASS",
+             polr = "MASS", multinom = "nnet", randomForest = "randomForest",
+             lme = "nlme", lme.formula = "nlme", gam = "mgcv",
+             coxph = "survival", survfit = "survival", xgb.train = "xgboost",
+             svm = "e1071", rpart = "rpart", lmer = "lme4", glmer = "lme4")
+  if (fn %in% names(known)) pkgs <- unique(c(pkgs, known[[fn]]))
+
+  paste(c(
+    sprintf("# %s - produced by EasyAnalysis", label),
+    sprintf("# Generated %s", format(Sys.time(), "%Y-%m-%d %H:%M")),
+    "#",
+    "# This is the model call as it was made. NOTE: it does not show any data",
+    "# preparation the screen did first (for example dropping rows with missing",
+    "# values, or converting a column to a factor), so re-running it on the raw",
+    "# file may not reproduce the result exactly.",
+    "",
+    if (length(pkgs)) c(sprintf("library(%s)", pkgs), "") else NULL,
+    "# --- your data ------------------------------------------------------",
+    sprintf('df <- read.csv("%s.csv")   # the dataset you had selected', data_name),
+    "",
+    "# --- the model ------------------------------------------------------",
+    sub("\\bdata = [^,)]+", "data = df", call_txt),
+    "", "# summary(result)"), collapse = "\n")
+}
+
 .ea_script_helpers <- c(
   '`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b',
   '.ea_formula <- function(y, x) stats::as.formula(',

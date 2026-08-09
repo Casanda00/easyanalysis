@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.23.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.24.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,25 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.23</b> · 92 releases ·
+      <p class="meta">Latest: <b>v0.11.24</b> · 93 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-23"><h2><a class="anchor" href="#v0-11-23">v0.11.23</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-24"><h2><a class="anchor" href="#v0-11-24">v0.11.24</a><span class="when">2026-08-10</span></h2>
+<h3>Adding data is one button again</h3>
+<p>There is a single <strong>Add Data</strong> button. It opens files straight from your computer, with no
+copying, so size does not affect how long it takes. The separate upload button is gone — there is
+nothing to choose between.</p>
+<h3>See the code behind more analyses</h3>
+<p><strong>Help ▸ See script for this analysis</strong> now shows the R code for screens that were previously
+left out, including <strong>Linear regression</strong>.</p>
+<p>The script shows the model call as it was made. It notes that it does not include preparation the
+screen did first, such as dropping rows with missing values, so you know what to check before
+re-running it.</p>
+</section><section class="rel" id="v0-11-23"><h2><a class="anchor" href="#v0-11-23">v0.11.23</a><span class="when">2026-08-10</span></h2>
 <h3>Fixed: choosing a large file gave no feedback at all</h3>
 <p>The message that was meant to appear as soon as you pick a file — <em>&quot;Reading 1 file (3.7 GB)…&quot;</em> —
 never actually appeared, because of a bug in how it was wired up. It now works.</p>

@@ -20,6 +20,23 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.24 — 2026-08-10
+
+### Adding data is one button again
+
+There is a single **Add Data** button. It opens files straight from your computer, with no
+copying, so size does not affect how long it takes. The separate upload button is gone — there is
+nothing to choose between.
+
+### See the code behind more analyses
+
+**Help ▸ See script for this analysis** now shows the R code for screens that were previously
+left out, including **Linear regression**.
+
+The script shows the model call as it was made. It notes that it does not include preparation the
+screen did first, such as dropping rows with missing values, so you know what to check before
+re-running it.
+
 ## v0.11.23 — 2026-08-10
 
 ### Fixed: choosing a large file gave no feedback at all

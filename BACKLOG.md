@@ -6609,3 +6609,56 @@ Scoped carefully: `ea-wsx-sw` is also used for placeholder and header dots elsew
 workspace, and those stay. The first removal attempt asserted on a bare count of that class,
 which matched all six uses and failed against a correct edit — the same over-broad-control
 mistake as the `classList.toggle('collapsed')` check in v0.11.5.
+
+
+---
+
+### 86. One way to add data; See script reaches every screen — v0.11.24
+
+> "user goes to Add data and thats it. there is no add data from disk and why do we even make
+> thigs complex. if that method is the best, we use only it... only the underlying function needs
+> to be changed."
+> "viewing the code for the other modules does not yet work"
+
+#### One control, and it was right to say so
+
+Two routes was complexity with no upside: it asked the user to know which was faster, which is
+knowledge they should never need. There is now **one "Add Data"**, and the underlying function is
+the disk route. `add_from_disk`, `Upload instead` and the size hint are gone.
+
+The control is rendered **server-side**, because only the server knows whether a native dialog
+exists: where it does, the control is a button; where it does not (browser build) it is a file
+input **with the same label**. Same name, same place — only the mechanism differs, and nothing
+about that is the user's problem.
+
+#### See script now reaches hand-written screens
+
+The registry-only boundary was documented honestly and was still wrong in practice: **Linear
+regression is hand-written and is the most-used screen in the app**, so a feature that skipped it
+read as broken rather than partial.
+
+**`ea_script_from_fit()` is the unified mechanism.** Most R model objects carry the call that made
+them — verified across the types these screens fit: `lm`, `glm`, `MASS::rlm`, `nnet::multinom`,
+`randomForest`, `nlme::lme` and `aov` all return one; `prcomp` and `kmeans` do not.
+
+- The module contract gains an optional **`fit = function()`** alongside `context` and `plot`.
+  **One line per screen** instead of an emitter per screen.
+- **Help > See script for this analysis** is the shared surface, so a screen opts in without
+  building its own dialog.
+- The call is rewritten to `data = df` so the script runs against the loaded file rather than the
+  variable it happened to be fitted on.
+- An unqualified call still gets the right `library()` line, via a small map of the functions
+  these screens actually use.
+
+**The limitation is stated in the artefact, not implied away.** A call shows what was fitted, not
+what was dropped or coerced first. Item 57 requires hidden steps to be visible, and a call alone
+cannot show them — so the script says so in its own header. And an object carrying no call returns
+`NULL` rather than a fabricated guess, which the check asserts as a CONTROL.
+
+**Still to do:** `fit = function()` on the remaining hand-written screens. Linear regression is
+done as the reported case; each of the others is the same single line.
+
+#### Not yet addressed
+
+**"sending predictions (map predictions) does not work"** — reported in the same message, not
+investigated here. Item 42's write-back is next.

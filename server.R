@@ -310,18 +310,34 @@ server <- function(input, output, session) {
       type = "message", duration = 8)
   })
 
-  # THE LOCAL ROUTE. Opens the user's own file in place -- no HTTP transfer, no
-  # temp copy. `.ingest_files` is reused verbatim: ea_files_from_paths() hands it
-  # the same shape fileInput produces, so every type, the shapefile grouping and
-  # the project bookkeeping all behave identically. The only thing that changes
-  # is that `datapath` is the real file.
-  observeEvent(input$add_from_disk, {
+  # ONE control, and the underlying function is the disk route. Where a native
+  # dialog exists this is a button; where it does not (browser build) it is a
+  # file input. Same name, same place, so there is nothing for the user to choose
+  # between and nothing to explain.
+  output$add_data_ui <- renderUI({
+    if (isTRUE(.ea_tk_ready()))
+      actionButton("add_data", "Add Data", icon = icon("folder-open"),
+                   class = "btn-success w-100 mb-1")
+    else
+      fileInput("upload_files", NULL, multiple = TRUE,
+        accept = c(".csv", ".txt", ".xlsx", ".xls",
+                   ".tif", ".tiff", ".img", ".asc", ".nc", ".grd",
+                   ".las", ".laz", ".gpkg", ".geojson", ".json",
+                   ".shp", ".shx", ".dbf", ".prj", ".cpg"),
+        buttonLabel = "Add Data", placeholder = "no file")
+  })
+
+  # Opens the user's own file in place -- no HTTP transfer, no temp copy.
+  # `.ingest_files` is reused verbatim: ea_files_from_paths() hands it the same
+  # shape fileInput produces, so every type, the shapefile grouping and the
+  # project bookkeeping all behave identically. The only thing that changes is
+  # that `datapath` is the real file.
+  observeEvent(input$add_data, {
     paths <- tryCatch(ea_pick_files("Add data to the project"),
                       error = function(e) NULL)
     if (is.null(paths)) {
-      showNotification(
-        paste("A file browser is not available in this build. Use 'Upload instead'",
-              "below."), type = "warning", duration = 8)
+      # Should not happen: the button only renders when the dialog is available.
+      showNotification("The file browser could not be opened.", type = "error")
       return()
     }
     if (!length(paths)) return()                       # cancelled: say nothing
@@ -1154,6 +1170,39 @@ server <- function(input, output, session) {
   # Help > How to cite. Renders from ea_citation(), so the version can never be
   # stale -- the landing page's had been frozen at 0.10.16 for eleven releases.
   observeEvent(input$cite_open, { showModal(ea_cite_modal()) })
+
+  # Help > See script. Reads the open screen's fitted model out of module_ctx and
+  # derives the code from the CALL the object carries, so a screen opts in with
+  # one line (`fit = function() ...`) rather than writing its own emitter.
+  # Registered after module_ctx exists; the body reads it lazily.
+  observeEvent(input$script_open, {
+    tool <- tryCatch(workspace_ctx$plot_ctx(), error = function(e) NULL)
+    ctx  <- if (!is.null(tool)) module_ctx[[tool]] else NULL
+    fitf <- if (is.list(ctx)) ctx$fit else NULL
+    fit  <- if (is.function(fitf)) tryCatch(fitf(), error = function(e) NULL) else NULL
+    if (is.null(fit)) {
+      showNotification(
+        if (is.null(fitf))
+          "This screen does not expose a model yet, so there is no script to show."
+        else "Run the analysis first, then the script will be available.",
+        type = "warning", duration = 7)
+      return()
+    }
+    sc <- ea_script_from_fit(fit, label = tool %||% "Analysis",
+                             data_name = active_ds() %||% "your_data")
+    if (is.null(sc)) {
+      showNotification(
+        "This analysis does not record the call that produced it, so its script cannot be shown.",
+        type = "warning", duration = 8)
+      return()
+    }
+    showModal(ea_settings_modal(
+      "Script for this analysis",
+      hint = paste("The model call as it was made. It does not include data",
+                   "preparation the screen did first, such as dropping rows with",
+                   "missing values."),
+      tags$pre(class = "ea-script", sc)))
+  })
 
   # ---- Tool search reaches tools that are NOT enabled (item 77) -------------
   # The menubar search is a client-side index of the RENDERED MENU, so it can

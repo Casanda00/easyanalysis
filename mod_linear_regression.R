@@ -796,6 +796,14 @@ lmServer <- function(id, dataset_pool, active_dataset) {
 
     # AI co-pilot context
     list(
+      # `fit` is the module contract's optional fourth element (item 57). Any
+      # screen that exposes its fitted model gets See-script for free, because
+      # ea_script_from_fit() reads the call off the object rather than needing a
+      # spec. One line per screen instead of an emitter per screen.
+      fit = function() {
+        res <- fitted_model_r()
+        if (is.character(res) || is.null(res)) NULL else res$model
+      },
       context = reactive({
         res <- fitted_model_r()
         if (is.character(res) || is.null(res))

@@ -22,6 +22,32 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.24 — 2026-08-10
+
+### One way to add data
+
+Two routes was complexity with no upside — it asked the user to know which was faster. There is
+now **one "Add Data"**, with the disk route underneath. `add_from_disk`, "Upload instead" and the
+size hint are gone. The control renders server-side: a button where a native dialog exists, a file
+input **with the same label** where it does not.
+
+### See script reaches hand-written screens
+
+The registry-only boundary was honest and still wrong in practice: **Linear regression is
+hand-written and is the most-used screen**, so skipping it read as broken.
+
+`ea_script_from_fit()` derives the script from the **call the model object carries** — verified
+for `lm`, `glm`, `MASS::rlm`, `nnet::multinom`, `randomForest`, `nlme::lme`, `aov`
+(`prcomp`/`kmeans` carry none). The module contract gains an optional `fit = function()`, so a
+screen opts in with **one line**, and **Help > See script for this analysis** is the shared
+surface.
+
+The call is rewritten to `data = df`; unqualified calls still get the right `library()` line. The
+limitation is stated **in the script**: a call does not show data preparation done first. An
+object with no call returns `NULL` rather than a guess — asserted as a CONTROL.
+
+Remaining: the same one-line `fit` on the other hand-written screens.
+
 ## v0.11.23 — 2026-08-10
 
 ### Item 84 — the upload feedback was dead code

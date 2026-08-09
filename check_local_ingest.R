@@ -68,22 +68,23 @@ u  <- if (is.function(ui)) ui(NULL) else ui
 rt <- htmltools::renderTags(u)
 html <- paste(paste(as.character(rt$head), collapse = "\n"),
               paste(as.character(rt$html), collapse = "\n"), sep = "\n")
-say(grepl("add_from_disk", html, fixed = TRUE), "the button exists in the rail")
-say(grepl("Add data from disk", html, fixed = TRUE), "and says what it does")
-# Order matters: opening a local file is the normal case here, uploading the
-# exception. If the uploader ever comes first again, the rule has been forgotten.
-#
-# Compared within the BODY only. The first version searched head+body and failed
-# against correct code, because `upload_files` is named in the head JavaScript
-# (the reset handler and the selection listener) long before either control is
-# rendered. Position in a concatenation of head and body is not layout order.
+# ONE control, not two. Offering both routes made the user choose between things
+# they should not have to tell apart, so the rail renders a single "Add Data"
+# whose underlying function is the disk route.
+say(grepl("add_data_ui", html, fixed = TRUE), "the rail renders one Add Data control")
 body_html <- paste(as.character(rt$html), collapse = "\n")
-say(regexpr("add_from_disk", body_html, fixed = TRUE) <
-    regexpr("upload_files", body_html, fixed = TRUE),
-    "the local route is offered BEFORE the uploader")
+say(!grepl("add_from_disk", body_html, fixed = TRUE),
+    "CONTROL: the separate 'Add data from disk' button is gone")
+say(!grepl("Upload instead", body_html, fixed = TRUE),
+    "CONTROL: there is no second, competing upload button")
 
 s <- paste(readLines("server.R", warn = FALSE), collapse = "\n")
-say(grepl("observeEvent(input$add_from_disk", s, fixed = TRUE), "and is handled")
+say(grepl("observeEvent(input$add_data", s, fixed = TRUE), "and is handled")
+say(grepl("output$add_data_ui", s, fixed = TRUE) &&
+    grepl(".ea_tk_ready()", s, fixed = TRUE),
+    "the control is chosen by whether a native dialog exists, not by the user")
+say(grepl('buttonLabel = "Add Data"', s, fixed = TRUE),
+    "and the fallback carries the SAME name, so only the mechanism differs")
 say(grepl("ea_files_from_paths(paths)", s, fixed = TRUE) &&
     grepl(".ingest_files(files)", s, fixed = TRUE),
     "reusing .ingest_files verbatim, so every file type behaves identically")

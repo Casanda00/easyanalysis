@@ -717,6 +717,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           # place someone finishing an analysis is not looking.
           .mi("How to cite…",
               "Shiny.setInputValue('cite_open', Date.now(), {priority:'event'})"),
+          # One shared surface for every screen. The registry tools carry their
+          # own button; this reaches the hand-written ones, which include Linear
+          # regression -- the most-used screen in the app.
+          .mi("See script for this analysis…",
+              "Shiny.setInputValue('script_open', Date.now(), {priority:'event'})"),
           .msep(),
           .mi("Ask the Co-Analyst", "document.getElementById('chat-panel').classList.add('open')"),
           .mi("Take the tour", "Shiny.setInputValue('ws_tour', Date.now(), {priority:'event'})"),

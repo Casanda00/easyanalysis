@@ -113,5 +113,47 @@ say(isTRUE(S$after),  "the See-script button appears once a result exists")
 say(!is.null(S$script) && grepl("height", S$script, fixed = TRUE),
     "and the script it offers carries the columns actually chosen")
 
+# ---- 15. The UNIFIED path: any fitted model, no spec required ---------------
+# Registry-only was not a boundary a user would accept: Linear regression is
+# hand-written and is the most-used screen in the app. ea_script_from_fit() reads
+# the call off the model object, so a screen opts in with one line.
+fits <- list(
+  lm  = lm(height ~ age + dbh, data = dat),
+  glm = glm(I(height > median(height)) ~ age, data = dat, family = binomial),
+  rlm = MASS::rlm(height ~ age + dbh, data = dat),
+  aov = aov(height ~ cut(age, 3), data = dat))
+for (nm in names(fits)) {
+  sc <- ea_script_from_fit(fits[[nm]], label = nm, data_name = "d")
+  say(!is.null(sc) && nzchar(sc),
+      sprintf("%s produces a script from its own call", nm))
+}
+say(grepl("library(MASS)", ea_script_from_fit(fits$rlm, "rlm", "d"), fixed = TRUE),
+    "an unqualified call still gets the right library() line")
+
+# It must point at the user's data frame, not the fixture it was fitted on --
+# otherwise the script only runs in the session that produced it.
+say(grepl("data = df", ea_script_from_fit(fits$lm, "lm", "d"), fixed = TRUE),
+    "the call is rewritten to read the loaded data frame")
+
+# The LIMITATION must be stated in the artefact. A call shows what was fitted,
+# not what was dropped or coerced first -- item 57 requires hidden steps to be
+# visible, and a call alone cannot show them.
+say(grepl("does not show any data", ea_script_from_fit(fits$lm, "lm", "d"), fixed = TRUE),
+    "and the script SAYS it omits data preparation, rather than implying otherwise")
+
+# CONTROL: objects with no call must report honestly, not fabricate one.
+say(is.null(ea_script_from_fit(prcomp(dat[, c("age", "dbh")]), "pca", "d")),
+    "CONTROL: an object carrying no call yields NULL, not a guess")
+
+# ---- 16. Reachable for hand-written screens ---------------------------------
+w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = "\n")
+say(grepl("Shiny.setInputValue('script_open'", w, fixed = TRUE),
+    "Help offers See script for this analysis")
+s <- paste(readLines("server.R", warn = FALSE), collapse = "\n")
+say(grepl("observeEvent(input$script_open", s, fixed = TRUE), "and it is handled")
+m <- paste(readLines("mod_linear_regression.R", warn = FALSE), collapse = "\n")
+say(grepl("fit = function()", m, fixed = TRUE),
+    "Linear regression exposes its model through the module contract")
+
 cat(if (ok) "\nSCRIPT CHECK: PASS\n" else "\nSCRIPT CHECK: FAIL\n")
 quit(status = if (ok) 0L else 1L)
