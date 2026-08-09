@@ -24,6 +24,7 @@ algoToolsUI <- function(id, spec) {
             else textInput(ns(paste0("p_", p$key)), p$label, value = p$value),
       sel = selectInput(ns(paste0("p_", p$key)), p$label, choices = p$choices,
                         selected = p$value),
+      bool = checkboxInput(ns(paste0("p_", p$key)), p$label, value = isTRUE(p$value)),
       # Seeded small; the full PROJ catalogue is attached server-side by
       # ea_crs_selectize() in algoServer (see algorithms.R).
       crs = selectizeInput(ns(paste0("p_", p$key)), p$label,

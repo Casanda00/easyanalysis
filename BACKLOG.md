@@ -5587,3 +5587,73 @@ so `whitebox_tools.exe` is a child of the worker R process. Tested three times: 
 program from inside a `callr::r_session`, `kill()` the session, check the child. It dies every
 time. `callr` uses `processx`, which places children in a Windows job object, so the whole tree
 goes down together. No orphaned processes, no action needed.
+
+---
+
+### 74 — engine BUILT v0.11.8 (`plugins.R`); the plugin menu is phase 2
+
+> Refined the design: a **Plugin menu** where WhiteboxTools is activated by the user, not
+> automatically — "it's an external tool and we did not develop it. we add it to make our
+> platform stronger." Ideally **individual tools** activatable too, with **search finding tools
+> that are not yet activated** so a user can enable one straight from the result. And a curated
+> list of popular tools, looked up rather than guessed.
+
+**All of that is the right design, and the measurement backs the speed argument.** Binding one
+algorithm module costs **33 ms**, so registering 484 WhiteboxTools entries would add **~16 s to
+every session start** plus 484 sets of observers. Activation must therefore gate *binding*, not
+merely menu visibility. (The 266 s metadata enumeration is a separate, once-only cost.)
+
+#### Built in v0.11.8 — `plugins.R`, the engine
+
+- **Opt-in state** at `<home>/plugins/state.json`. Deliberately NOT in the project: activating a
+  tool is a preference about this installation, not data about one analysis. Provider-level and
+  per-tool switches; turning the provider off hides everything **without losing the per-tool
+  picks**.
+- **Manifest** — `wbt_list_tools()` plus `wbt_tool_parameters()` and `wbt_toolbox()` per tool,
+  cached to disk and keyed by `wbt_version()` so an upgrade rebuilds it and nothing else does.
+  Roughly **1 s per tool** (0.55 s parameters + 0.47 s category), so ~8 minutes for all 484 —
+  which is exactly why it is an explicit, progress-reported action and never happens at boot.
+- **Type mapper**, eight closed cases, `ea_bool()` added to the spec vocabulary for the one type
+  nothing hand-written had needed.
+- **One `run()` closure for all 484**, because WhiteboxTools is uniformly file-based. There is no
+  per-tool code anywhere.
+- **Search index** — `ea_wbt_catalogue(query)` searches the manifest, so a tool that has never
+  been activated is still findable, and each result reports `active` and `featured` so it can be
+  enabled from the result. This is what keeps the app fast **without hiding capability**: the
+  index is text, and text is cheap.
+- **`ea_algorithms()` now concatenates providers.** Everything downstream — `mod_algo.R`, the
+  workspace registration loop, `server.R`'s binding loop, worker routing — already operates on
+  whatever the registry returns, so nothing else changed.
+
+#### The featured set — looked up, then verified against the installed catalogue
+
+31 tools: the DEM-to-streams hydrology chain (`FillDepressions`,
+`BreachDepressionsLeastCost`, `D8Pointer`, `D8FlowAccumulation`, `DInfFlowAccumulation`,
+`WetnessIndex`, `ExtractStreams`, `StreamLinkIdentifier`, `Watershed`, `Basins`, `Sink`), the
+common geomorphometric derivatives (`Slope`, `Aspect`, `Hillshade`, the three curvatures,
+`RelativeTopographicPosition`, `RuggednessIndex`, `MultiscaleTopographicPositionImage`,
+`HypsometricAnalysis`, `FeaturePreservingSmoothing`), the LiDAR gridding/filtering set, and three
+image filters.
+
+**Every name was checked against `wbt_list_tools()` on the installed version**, and the check
+re-verifies it on every run — a featured tool that did not exist would render a broken row with
+no way to tell why.
+
+#### Verified by `check_plugins.R` (26 assertions)
+
+The load-bearing one: **a generated spec runs end to end.** `Slope` was mapped from JSON,
+executed against a synthetic DEM and returned a real raster (2.07–17.06°). Plus the control that
+matters for speed — provider ON with no tools activated still contributes nothing.
+
+#### Phase 2 — not built
+
+- **The Plugin menu itself:** a screen listing providers with authors and licence
+  (WhiteboxTools is Prof. John Lindsay's; the R wrapper is MIT, Qiusheng Wu and Andrew Brown),
+  an Enable switch, a "build catalogue" action with progress, and the searchable tool list with
+  per-tool toggles.
+- **Lazy binding.** Activation currently changes what `ea_algorithms()` returns, but `server.R`
+  binds at session start, so a newly activated tool needs a reload. The fix is to bind on **first
+  open** rather than on activation — otherwise activating 50 tools costs 1.7 s and reintroduces
+  the problem the design exists to avoid.
+- **A project that used a now-inactive tool** should say so on open, like the missing-spatial-file
+  flag, rather than silently lacking it.

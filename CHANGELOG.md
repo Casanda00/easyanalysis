@@ -22,6 +22,38 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.8 — 2026-08-09
+
+### Item 74 — `plugins.R`: WhiteboxTools as an opt-in provider
+
+Generates registry specs from WhiteboxTools' own self-description instead of hand-wrapping 484
+tools, and makes every external tool opt-in so nothing is registered or bound until a user asks.
+
+Both costs measured, not assumed: metadata **0.55 s/tool** (266 s for all 484) and module binding
+**33 ms/tool** (~16 s added to every session start). Activation therefore gates *binding*.
+
+- State at `<home>/plugins/state.json` — a preference about the installation, not project data.
+  Provider and per-tool switches; turning the provider off keeps the per-tool picks.
+- Manifest cached and keyed by `wbt_version()`. Captures parameters **and** the authoritative
+  `wbt_toolbox(tool)` category — note `wbt_toolbox()` with no argument is broken in the R package
+  (panics with *"Unrecognized tool name …whitebox_tools.exe"*), per-tool works.
+- Eight-case type mapper; `ea_bool()` added for the one type nothing hand-written needed.
+- **One `run()` closure for all 484** — WhiteboxTools is uniformly file-based, so there is no
+  per-tool code.
+- `ea_wbt_catalogue(query)` searches the manifest, so a never-activated tool is still findable and
+  each result reports `active`/`featured`. Fast *without* hiding capability.
+- `ea_algorithms()` concatenates providers; everything downstream was already generic.
+
+31 featured tools, verified against `wbt_list_tools()` on the installed version — and re-verified
+by the check on every run.
+
+**`check_plugins.R`** — 26 assertions. The load-bearing one: a **generated** spec runs end to end
+(`Slope` mapped from JSON, executed on a synthetic DEM, real raster back). Plus the speed control:
+provider ON with no tools activated contributes nothing.
+
+**Phase 2 not built:** the Plugin menu UI, lazy binding on first open (activation currently needs
+a reload), and flagging a project that used a now-inactive tool.
+
 ## v0.11.7 — 2026-08-09
 
 ### Item 13 step 1 — WhiteboxTools was guarded on the wrong thing

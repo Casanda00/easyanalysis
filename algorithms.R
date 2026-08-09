@@ -44,6 +44,12 @@ ea_txt <- function(key, label, value = "", hint = NULL, rows = 1, show_if = NULL
   list(kind = "txt", key = key, label = label, value = value, hint = hint,
        rows = rows, show_if = show_if)
 
+# Boolean flag. Added for the WhiteboxTools provider (plugins.R): its parameter
+# vocabulary includes Boolean, which nothing in the hand-written registry needed.
+ea_bool <- function(key, label, value = FALSE, hint = NULL, show_if = NULL)
+  list(kind = "bool", key = key, label = label, value = isTRUE(value),
+       hint = hint, show_if = show_if)
+
 ea_sel <- function(key, label, choices, value = NULL, hint = NULL, show_if = NULL)
   list(kind = "sel", key = key, label = label, choices = choices,
        value = value %||% unname(choices)[1], hint = hint, show_if = show_if)
@@ -265,6 +271,12 @@ ea_algorithms <- function() {
 
   algs <- c(algs, .ea_terrain_algs(), .ea_hydro_algs(),
             .ea_raster_algs(), .ea_vector_algs())
+  # External PROVIDERS append here. They contribute nothing until a user has
+  # activated them, so this costs one function call and an empty list on a
+  # default install -- deliberately, because binding a module is 33 ms and an
+  # unfiltered WhiteboxTools would add ~16 s to every session start.
+  if (exists("ea_provider_whitebox", mode = "function"))
+    algs <- c(algs, tryCatch(ea_provider_whitebox(), error = function(e) list()))
   ids <- vapply(algs, function(a) a$id, character(1))
   # Keyed by id: server.R binds one algoServer per name and keys the Co-Analyst
   # context off it, and a duplicate id would silently shadow an operation.

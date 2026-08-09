@@ -20,6 +20,18 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.8 — 2026-08-09
+
+### Groundwork for optional tool packs
+
+Internal plumbing that lets EasyAnalysis offer tools from other open-source projects — starting
+with WhiteboxTools and its 484 spatial algorithms — **without slowing the app down**.
+
+Nothing changes for you yet, and nothing is switched on. Tools from an external project will stay
+off until you choose to enable them, they will be credited to the people who wrote them, and you
+will be able to enable them one at a time. Searching will find a tool even before it is enabled,
+so you can turn it on at the moment you need it.
+
 ## v0.11.7 — 2026-08-09
 
 ### The WhiteboxTools hydrology tools could not run on a new machine
