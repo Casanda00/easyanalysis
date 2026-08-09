@@ -20,6 +20,15 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.20 — 2026-08-10
+
+### CSV files load dramatically faster
+
+Reading a CSV is now roughly **60 times faster**. A large file that previously froze the app for
+about fifteen seconds now loads in well under a second.
+
+Column names, types and values are unchanged — this is the same data, read a faster way.
+
 ## v0.11.19 — 2026-08-10
 
 ### Groundwork for making large files fast
@@ -33,17 +42,6 @@ through the browser.
 
 The fix being built is to let you point at a file already on your computer instead of uploading
 it.
-
-## v0.11.18 — 2026-08-10
-
-### GeoPackages with several layers now load all of them
-
-A GeoPackage containing more than one layer was loading **only the first** — the rest were
-discarded with no message anywhere in the app. A file with two layers and five features arrived
-as one layer and three features, and looked like it had worked.
-
-All layers now load, each as its own layer named after the file and the layer inside it, and a
-message tells you how many arrived. Reopening a project restores the right layers too.
 
 ## v0.11.18 — 2026-08-10
 

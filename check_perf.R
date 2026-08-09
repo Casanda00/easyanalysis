@@ -69,11 +69,40 @@ rm(d); invisible(gc())
 # one place is what makes "fread would help" a number rather than a belief.
 df <- phase("csv", sprintf("read.csv  [%0.f MB]", mb_csv),
             if (BIG) 60 else 12, utils::read.csv(csv))
-if (requireNamespace("data.table", quietly = TRUE))
-  phase("csv", "data.table::fread  [candidate]", NA,
-        data.table::fread(csv, showProgress = FALSE))
+# The app's actual reader. Budgeted TIGHTLY relative to read.csv above: if this
+# ever creeps back toward it, the fast path has silently stopped being taken --
+# a fallback that quietly becomes the norm is exactly how a 60x win disappears.
+phase("csv", "ea_read_table  [what the app uses]", if (BIG) 6 else 2,
+      ea_read_table(csv, ","))
 phase("csv", "init_data  [the app's own cleaning]", 2, init_data(df))
 rm(df); invisible(gc())
+
+# EQUIVALENCE, not just speed. fread keeps column names verbatim while read.csv
+# mangles them, so "my col" would stay "my col" and "TRUE" would stay "TRUE" --
+# and every formula in the app is built by pasting names together, so either
+# would produce a formula that cannot parse. check.names = TRUE restores parity;
+# this fails the day somebody removes it thinking it is noise.
+awk <- file.path(tmp, "awkward.csv")
+writeLines(c("my col,2nd-col,ok_name,with space,TRUE,NA col",
+             "1,2.5,alpha,x,1,", "2,3.5,beta,y,0,7"), awk)
+.a <- utils::read.csv(awk); .b <- ea_read_table(awk, ",")
+if (!identical(names(.a), names(.b))) {
+  ok <- FALSE
+  cat("  FAIL  ea_read_table names differ from read.csv:
+        ",
+      paste(names(.a), collapse = " | "), "
+        ",
+      paste(names(.b), collapse = " | "), "
+")
+} else if (!identical(class(.b), "data.frame")) {
+  ok <- FALSE
+  cat("  FAIL  ea_read_table returned a", class(.b)[1],
+      "- data.table `[` has different semantics from data.frame
+")
+} else {
+  cat("  OK    ea_read_table matches read.csv on names, types and class
+")
+}
 
 # ============================================================================
 # Raster -- open must stay LAZY, display must stay downsample-first

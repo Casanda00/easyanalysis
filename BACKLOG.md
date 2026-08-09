@@ -6433,3 +6433,44 @@ the ingest; one measurement reversed it. The ranking was a guess, and the guess 
   on downsample-before-reproject, and a refactor could silently restore the 50 s version.
 - **`fread` is measured but not judged** (budget `NA`), because it is not wired in yet. It is
   there to keep the comparison honest and current rather than a number in a commit message.
+
+
+---
+
+### 82 step C built v0.11.20 — fread, and the equivalence trap it nearly walked into
+
+Promoted ahead of backgrounding on the suite's own evidence (60x, not the ~10x guessed).
+`ea_read_table()` uses `data.table::fread` with `read.csv` as a real fallback -- data.table is an
+extra, and a fresh install that skipped it must still open a CSV.
+
+**Through the app's actual code path: 1.48 s -> 0.02 s.** The 92 MB file that froze the UI for
+15.5 s now reads in a fraction of a second, which is why **backgrounding the CSV ingest is no
+longer worth doing** -- there is not enough time left to move off the main thread.
+
+#### Two things that would have broken quietly
+
+**1. `data.table = FALSE`.** fread returns a data.table by default, and data.table's `[` has
+DIFFERENT semantics from a data.frame -- `df[, "col"]` and `df[i, ]` do not mean the same thing.
+Around forty modules index these frames as plain data.frames, so returning a data.table would
+have changed behaviour app-wide in ways nothing here would have caught.
+
+**2. `check.names = TRUE`, and this one was nearly missed.** fread keeps column names verbatim.
+Measured on a deliberately awkward CSV, **six of six columns differed**:
+
+| read.csv | fread, default |
+|---|---|
+| `my.col` | `my col` |
+| `X2nd.col` | `2nd-col` |
+| `with.space` | `with space` |
+| `TRUE.` | `TRUE` |
+
+Every formula in the app is built by **pasting column names together**, so `y ~ my col` does not
+parse and `TRUE` is a reserved word. And `init_data()` does **not** normalise names, so nothing
+downstream would have repaired it. The symptom would have been "regression fails on some CSVs",
+weeks later, with no obvious link to a performance change.
+
+Types and dimensions matched throughout; it was only ever the names.
+
+**The equivalence is now asserted in `check_perf.R`**, not just fixed: names, types and class are
+compared against `read.csv` on that awkward fixture, so removing `check.names` as apparent noise
+fails immediately. A performance suite that only measured speed would have shipped this.

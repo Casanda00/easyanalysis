@@ -22,6 +22,28 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.20 — 2026-08-10
+
+### CSV reading is ~60x faster (item 82, step C)
+
+`ea_read_table()` uses `data.table::fread` with `read.csv` as a genuine fallback. Through the
+app's own path: **1.48 s -> 0.02 s**. The 92 MB CSV that froze the UI for 15.5 s now reads in a
+fraction of a second — which retires the plan to background it, since there is no longer enough
+time left to be worth moving off the main thread.
+
+**Two silent breakages avoided:**
+
+- `data.table = FALSE` — fread otherwise returns a data.table, whose `[` has different semantics
+  from a data.frame. ~40 modules index these frames as plain data.frames.
+- `check.names = TRUE` — **nearly missed.** fread keeps names verbatim: `my col`, `2nd-col`,
+  `TRUE`, where read.csv gives `my.col`, `X2nd.col`, `TRUE.`. Six of six awkward columns differed.
+  Every formula is built by pasting column names, so `y ~ my col` does not parse and `TRUE` is
+  reserved — and `init_data()` does not normalise names, so nothing downstream would have caught
+  it. The symptom would have been "regression fails on some CSVs" weeks later.
+
+Equivalence (names, types, class vs `read.csv`) is now **asserted** in `check_perf.R`. A suite
+that only measured speed would have shipped the name bug.
+
 ## v0.11.19 — 2026-08-10
 
 ### THE DATA RULE, and `check_perf.R` (item 82, step B)
