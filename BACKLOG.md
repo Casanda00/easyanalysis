@@ -6290,3 +6290,146 @@ the generated text. A test that rewrites the artefact it is testing ends up test
 
 **Not done:** `mod_algo.R` has the same one-line hook available (`ea_analysis_script()` already
 handles `run`), and the 23 hand-written screens need per-module work.
+
+---
+
+### 82. THE DATA RULE — local-first, not a web app. How industrial tools do it, and the unified fix
+
+> "the slowness is a nightmare. I think more test cases must be documented and formulated with a
+> unified fix. how does industrial grade tools handle these?"
+> "we should not operate like an online web app. its a local first app."
+
+**Promoted to a non-negotiable rule in CLAUDE.md.** This entry is the reasoning behind it.
+
+#### How industrial tools actually handle large data
+
+Three families, all obeying the same handful of rules.
+
+**Desktop GIS (QGIS, ArcGIS Pro).** Never uploads anything — it opens a path. Zero copy. Then:
+- **Overviews / pyramids.** A raster carries downsampled copies at several resolutions (`.ovr`,
+  or internal to a COG). Drawing reads the cheapest level that satisfies the screen, which is why
+  a 50 GB raster opens instantly: it never reads 50 GB.
+- **Windowed reads and spatial indexes.** Only the viewport is read; vectors use an R-tree, so
+  features outside the view are never touched.
+
+**Web GIS (Felt, Mapbox, Earth Engine).** The raw file never crosses the browser. Data sits in
+object storage as **COG**, and the client fetches byte RANGES for the tiles it needs. Vectors
+become vector tiles. Earth Engine goes further: computation is lazy and server-side, and the
+client only ever receives a rendered tile or a small summary.
+
+**Analysis platforms (Databricks, RStudio Server, JupyterHub).** The data already sits next to
+the compute; you reference a path or a table. Columnar formats (Parquet, Arrow) give column
+pruning and predicate pushdown, so a 100 GB table costs only the columns and rows asked for.
+
+**The five shared rules** — now in CLAUDE.md:
+
+1. Reference data in place; do not carry it.
+2. Read only what the question needs.
+3. Read at the resolution the **screen** needs, not the resolution the file has.
+4. Stream and chunk; do not materialise.
+5. Do the work where the data is.
+
+#### Where this app actually stands — and it is the good position
+
+**EasyAnalysis is local-first, so the data is already on the same machine as R.** It is in the
+*best* of the three positions and should behave like desktop GIS, not like a web app.
+
+The browser upload is an accident of Shiny being the UI, not a requirement of the architecture.
+The app takes a file already on disk, copies it through an HTTP multipart transfer into a temp
+file, and then opens it — **to reach a path it could have opened directly.** Rule 1, broken at
+the front door.
+
+Everything downstream is already right, and measured:
+
+| | |
+|---|---|
+| `terra::rast()` on 100 M cells | **0.09 s** (lazy) |
+| display prep (aggregate + project) | **0.9 s** |
+| plain disk copy | **1,277 MB/s** -> a 4 GB write is ~3 s |
+| `read.csv()` on a 92 MB CSV | **15.48 s**, on the main thread, UI frozen |
+| `init_data()` after it | **0.00 s** |
+
+So the app is not the cost anywhere except CSV parsing. The transport is.
+
+#### The unified fix
+
+**Reference data instead of carrying it, and read at the resolution the screen needs rather than
+the resolution the file has.**
+
+| # | Change | Fixes | Kind |
+|---|---|---|---|
+| 1 | **Path-based ingest** — add from disk, native picker | Upload slowness, for every file type at once | Architectural |
+| 2 | **Overviews for display** — read a pyramid level | Display cost stops scaling with file size | Architectural |
+| 3 | **`data.table::fread` for CSV** | 15.5 s -> ~1-2 s | Symptom relief |
+| 4 | **Background the ingest** | UI freeze during long reads | Symptom relief |
+
+**Note which is which.** 3 and 4 are relief; 1 and 2 remove the cause. Backgrounding the ingest —
+which was the next thing about to be built — would have relieved a symptom that was **never
+reported**: the upload finishes *before* `.ingest_files` is called, since `input$upload_files`
+only exists once the transfer completes. It cannot touch a second of the upload.
+
+#### The gap this exposed in how we work
+
+Every measurement above came from throwaway scripts in a scratch directory. **There is no
+repeatable performance suite**, so "is it faster?" has no answer that survives a session, and a
+regression would go unnoticed for months.
+
+**Agreed order: B then A, then the rest.**
+
+- **B — `check_perf.R` first.** A performance matrix with declared budgets, generating its own
+  fixtures so no test data is committed. Types (CSV, GeoTIFF, multi-band, GPKG, shapefile, LAZ)
+  x sizes x phases (open, first draw, one operation). Built first so that A's benefit is
+  *demonstrated* rather than asserted — right now a performance "fix" could not be proven either
+  way.
+- **A — path-based ingest.** The fix for what was actually reported. Needs the native picker
+  deleted on 2026-07-27, which is also why the dead Tk pre-warm was removed in v0.11.17: it comes
+  back deliberately, next to the code that uses it.
+- Then overviews, `fread`, and backgrounding.
+
+
+---
+
+### 82 step B built v0.11.19 — `check_perf.R`, and what it found immediately
+
+The performance matrix, built first so that the path-based ingest can be **demonstrated** rather
+than asserted. It generates its own fixtures (nothing committed), measures each phase separately,
+and compares against a declared budget.
+
+**Small fixtures by default (~1 min); `EASYANALYSIS_PERF=large` uses sizes near those actually
+complained about.** The large run is slow by design and is not part of the default suite.
+
+**Budgets are deliberately loose — roughly 3-5x the dev-machine time.** A tight budget on a
+slower or shared machine fails for reasons nobody will act on, and a check that cries wolf gets
+ignored, which is worse than not having one.
+
+First run, small fixtures:
+
+| group | phase | secs | budget |
+|---|---|---|---|
+| csv | `read.csv` [14 MB] | 2.42 | 12 |
+| csv | **`data.table::fread` [candidate]** | **0.04** | - |
+| csv | `init_data` | 0.00 | 2 |
+| raster | `terra::rast` [61 MB, must stay lazy] | 0.08 | 1 |
+| raster | metadata | 0.01 | 0.5 |
+| display | aggregate to <=400k cells | 0.21 | 3 |
+| display | project to WGS84 (after shrink) | 0.35 | 3 |
+| vector | `ea_read_vector` [20k features] | 0.14 | 6 |
+| transport | plain disk copy [61 MB] | 0.06 | - |
+
+#### The finding: fread is not symptom relief, it is the fix for CSV
+
+**`read.csv` 2.42 s vs `fread` 0.04 s — 60x**, not the ~10x estimated when it was filed as
+"symptom relief" in item 82's table. At that ratio the CSV problem does not need backgrounding at
+all: a 92 MB CSV that blocks the UI for 15.5 s would read in roughly a quarter of a second.
+
+**That is exactly why the suite was built first.** The plan had `fread` ranked below backgrounding
+the ingest; one measurement reversed it. The ranking was a guess, and the guess was wrong.
+
+#### Assertions worth noting
+
+- **`terra::rast` has a 1-second budget** on a 61 MB file. It is the guard against the day
+  somebody makes ingest read values: laziness is the property, not the speed.
+- **A CONTROL for the project-first order** runs in `large` mode. The whole display budget rests
+  on downsample-before-reproject, and a refactor could silently restore the 50 s version.
+- **`fread` is measured but not judged** (budget `NA`), because it is not wired in yet. It is
+  there to keep the comparison honest and current rather than a number in a commit message.

@@ -20,6 +20,20 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.19 — 2026-08-10
+
+### Groundwork for making large files fast
+
+Internal only — nothing changes in the app yet.
+
+We measured where time actually goes when loading data, and added a repeatable performance test
+so that future speed work can be proven rather than claimed. The measurements confirmed that
+opening large rasters and drawing them are already fast; the wait is the file being copied
+through the browser.
+
+The fix being built is to let you point at a file already on your computer instead of uploading
+it.
+
 ## v0.11.18 — 2026-08-10
 
 ### GeoPackages with several layers now load all of them

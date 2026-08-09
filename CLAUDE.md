@@ -116,6 +116,38 @@ reshaped to canvas+tools before wiring.
 Workflow per component: reshape → add `.viewPanel`s to both navsets → wire server →
 verify build + `testServer` → **user confirms** → next.
 
+## DATA RULE (non-negotiable): this is a LOCAL-FIRST app, not a web app
+
+**The data is already on the same machine as R. Never move bytes you do not have to.**
+
+The app currently takes a file that is already on disk, copies it through an HTTP multipart
+upload into a temp file, and then opens it — to reach a path it could have opened directly.
+That is the entire reason large files feel slow. Measured: a 100 M-cell raster opens in
+**0.09 s** (terra is lazy), display prep is **0.9 s**, disk runs at **1,277 MB/s** — so the app
+is never the cost. The transport is.
+
+Five rules, taken from how desktop GIS (QGIS, ArcGIS Pro), web GIS (COG + range requests,
+vector tiles) and analysis platforms (Parquet/Arrow, predicate pushdown) all actually work:
+
+1. **Reference data in place; do not carry it.** A path, not an upload. Desktop GIS never
+   uploads anything, which is why it opens a 50 GB raster instantly.
+2. **Read only what the question needs.** Windowed reads, spatial indexes, column pruning.
+3. **Read at the resolution the SCREEN needs, not the resolution the file has.** Overviews /
+   pyramids make display cost independent of file size. `.disp_raster()` aggregates the full
+   grid; an overview level would not.
+4. **Stream and chunk; do not materialise.** `terra` is lazy by default — keep it that way.
+   `sf::st_read` and `read.csv` are not.
+5. **Do the work where the data is.** Heavy compute already goes to `compute_worker.R`; ingest
+   does not, and should.
+
+**Applies to every new feature.** If a design needs the browser to carry the bytes, it is the
+wrong design for this app — say so rather than optimising the transport. Backgrounding,
+progress bars and faster parsers are symptom relief; not transporting is the fix.
+
+**Do not "solve" a performance complaint without a measurement.** Every claim above is a number
+from `check_perf.R`, and a change that cannot be shown to move one of those numbers has not been
+shown to help.
+
 ## App-wide UX rules (non-negotiable — enforce in every module)
 10. **No per-module dataset selector.** Modules NEVER show a `selectInput` / `uiOutput` for
     choosing a dataset. The active dataset is always driven by clicking in the left data rail,

@@ -22,6 +22,33 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.19 — 2026-08-10
+
+### THE DATA RULE, and `check_perf.R` (item 82, step B)
+
+**Promoted to a non-negotiable rule in CLAUDE.md: this is a local-first app, not a web app.** The
+data is already on the same machine as R, so never move bytes you do not have to. The app was
+copying a file already on disk through an HTTP multipart upload into a temp file, to reach a path
+it could have opened directly — rule 1 broken at the front door, and the entire reason large files
+feel slow.
+
+Five rules, taken from how desktop GIS, web GIS and analysis platforms actually work: reference
+in place; read only what is needed; read at the resolution the **screen** needs, not the file's;
+stream rather than materialise; do the work where the data is.
+
+**`check_perf.R`** — a repeatable matrix with declared budgets, generating its own fixtures.
+Built *before* the path-based ingest so that fix can be demonstrated rather than asserted; until
+now every performance number came from a throwaway script and no claim survived the session.
+
+**It immediately reversed a plan.** `read.csv` 2.42 s vs `data.table::fread` **0.04 s — 60x**,
+not the ~10x assumed when `fread` was filed below backgrounding as "symptom relief". At that
+ratio the 92 MB CSV that freezes the UI for 15.5 s would read in about a quarter of a second, and
+backgrounding it becomes unnecessary. The ranking was a guess; one measurement corrected it.
+
+Notable assertions: `terra::rast` carries a **1-second budget** on a 61 MB file — the guard is
+laziness, not speed — and `large` mode keeps a CONTROL for the project-first order, since the
+whole display budget rests on downsample-before-reproject not coming back.
+
 ## v0.11.18 — 2026-08-10
 
 ### Item 81 — a multi-layer GeoPackage lost every layer but the first

@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.18.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.19.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.18</b> · 88 releases ·
+      <p class="meta">Latest: <b>v0.11.19</b> · 89 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-18"><h2><a class="anchor" href="#v0-11-18">v0.11.18</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-19"><h2><a class="anchor" href="#v0-11-19">v0.11.19</a><span class="when">2026-08-10</span></h2>
+<h3>Groundwork for making large files fast</h3>
+<p>Internal only — nothing changes in the app yet.</p>
+<p>We measured where time actually goes when loading data, and added a repeatable performance test
+so that future speed work can be proven rather than claimed. The measurements confirmed that
+opening large rasters and drawing them are already fast; the wait is the file being copied
+through the browser.</p>
+<p>The fix being built is to let you point at a file already on your computer instead of uploading
+it.</p>
+</section><section class="rel" id="v0-11-18"><h2><a class="anchor" href="#v0-11-18">v0.11.18</a><span class="when">2026-08-10</span></h2>
 <h3>GeoPackages with several layers now load all of them</h3>
 <p>A GeoPackage containing more than one layer was loading <strong>only the first</strong> — the rest were
 discarded with no message anywhere in the app. A file with two layers and five features arrived
