@@ -5197,3 +5197,56 @@ from whatever is behind it in every theme rather than being a fixed tint that su
 the rule. Whether the chip *looks* right — contrast against each of the five palettes, wrapping
 on a narrow panel — remains an eyeball job. Item 68 stays open for that reason, now narrowed to
 appearance alone.
+
+---
+
+### 72. Interactive codebase schematic — BUILT 2026-08-09
+
+> Asked for an interactive schematic of the codebase, to check the structure against what it is
+> expected to look like. First attempt was a filterable file list; corrected to an actual
+> node-and-edge diagram.
+
+**https://claude.ai/code/artifact/826d910e-4c93-4304-9d48-bdf79a514125**
+
+Three toggleable views over one graph — **load order** (`global.R` fanning out to foundation,
+registries, runners and module groups, with `ui.R`/`server.R` binding in), **runtime wiring**
+(the five pools flowing to their consumers, then to the workspace and the Co-Analyst context),
+and **tool fan-out** (how 23 hand-written + 51 algorithm + 14 statistical entries become the
+same 88 tool keys). Clicking a node isolates its connections. Edge style carries meaning: solid
+sources, dashed binds/registers, dotted state flow. Themed from the app's own `ea_palettes`.
+
+**Extracted from the code, not the docs** — load order from `global.R`'s `source()` calls,
+bindings from `server.R`, tool keys from `mod_workspace.R`, registry counts by *calling*
+`ea_algorithms()` / `ea_statistics()`. That is the entire point: it can disagree with the
+written architecture, and it does.
+
+#### CodeBoarding was considered and rejected
+
+Checked rather than assumed: it supports Python, TypeScript, JavaScript, Java, Go, PHP, Rust
+and C# — **not R**. Its static analyser has no parser for 33k lines of R, and it needs an LLM
+API key per run. It also could not know that a sourced-but-unbound module is *deliberate* here;
+that convention is local knowledge, which is exactly what makes ours worth keeping.
+
+#### Three gaps between the docs and the code
+
+1. **`ui.R` declares three view panels, not one per screen** — `projects`, `project`,
+   `workspace`. The "one `.viewPanel` per screen wired into two navsets" model that CLAUDE.md
+   and ARCHITECTURE.md still describe is gone; every analysis screen is a *tool* inside the
+   workspace shell. Largest documentation drift in the repo. **Both docs need correcting.**
+2. **Twelve module files are sourced but never bound**, deliberately — nine replaced by
+   `statistics.R` entries, three by `algorithms.R` operations, each omission annotated in
+   `server.R`. Nothing is broken, but **3,536 lines are parsed at every boot for no runtime
+   benefit**. Open decision: delete, or move to a `superseded/` folder.
+3. **`mod_annotator.R` is an orphan, not a deferred feature.** It groups with `mod_gee.R` /
+   `gee_dictionary.R` under "not sourced", but those two are complete and deliberately un-wired
+   pending Python and a GEE account. Annotation was *folded into* `mod_raster.R`, so this file
+   has no future owner. 312 lines.
+
+#### The number worth remembering
+
+**65 of 88 workspace tools come from the two registries.** Capability is already mostly data
+rather than code, which is the strongest evidence on record for the plugin direction
+(item 61) — the pattern it would generalise already carries three quarters of the app.
+
+**Regenerating:** the counts are a snapshot at v0.11.4 and will drift. Re-run the extraction
+and republish the same file path to keep the URL.
