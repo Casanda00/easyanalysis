@@ -22,6 +22,63 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.3 — 2026-08-09
+
+### Error notifications are persistent — one wrapper, not 110 edits
+
+**Measured before touching anything: 110 error-type notifications in the app, 2 of them
+persistent.** The other 108 expired after 5–8 seconds.
+
+The messages themselves are good — most name the cause *and* the remedy — so what expired was
+exactly the useful part. It is also a hidden tax on the external testing about to start: **a
+tester cannot report a message they never finished reading**, so the report arrives as "it
+didn't work" with the diagnosis already deleted. Fixed now rather than after, because the
+whole point of the test round is the diagnostics.
+
+Implemented as a single `showNotification()` wrapper in `helpers.R` shadowing shiny's. Viable
+because **no call site writes `shiny::showNotification`** (checked — a qualified call bypasses
+a shadow, gotcha 27), and helpers.R is sourced into the global env, so an unqualified call in
+any module resolves to ours. The signature mirrors shiny's exactly so positional calls still
+map correctly.
+
+- `type = "error"` → `duration = NULL`, `closeButton = TRUE`.
+- Errors get a **content-derived id** (`xxhash64` of the message), so a reactive that fails on
+  every flush replaces its own notification instead of stacking hundreds.
+- Warnings and messages are untouched — transient by intent.
+
+### Data Quality pop-ups removed
+
+Reporter: useful the first time, noise afterwards. **The reason it wore out is the part worth
+keeping:** the observer fired on `active_ds()`, i.e. on dataset **activation**, not on load —
+so clicking between datasets in the left rail replayed the entire stack, one notification per
+issue, every time.
+
+`.quality_check()` in `helpers.R` is **kept and deliberately unwired**, with a comment at the
+old call site saying so, so it is not mistaken for dead code. The analysis was right; the
+delivery was wrong. Its intended home is a panel the user opens.
+
+### `check_notifications.R` — new guard
+
+Control-tested: asserts an error passed `duration = 8` arrives at shiny with `duration = NULL`,
+while a message passed `duration = 3` still arrives as 3. Records what actually reaches shiny
+via `assignInNamespace`.
+
+**Two harness faults caught during the writing, both the familiar kind:**
+
+1. The module-level section was appended **after the script's `quit()`**, so it never ran — and
+   the run still printed PASS, from the earlier ending. A guard that cannot execute reports
+   success.
+2. The role inputs were set as `role_y`/`role_x`; `mod_stat.R` uses **`r_<key>`**. With the
+   wrong names nothing fitted, no action fired, and the check proved nothing while looking
+   green.
+
+Now proves the real path: fitting `robust` on a dataset with no layer link, pressing
+*Predictions to map layer*, and confirming the refusal arrives **from inside a module frame**,
+persistent, with the remedy text intact — the exact message the reporter could not read.
+
+Verified: all four guards pass; build OK; app serves HTTP 200 (a shadowed shiny function is a
+runtime risk, not a build-time one, so serving was checked rather than assumed).
+
 ## v0.11.2 — 2026-08-08
 
 ### Item 36 — the cross-validation fold loops (priorities 2 and 4)

@@ -5102,3 +5102,58 @@ for a short sentence.
 **Neither is a correctness risk** — the numbers and the guard are proven. Both are presentation
 risks, and both are the kind of thing that is obvious in one second of looking and invisible
 from a test suite.
+
+---
+
+### 69. Error messages deleted themselves — FIXED v0.11.3
+
+Chosen as the first thing to do before external testers, ahead of every other open item, on an
+argument that is not about polish.
+
+**Measured first: 110 error-type notifications in the app; 2 were persistent.** The other 108
+expired after 5–8 seconds.
+
+**Why it outranks the rest.** The messages are mostly good — they name the cause *and* the
+remedy. So what expired was precisely the part worth having. And during an external test round
+it is worse than a UX annoyance: **a tester cannot report a message they never finished
+reading.** The report arrives as *"it didn't work"* and the diagnosis is already gone. Running
+external testing with self-deleting error text is running it with the instruments switched off.
+
+It is also a plausible contributor to item 67: every refusal in the analysis-to-map round trip
+is one of these. The reporter may well have been told exactly what was wrong and had it taken
+away before they could act.
+
+**One wrapper, not 110 edits.** `helpers.R` defines `showNotification()` shadowing shiny's.
+Viable because **no call site writes `shiny::showNotification`** — checked, since a qualified
+call bypasses a shadow (gotcha 27) — and helpers.R is sourced into the global env, so any
+unqualified call in any module resolves to ours. Signature mirrored exactly so positional calls
+still land. Errors become `duration = NULL` + `closeButton = TRUE`, and get a content-derived
+id so a reactive failing on every flush replaces its own notification rather than stacking.
+Warnings and messages untouched.
+
+**Guarded by `check_notifications.R`**, which proves the wrapper is reached **from a module
+frame** — not just from a script, whose environment is the global env anyway — by triggering the
+item-67 refusal and asserting it arrives persistent with its remedy text intact.
+
+---
+
+### 70. The Data Quality pop-ups — REMOVED v0.11.3
+
+> "there is a message that comes as a notification when you load a new data … at first, that
+> pop saying what you need to do to your data was useful but now, it is not."
+
+**The reason it wore out is more useful than the removal.** The observer fired on `active_ds()`
+— on dataset **activation**, not on load. So clicking between datasets in the left rail, which
+is a navigation action, replayed the whole stack of warnings about data the user had already
+seen. One notification per issue, every time, unprompted and undismissable except by waiting.
+
+A diagnostic that repeats on navigation stops being information and becomes furniture — and
+worse, it trains the user to ignore the notification channel, which is the same channel errors
+use. Removing it protects item 69's work.
+
+`.quality_check()` is **kept and deliberately unwired**, with a comment at the old call site
+saying so, so nobody reads it as dead code. The analysis was right; the delivery was wrong.
+
+**Where it should return:** a panel the user opens when they want it — collapsed by default,
+on the data screen or in Recommend. Pull, not push. Not built yet, deliberately: it should be
+designed as something declined by default rather than re-added as a quieter interruption.

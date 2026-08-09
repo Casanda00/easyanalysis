@@ -8,6 +8,46 @@
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
 # ==========================================================================
+# Error notifications never expire
+# ==========================================================================
+# The app raised 110 error notifications and only 2 of them were persistent;
+# the rest deleted themselves after 5-8 seconds. The messages are usually good
+# -- they name the cause AND the remedy -- so what was lost was precisely the
+# explanation, at the one moment it was needed. It is also what makes external
+# testing expensive: a tester cannot report a message they never got to read,
+# so the report arrives as "it didn't work" with the diagnosis discarded.
+#
+# Done as ONE wrapper rather than 110 edits. Modules call showNotification()
+# unqualified, and helpers.R is sourced into the global environment, so this
+# definition is found before shiny's -- verified that NO call site writes
+# `shiny::showNotification`, which would bypass a shadow (gotcha 27). The
+# signature mirrors shiny's exactly so positional calls still land correctly.
+#
+# Errors also get a CONTENT-DERIVED id, so a reactive that fails on every flush
+# replaces its own notification instead of stacking hundreds of them. Warnings
+# and messages are left alone: they are transient by intent.
+showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE,
+                             id = NULL,
+                             type = c("default", "message", "warning", "error"),
+                             session = getDefaultReactiveDomain()) {
+  type <- match.arg(type)
+  if (identical(type, "error")) {
+    duration    <- NULL          # stays until dismissed
+    closeButton <- TRUE          # ...so it MUST be dismissible
+    if (is.null(id)) {
+      key <- tryCatch(paste(as.character(ui), collapse = " "),
+                      error = function(e) "")
+      id <- if (requireNamespace("digest", quietly = TRUE) && nzchar(key))
+        paste0("ea-err-", digest::digest(key, algo = "xxhash64"))
+      else NULL
+    }
+  }
+  shiny::showNotification(ui, action = action, duration = duration,
+                          closeButton = closeButton, id = id, type = type,
+                          session = session)
+}
+
+# ==========================================================================
 # Cross-validation and classification metric helpers
 # ==========================================================================
 

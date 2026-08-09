@@ -66,16 +66,17 @@ server <- function(input, output, session) {
     ds
   })
 
-  observeEvent(active_ds(), {
-    nm <- active_ds()
-    req(isTruthy(nm), nm %in% names(dataset_pool))
-    df <- dataset_pool[[nm]]
-    # A quality warning must NEVER break dataset activation.
-    msgs <- tryCatch(.quality_check(df), error = function(e) character(0))
-    for (m in msgs)
-      showNotification(HTML(paste0("<b>Data Quality:</b> ", m)),
-                       type = "warning", duration = 8)
-  }, ignoreInit = TRUE)
+  # The Data Quality pop-ups used to fire here on every dataset activation.
+  # REMOVED 2026-08-09 on the reporter's instruction: useful the first time,
+  # noise from then on. The reason it wore out is worth keeping -- it fired on
+  # ACTIVATION, not on load, so merely clicking between datasets in the left rail
+  # replayed the entire stack of warnings about data the user had already seen.
+  # One notification per issue, every time, unprompted.
+  #
+  # `.quality_check()` (helpers.R) is deliberately KEPT and is currently unwired.
+  # It works and is the right analysis; it was the delivery that was wrong. Its
+  # intended home is a collapsed panel the user opens when they want it, rather
+  # than an interruption they cannot decline. Do not treat it as dead code.
 
   # Read a LAS/LAZ with a memory-safety point cap: decimate AT READ above `cap`
   # so a large cloud never loads in full and OOMs. Used by BOTH the upload path

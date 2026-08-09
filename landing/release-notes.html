@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.2.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.3.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,31 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.2</b> · 71 releases ·
+      <p class="meta">Latest: <b>v0.11.3</b> · 72 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-2"><h2><a class="anchor" href="#v0-11-2">v0.11.2</a><span class="when">2026-08-08</span></h2>
+<section class="rel" id="v0-11-3"><h2><a class="anchor" href="#v0-11-3">v0.11.3</a><span class="when">2026-08-09</span></h2>
+<h3>Error messages now stay on screen until you dismiss them</h3>
+<p>When something failed, the app explained why — and then deleted the explanation a few seconds
+later. Almost every error message in the app behaved this way.</p>
+<p>Those messages are usually the most useful thing on screen: they name the cause <em>and</em> what to
+do about it. Losing them meant you were told how to fix the problem and then had it taken away
+before you could act.</p>
+<p>Error messages now remain until you close them. If the same error happens repeatedly it
+updates in place instead of stacking up. Ordinary confirmations (&quot;Raster added to the project&quot;)
+still fade on their own, since those are meant to be glanced at.</p>
+<h3>The Data Quality pop-ups are gone</h3>
+<p>Selecting a dataset raised a stack of warnings about missing values, duplicate rows and similar
+issues — every time, one pop-up per issue. Because they appeared whenever a dataset became
+active rather than only when it was first loaded, simply clicking between datasets replayed
+warnings you had already read.</p>
+<p>They no longer appear. The underlying checks still exist and will return somewhere you can open
+when you want them, rather than as an interruption you cannot decline.</p>
+</section><section class="rel" id="v0-11-2"><h2><a class="anchor" href="#v0-11-2">v0.11.2</a><span class="when">2026-08-08</span></h2>
 <h3>Cross-validation accuracy could be reported too high</h3>
 <p><strong>If you have recorded a cross-validated accuracy from Logistic Regression or Classification,
 please re-run it.</strong> On some datasets the figure shown was optimistic.</p>

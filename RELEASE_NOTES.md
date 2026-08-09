@@ -20,6 +20,31 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.3 — 2026-08-09
+
+### Error messages now stay on screen until you dismiss them
+
+When something failed, the app explained why — and then deleted the explanation a few seconds
+later. Almost every error message in the app behaved this way.
+
+Those messages are usually the most useful thing on screen: they name the cause *and* what to
+do about it. Losing them meant you were told how to fix the problem and then had it taken away
+before you could act.
+
+Error messages now remain until you close them. If the same error happens repeatedly it
+updates in place instead of stacking up. Ordinary confirmations ("Raster added to the project")
+still fade on their own, since those are meant to be glanced at.
+
+### The Data Quality pop-ups are gone
+
+Selecting a dataset raised a stack of warnings about missing values, duplicate rows and similar
+issues — every time, one pop-up per issue. Because they appeared whenever a dataset became
+active rather than only when it was first loaded, simply clicking between datasets replayed
+warnings you had already read.
+
+They no longer appear. The underlying checks still exist and will return somewhere you can open
+when you want them, rather than as an interruption you cannot decline.
+
 ## v0.11.2 — 2026-08-08
 
 ### Cross-validation accuracy could be reported too high
