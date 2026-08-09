@@ -46,6 +46,10 @@ statToolsUI <- function(id, spec) {
       lapply(spec$params, ctl)),
     actionButton(ns("run"), tagList(icon("play"), " Run"),
                  class = "btn-success w-100 mt-2"),
+    # "See script" (item 57). Rendered server-side for the same reason as the
+    # actions below: before a fit there are no choices to show, and a script of
+    # placeholders would teach nothing.
+    uiOutput(ns("script_ui")),
     # Extra actions render server-side: they only make sense once a fit exists,
     # so showing them beforehand would offer something that cannot work.
     uiOutput(ns("actions_ui")),
@@ -210,6 +214,40 @@ statServer <- function(id, spec, dataset_pool, active_dataset,
                  error = function(e) show_placeholder(conditionMessage(e)))
       })
     })
+
+    # ---- See script (item 57) ----------------------------------------------
+    # Reproducibility: a point-and-click result cannot otherwise be checked by
+    # anyone who was not at the machine.
+    output$script_ui <- renderUI({
+      if (is.null(fit_obj())) return(NULL)
+      actionButton(ns("see_script"), tagList(icon("code"), " See script"),
+                   class = "btn-outline-secondary w-100 mt-2")
+    })
+    .script_text <- reactive({
+      f <- fit_obj()
+      if (is.null(f)) return(NULL)
+      ea_analysis_script(spec, roles = f$roles %||% list(),
+                         params = f$params %||% list(),
+                         data_name = active_dataset() %||% "your_data")
+    })
+    observeEvent(input$see_script, {
+      sc <- .script_text()
+      if (is.null(sc)) return()
+      showModal(ea_settings_modal(
+        paste0("Script - ", spec$label),
+        hint = paste("This is the code that produced the result above, with the",
+                     "columns and settings you chose. It runs in plain R."),
+        tags$pre(class = "ea-script", sc),
+        footer = tagList(
+          downloadButton(ns("dl_script"), "Download .R",
+                         class = "btn-sm btn-outline-success"),
+          modalButton("Close"))))
+    })
+    output$dl_script <- downloadHandler(
+      filename = function()
+        paste0(gsub("[^A-Za-z0-9]+", "_", spec$label), "_",
+               format(Sys.Date(), "%Y%m%d"), ".R"),
+      content  = function(file) writeLines(.script_text() %||% "", file))
 
     # ---- Extra actions (spec$actions) --------------------------------------
     # A second button that operates on an existing fit rather than producing

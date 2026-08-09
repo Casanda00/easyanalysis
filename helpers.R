@@ -48,6 +48,124 @@ showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE
 }
 
 # ==========================================================================
+# "See script" -- the code that actually ran (backlog item 57)
+# ==========================================================================
+# A point-and-click result cannot be reproduced by anyone who was not at the
+# machine. This emits the R that produced it.
+#
+# THE KEY DECISION: the script is not a DESCRIPTION of the analysis rebuilt from
+# the spec -- it is the spec's own `fit`/`run` body, verbatim, with the user's
+# actual roles and parameters bound above it. Rewriting the body to inline values
+# would mean maintaining a second rendering of every method that could drift from
+# the first, and a script that quietly disagrees with what ran is worse than no
+# script. Binding `df`, `r` and `p` and then pasting the real body cannot
+# misrepresent anything, because it IS what ran.
+#
+# The two internal helpers the bodies rely on are emitted too, so the script
+# stands alone in a plain R session.
+.ea_script_helpers <- c(
+  '`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b',
+  '.ea_formula <- function(y, x) stats::as.formula(',
+  '  paste(y, "~", if (length(x)) paste(x, collapse = " + ") else "1"))'
+)
+
+# Packages named with `pkg::` anywhere in the body -- so the script's library()
+# lines are derived from the code rather than from a list that can go stale.
+.ea_script_pkgs <- function(txt) {
+  m <- regmatches(txt, gregexpr("[A-Za-z][A-Za-z0-9.]*(?=::)", txt, perl = TRUE))
+  setdiff(sort(unique(unlist(m))), c("stats", "utils", "base", "grDevices", "graphics"))
+}
+
+.ea_deparse_val <- function(v) paste(deparse(v), collapse = " ")
+
+# `data_expr` overrides the data-loading line. The default reads a CSV, which is
+# right for the app; the check passes a fixture instead, so it can EXECUTE the
+# script rather than regex-patch it afterwards. A test that rewrites the artefact
+# it is testing is testing its own regex.
+ea_analysis_script <- function(spec, roles = list(), params = list(),
+                               data_name = "your_data", fn = NULL,
+                               data_expr = NULL) {
+  f <- fn %||% spec$fit %||% spec$run
+  if (!is.function(f)) return(NULL)
+  body_txt <- paste(deparse(body(f)), collapse = "\n")
+  pkgs <- .ea_script_pkgs(body_txt)
+
+  ln <- c(
+    sprintf("# %s - produced by EasyAnalysis", spec$label %||% spec$id),
+    sprintf("# Generated %s", format(Sys.time(), "%Y-%m-%d %H:%M")),
+    "#",
+    "# This is the code that ran, not a reconstruction of it: the analysis body",
+    "# below is taken verbatim from the tool, with your choices bound above it.",
+    "")
+  if (length(pkgs)) ln <- c(ln, sprintf("library(%s)", pkgs), "")
+  ln <- c(ln,
+    "# --- your data ------------------------------------------------------",
+    data_expr %||%
+      sprintf('df <- read.csv("%s.csv")   # the dataset you had selected', data_name),
+    "")
+  if (length(roles)) ln <- c(ln,
+    "# --- the columns you chose -------------------------------------------",
+    "r <- list(",
+    paste0("  ", names(roles), " = ", vapply(roles, .ea_script_val <- function(v)
+      .ea_deparse_val(v), character(1)), collapse = ",\n"),
+    ")", "")
+  ln <- c(ln,
+    "# --- the settings you chose -------------------------------------------",
+    if (length(params)) c("p <- list(",
+      paste0("  ", names(params), " = ",
+             vapply(params, .ea_deparse_val, character(1)), collapse = ",\n"), ")")
+    else "p <- list()",
+    "",
+    "# --- helpers EasyAnalysis uses internally ------------------------------",
+    .ea_script_helpers, "",
+    "# --- the analysis ------------------------------------------------------",
+    "result <- local(", body_txt, ")", "", "print(result)")
+  paste(ln, collapse = "\n")
+}
+
+# ==========================================================================
+# Reading vector files -- every layer, not just the first
+# ==========================================================================
+# `sf::st_read(path)` on a multi-layer source (a GeoPackage, a FileGDB, some
+# GeoJSON) silently takes the FIRST layer and warns:
+#
+#   "automatically selected the first layer in a data source containing more
+#    than one"
+#
+# With quiet = TRUE that warning goes to the CONSOLE, which nobody running the
+# app ever sees. Reproduced: a 2-layer GeoPackage loaded 3 of 5 features and
+# reported success. Silent data loss -- the same failure shape as the upload
+# cap, and worse, because the result looks complete.
+#
+# Returns a NAMED list of sf objects, one per layer, so a caller cannot
+# accidentally keep only one. Single-layer sources return a one-element list, so
+# there is no special case at the call sites.
+ea_read_vector <- function(path, base = basename(path)) {
+  lay <- tryCatch(sf::st_layers(path), error = function(e) NULL)
+  nms <- if (!is.null(lay)) as.character(lay$name) else character(0)
+  # Drivers that expose no layer table (plain GeoJSON) still read fine; treat
+  # them as the single unnamed layer they are.
+  if (length(nms) <= 1) {
+    v <- sf::st_read(path, quiet = TRUE)
+    out <- list(v); names(out) <- base
+    return(out)
+  }
+  out <- list()
+  for (n in nms) {
+    v <- tryCatch(sf::st_read(path, layer = n, quiet = TRUE), error = function(e) NULL)
+    if (is.null(v)) next
+    # Name each layer for what it is. Prefixing with the file keeps two files
+    # that both contain "roads" from colliding in the pool.
+    out[[paste0(tools::file_path_sans_ext(base), ":", n)]] <- v
+  }
+  if (!length(out)) {           # every layer failed: fall back rather than lose the file
+    v <- tryCatch(sf::st_read(path, quiet = TRUE), error = function(e) NULL)
+    if (!is.null(v)) { out <- list(v); names(out) <- base }
+  }
+  out
+}
+
+# ==========================================================================
 # Settings dialogs -- one shape for every "manage something" screen
 # ==========================================================================
 # Packages, Plugins, Preferences and whatever follows are all the same kind of

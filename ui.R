@@ -1300,6 +1300,12 @@ page_fillable(
        keeps its cream background under light text on every dark set (gotcha 31). */
     /* Plugins is a DIALOG, not a screen (item 76b): the list scrolls inside the
        modal so the modal itself never grows past the viewport. */
+    /* See-script dialog (item 57): code in a modal. Monospace, scrollable and
+       themed -- a fixed light code block is gotcha 31 at its most obvious. */
+    .ea-script { font: 12px/1.55 var(--mono); white-space: pre; overflow: auto;
+                  max-height: 55vh; margin: 0; padding: 12px 14px;
+                  border: 1px solid var(--line); border-radius: 7px;
+                  background: var(--sunk); color: var(--ink); }
     /* Provider badge on a generated tool's panel (item 77). Says whose engine is
        about to run, while the panel is open -- not only in the tool's name. */
     .ea-prov { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 8px;

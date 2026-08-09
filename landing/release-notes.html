@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.17.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.18.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,34 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.17</b> · 86 releases ·
+      <p class="meta">Latest: <b>v0.11.18</b> · 88 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-17"><h2><a class="anchor" href="#v0-11-17">v0.11.17</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-18"><h2><a class="anchor" href="#v0-11-18">v0.11.18</a><span class="when">2026-08-10</span></h2>
+<h3>GeoPackages with several layers now load all of them</h3>
+<p>A GeoPackage containing more than one layer was loading <strong>only the first</strong> — the rest were
+discarded with no message anywhere in the app. A file with two layers and five features arrived
+as one layer and three features, and looked like it had worked.</p>
+<p>All layers now load, each as its own layer named after the file and the layer inside it, and a
+message tells you how many arrived. Reopening a project restores the right layers too.</p>
+</section><section class="rel" id="v0-11-18"><h2><a class="anchor" href="#v0-11-18">v0.11.18</a><span class="when">2026-08-10</span></h2>
+<h3>GeoPackages with several layers now load all of them</h3>
+<p>A GeoPackage containing more than one layer was loading <strong>only the first</strong>, and the rest were
+discarded with no message anywhere in the app — a file with two layers and five features arrived
+as one layer and three features, looking like it had worked.</p>
+<p>All layers now load, each named after the file and the layer inside it, with a message saying how
+many arrived. Reopening a project restores the right ones.</p>
+<h3>See the code behind any result</h3>
+<p>Statistical analyses now have a <strong>See script</strong> button. It shows the R code that produced your
+result — with the columns and settings you actually chose — and you can download it as a <code>.R</code>
+file and run it yourself.</p>
+<p>It is the real code, not a description of it, so a result can be checked, repeated or cited by
+someone who was not sitting at your machine.</p>
+</section><section class="rel" id="v0-11-17"><h2><a class="anchor" href="#v0-11-17">v0.11.17</a><span class="when">2026-08-10</span></h2>
 <h3>Faster startup</h3>
 <p>The app was spending about 1.6 seconds of every startup preparing native file dialogs that were
 removed some time ago. That work is gone.</p>

@@ -4630,7 +4630,7 @@ node build, so that needs its own decision.
 
 ---
 
-### 57. Show the script that ran an analysis — **OPEN, documented not built**
+### 57. Show the script that ran an analysis — **BUILT v0.11.18 for the registry**
 > "this should be a feature where the user can click see script ran and the script that was used
 > for the analyses gets shown."
 
@@ -6211,3 +6211,82 @@ next to the code that uses it.
 - **A real multi-GB browser upload has still not been timed end to end** — there is no browser
   here. The reporter is testing one; that measurement will confirm or refute the elimination
   above, and it is the only piece of this that is guesswork rather than measurement.
+
+
+---
+
+### 81. A multi-layer GeoPackage lost every layer but the first — FIXED v0.11.18
+
+> Spotted in the terminal while testing:
+> `Warning in CPL_read_ogr(...): automatically selected the first layer in a data source
+> containing more than one.`
+
+**Real data loss, and the third instance of this project's worst failure shape.**
+`sf::st_read(path)` on a source with more than one layer takes the FIRST and warns. Every call
+site passed `quiet = TRUE`, so the warning went to the **console** — where nobody running the app
+sees it. It surfaced only because a terminal happened to be visible.
+
+**Reproduced before fixing:** a 2-layer GeoPackage loaded **3 of 5 features** and reported
+success. Not a wrong answer, not a visible error — missing data that looks complete. The other
+two instances were the self-deleting error messages (v0.11.3) and the silent upload rejection
+(v0.11.16).
+
+**Fixed with `ea_read_vector()` (helpers.R)**, which returns a **named list of every layer** so a
+caller cannot accidentally keep one. Layers are named `<file>:<layer>` — after the layers
+themselves, not `layer1`/`layer2` — and the file prefix stops two sources that both contain
+`roads` from colliding in the pool. A single-layer file returns one entry named after the file,
+so there is no special case at the call sites and no suffix to explain.
+
+Applied at the upload path and the type-detection fallback, with a notification naming the layers
+when there is more than one.
+
+**And on reopening a project**, which was the subtler half. Each layer is a separate pool entry,
+so restore has to read back *that* layer: `.spatial_get()` now takes the entry name and reads the
+layer after the `:`. The read cache is keyed per layer too — without that, every layer of one
+file would have returned whichever was cached first, which is the same bug hiding in a place
+where the names still look right.
+
+**Guarded by `check_vector_layers.R`**, whose load-bearing assertion is the CONTROL that plain
+`st_read()` really does return 3 of 5 features. Without it, the fix would pass against a
+single-layer fixture and prove nothing.
+
+
+---
+
+### 57 built v0.11.18 — and the honest answer to "can it be done fully?"
+
+**For the 65 registry-hosted tools: yes, and it is done.** Verified rather than assumed — all 14
+`statistics.R` `fit()` bodies and all 51 `algorithms.R` `run()` bodies deparse.
+
+**For the ~23 hand-written screens: no.** They carry no spec, so each needs its own emitter. That
+is the real boundary, and it is another argument for the registry: the tools that are *data* got
+this feature for free; the ones that are *code* did not.
+
+#### The decision that makes it trustworthy
+
+The script is **not a reconstruction of the analysis**. It is the spec's own `fit`/`run` body,
+**verbatim**, with the user's roles and parameters bound above it, plus the two internal helpers
+(`%||%`, `.ea_formula`) so it stands alone in a plain R session.
+
+Rewriting the body to inline values would mean maintaining a second rendering of every method,
+which can drift from the first — and **a script that quietly disagrees with what ran is worse
+than no script**, because it looks authoritative. Binding `df`/`r`/`p` and pasting the real body
+cannot misrepresent anything, because it *is* what ran.
+
+`library()` lines are derived by scanning the body for `pkg::`, so they cannot go stale either.
+
+#### Proof
+
+`check_script.R` does not inspect the text and call it done: it **executes** the generated script
+in a fresh environment and compares coefficients with what the app computed.
+**Max difference: 0.00e+00.**
+
+It also asserts reachability — no button before a fit, a button after one — because a script
+nobody can open is item 67 again. And a CONTROL that the body is verbatim, so replacing it with a
+prettified reconstruction fails the check.
+
+`data_expr` exists so the check can execute the script with a fixture instead of regex-patching
+the generated text. A test that rewrites the artefact it is testing ends up testing its own regex.
+
+**Not done:** `mod_algo.R` has the same one-line hook available (`ea_analysis_script()` already
+handles `run`), and the 23 hand-written screens need per-module work.

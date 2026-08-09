@@ -22,6 +22,60 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.18 — 2026-08-10
+
+### Item 81 — a multi-layer GeoPackage lost every layer but the first
+
+Noticed as a console warning while testing: *"automatically selected the first layer in a data
+source containing more than one"*. Every call site passed `quiet = TRUE`, so it never reached the
+app. **Reproduced: a 2-layer GeoPackage loaded 3 of 5 features and reported success.**
+
+Third instance of this project's worst failure shape — missing data that looks complete. The
+others: self-deleting error messages (v0.11.3) and the silent upload rejection (v0.11.16).
+
+`ea_read_vector()` (helpers.R) returns a **named list of every layer**, so a caller cannot keep
+just one. Named `<file>:<layer>`; single-layer files return one entry named after the file, so
+call sites need no special case.
+
+**Project restore was the subtler half:** each layer is its own pool entry, so `.spatial_get()`
+now takes the entry name and reads the layer after the `:`. The read cache is keyed per layer too
+— otherwise every layer of one file returns whichever was cached first, the same bug hiding
+somewhere the names still look right.
+
+`check_vector_layers.R` — the load-bearing assertion is the CONTROL that plain `st_read()` really
+returns 3 of 5. Without it the fix would pass against a single-layer fixture and prove nothing.
+
+## v0.11.18 — 2026-08-10
+
+### Item 81 — a multi-layer GeoPackage lost every layer but the first
+
+Console warning spotted while testing: *"automatically selected the first layer in a data source
+containing more than one"*. Every call site passed `quiet = TRUE`, so it never reached the app.
+**Reproduced: a 2-layer GeoPackage loaded 3 of 5 features and reported success.** Third instance
+of this project's worst failure shape — missing data that looks complete.
+
+`ea_read_vector()` returns a **named list of every layer** (`<file>:<layer>`); single-layer files
+return one entry named after the file, so call sites need no special case. **Project restore was
+the subtler half**: each layer is its own pool entry, so `.spatial_get()` now takes the entry name
+and reads the layer after the `:`, with the read cache keyed per layer — otherwise every layer of
+one file returns whichever was cached first.
+
+`check_vector_layers.R` — load-bearing assertion is the CONTROL that plain `st_read()` really
+returns 3 of 5. Without it the fix would pass against a single-layer fixture and prove nothing.
+
+### Item 57 — See script, for the 65 registry tools
+
+All 14 `fit()` and 51 `run()` bodies deparse. The script is the spec's **own body, verbatim**,
+with the user's roles and parameters bound above it plus the internal helpers, so it runs in plain
+R. Not a reconstruction: a second rendering can drift, and a script that disagrees with what ran
+is worse than none. `library()` lines are scanned from the body, so they cannot go stale.
+
+`check_script.R` **executes** the generated script and compares coefficients with the app's —
+**max difference 0.00e+00** — plus reachability and a CONTROL that the body is verbatim.
+
+**The honest boundary:** the ~23 hand-written screens have no spec and need per-module emitters.
+The tools that are *data* got this for free; the ones that are *code* did not.
+
 ## v0.11.17 — 2026-08-10
 
 ### Item 80 — measured: the app is not what is slow

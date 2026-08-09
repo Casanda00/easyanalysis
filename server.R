@@ -198,10 +198,19 @@ server <- function(input, output, session) {
 
         } else if (ext %in% c("gpkg","geojson","json")) {
           # ---- Vector (single-file) ----
-          vec <- sf::st_read(fpath, quiet = TRUE)
-          vector_pool[[fname]] <- vec
-          .keep_source(fname, fpath, fname)
-          showNotification(paste0("Vector '", fname, "' added to the project."), type = "message")
+          # EVERY layer, not just the first. A multi-layer GeoPackage used to load
+          # its first layer and discard the rest, warning only to the console.
+          vecs <- ea_read_vector(fpath, fname)
+          for (ln in names(vecs)) {
+            vector_pool[[ln]] <- vecs[[ln]]
+            .keep_source(ln, fpath, fname)
+          }
+          showNotification(
+            if (length(vecs) > 1)
+              paste0("'", fname, "' contains ", length(vecs), " layers - all added: ",
+                     paste(names(vecs), collapse = ", "), ".")
+            else paste0("Vector '", fname, "' added to the project."),
+            type = "message")
 
         } else if (ext == "shp" && !is.null(shp_tmpdir)) {
           # ---- Shapefile (multi-file; all parts already copied to tempdir) ----
@@ -248,11 +257,18 @@ server <- function(input, output, session) {
             .keep_source(nm, fpath, fname)
             showNotification(paste0("Detected raster '", nm, "' — added to the project."), type = "message")
           } else {
-            vv <- tryCatch(sf::st_read(fpath, quiet = TRUE), error = function(e) NULL)
-            if (!is.null(vv)) {
-              vector_pool[[fname]] <- vv
-              .keep_source(fname, fpath, fname)
-              showNotification(paste0("Detected vector '", fname, "' — added to the project."), type = "message")
+            vv <- tryCatch(ea_read_vector(fpath, fname), error = function(e) NULL)
+            if (length(vv)) {
+              for (ln in names(vv)) {
+                vector_pool[[ln]] <- vv[[ln]]
+                .keep_source(ln, fpath, fname)
+              }
+              showNotification(
+                if (length(vv) > 1)
+                  paste0("Detected vector '", fname, "' with ", length(vv),
+                         " layers - all added.")
+                else paste0("Detected vector '", fname, "' — added to the project."),
+                type = "message")
             } else {
               showNotification(paste("Skipped unsupported file:", fname), type = "warning")
             }
@@ -717,21 +733,35 @@ server <- function(input, output, session) {
     fi <- file.info(path)
     paste(kind, path, as.numeric(fi$mtime), fi$size, sep = "|")
   }
-  .spatial_cached <- function(kind, path) {
+  .spatial_cached <- function(kind, path, name = NULL) {
     if (identical(kind, "raster")) return(FALSE)
     k <- .spatial_key(kind, path)
+    if (!is.na(k) && identical(kind, "vector") && !is.null(name) &&
+        grepl(":", name, fixed = TRUE))
+      k <- paste0(k, "|", sub("^[^:]*:", "", name))
     !is.na(k) && !is.null(.spatial_cache[[k]])
   }
-  .spatial_get <- function(kind, path) {
+  # `name` matters for vectors: a multi-layer source is stored one pool entry per
+  # layer, named "<file>:<layer>", so reopening a project must read back THAT
+  # layer. Without it every layer of a GeoPackage would restore as the first one
+  # -- the same silent loss as on upload, in a place where it is harder to spot
+  # because the names still look right.
+  .spatial_get <- function(kind, path, name = NULL) {
+    lyr <- if (identical(kind, "vector") && !is.null(name) &&
+               grepl(":", name, fixed = TRUE))
+      sub("^[^:]*:", "", name) else NULL
     read_it <- function() switch(kind,
       raster = terra::rast(path),
       # LAS stays capped on open: the full cloud OOM-crashed the app when a
       # raster, a vector and a big LAS all loaded at once.
       las    = .read_las_capped(path, cap = 500000L),
-      vector = sf::st_read(path, quiet = TRUE),
+      vector = if (is.null(lyr)) sf::st_read(path, quiet = TRUE)
+               else tryCatch(sf::st_read(path, layer = lyr, quiet = TRUE),
+                             error = function(e) sf::st_read(path, quiet = TRUE)),
       NULL)
     if (identical(kind, "raster")) return(read_it())
     k <- .spatial_key(kind, path)
+    if (!is.na(k) && !is.null(lyr)) k <- paste0(k, "|", lyr)   # per-layer cache key
     if (is.na(k)) return(NULL)
     hit <- .spatial_cache[[k]]
     if (!is.null(hit)) return(hit)
@@ -776,12 +806,12 @@ server <- function(input, output, session) {
       s <- spat[[i]]
       nm <- s$name %||% ""; kind <- s$kind %||% ""; path <- s$path %||% ""
       lab <- kind_label[[kind]] %||% "layer"
-      cached <- .spatial_cached(kind, path)
+      cached <- .spatial_cached(kind, path, nm)
       prog$set(value = i, message = sprintf("Loading %d of %d", i, length(spat)),
                detail = paste0(nm, " (", lab, if (cached) ", cached" else "", ")"))
       if (isTRUE(s$missing)) { failed <- c(failed, nm); next }
       okl <- tryCatch({
-        obj <- .spatial_get(kind, path)
+        obj <- .spatial_get(kind, path, nm)
         if (is.null(obj)) FALSE else {
           if (identical(kind, "raster"))      raster_pool[[nm]] <- obj
           else if (identical(kind, "las"))    las_pool[[nm]]    <- obj

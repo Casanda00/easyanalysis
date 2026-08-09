@@ -20,6 +20,37 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.18 — 2026-08-10
+
+### GeoPackages with several layers now load all of them
+
+A GeoPackage containing more than one layer was loading **only the first** — the rest were
+discarded with no message anywhere in the app. A file with two layers and five features arrived
+as one layer and three features, and looked like it had worked.
+
+All layers now load, each as its own layer named after the file and the layer inside it, and a
+message tells you how many arrived. Reopening a project restores the right layers too.
+
+## v0.11.18 — 2026-08-10
+
+### GeoPackages with several layers now load all of them
+
+A GeoPackage containing more than one layer was loading **only the first**, and the rest were
+discarded with no message anywhere in the app — a file with two layers and five features arrived
+as one layer and three features, looking like it had worked.
+
+All layers now load, each named after the file and the layer inside it, with a message saying how
+many arrived. Reopening a project restores the right ones.
+
+### See the code behind any result
+
+Statistical analyses now have a **See script** button. It shows the R code that produced your
+result — with the columns and settings you actually chose — and you can download it as a `.R`
+file and run it yourself.
+
+It is the real code, not a description of it, so a result can be checked, repeated or cited by
+someone who was not sitting at your machine.
+
 ## v0.11.17 — 2026-08-10
 
 ### Faster startup
