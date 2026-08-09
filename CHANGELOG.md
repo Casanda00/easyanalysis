@@ -22,6 +22,34 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.14 — 2026-08-09
+
+### Item 78 — one R Console, and the "More" group deleted
+
+**R Console was in two menus with two different behaviours**: Analysis → R Console called
+`eaConsole(..., 'dock')`, View → R Console toggled a CSS class. Which one you found decided what
+it did. Now a single top-level menu.
+
+**"More" removed from the menubar.** Verified first that Documentation and References are already
+in Help (`:709-710`). They could not be deleted — Help opens them *by tool key* — so they are
+marked `hidden = TRUE`: still real and openable, contributing no menu entry. The group builder
+skips hidden tools and drops a group left empty, so `More` vanishes rather than becoming an empty
+fly-out.
+
+Guarded on the **rendered menubar**: `More` absent, `Data` present as a control, Documentation
+still reachable, `R Console` appearing exactly once.
+
+### Item 77 gap closed — provenance on the result
+
+The v0.11.13 badge says what is *about* to run; three layers later nothing said which engine made
+which. Output objects now carry `attr(res, "ea_provider")` and the completion message names the
+engine.
+
+**Still open, and a deliberate design difference:** the request was for the tool to open in the
+sidebar with Activate *there*; what was built is Activate in the search dropdown (enable + open in
+one click). Both reach the same state; the difference is whether you can inspect a tool before
+enabling someone else's engine. Recorded for a decision rather than silently substituted again.
+
 ## v0.11.13 — 2026-08-09
 
 ### Item 77 — search reaches unenabled tools; provenance is visible

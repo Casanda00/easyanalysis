@@ -20,6 +20,21 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.14 — 2026-08-09
+
+### Tidier menus
+
+**R Console** now has its own place in the menu bar. It used to appear in two different menus and
+behave slightly differently depending on which one you used.
+
+The **More** menu is gone. Everything in it — Documentation and References — is already in
+**Help**, so it was one more place to look for no benefit.
+
+### Results say which engine produced them
+
+When a WhiteboxTools tool finishes, the confirmation now names it, and the layer itself remembers
+where it came from.
+
 ## v0.11.13 — 2026-08-09
 
 ### Search now finds WhiteboxTools tools you have not enabled

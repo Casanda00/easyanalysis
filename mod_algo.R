@@ -281,9 +281,22 @@ algoServer <- function(id, spec, pools, tool_open = NULL) {
       # derivative shows up as "slope" or "lyr.1" whatever you called it.
       if (inherits(res, "SpatRaster") && terra::nlyr(res) == 1L)
         try(names(res) <- nm, silent = TRUE)
+      # PROVENANCE ON THE RESULT (item 77). The badge on the tool panel only says
+      # what is about to run; three layers later, nothing says which engine made
+      # which. Stamped as an attribute so it travels with the object, and named in
+      # the completion message so it is stated once at the moment it is created.
+      if (!is.null(spec$provider))
+        try(attr(res, "ea_provider") <- list(provider = spec$provider,
+                                             tool = spec$tool %||% spec$id,
+                                             at = as.character(Sys.time())),
+            silent = TRUE)
       outp[[nm]] <- res
       last(nm)
-      showNotification(sprintf("%s complete - added layer '%s'.", spec$label, nm),
+      showNotification(sprintf("%s complete - added layer '%s'%s.", spec$label, nm,
+                               if (is.null(spec$provider)) ""
+                               else paste0(" (via ",
+                                 switch(spec$provider, whitebox = "WhiteboxTools",
+                                        spec$provider), ")")),
                        type = "message")
     }
 

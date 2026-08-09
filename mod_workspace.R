@@ -551,9 +551,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # Analysis = OUR tools, grouped exactly like GeoLibre's submenu list.
       # Each group is a ▸ FLY-OUT (GeoLibre style): hover the group, its tools
       # open in a nested panel to the side.
-      grps <- unique(vapply(MODUI_R(), function(t) t$grp, character(1)))
+      # Hidden tools stay openable by key but contribute no menu entry, so a group
+      # that contains only hidden tools disappears entirely rather than becoming
+      # an empty fly-out.
+      .vis_tool <- function(t) !isTRUE(t$hidden)
+      shown <- Filter(.vis_tool, MODUI_R())
+      grps <- unique(vapply(shown, function(t) t$grp, character(1)))
       proc_items <- lapply(grps, function(g) {
-        ks <- names(MODUI_R())[vapply(MODUI_R(), function(t) identical(t$grp, g), logical(1))]
+        ks <- names(shown)[vapply(shown, function(t) identical(t$grp, g), logical(1))]
         tags$div(class = "gm-item has-sub", g,
           tags$div(class = "gm-sub",
             lapply(ks, function(k) .mi(MODUI_R()[[k]]$nm, .setTool(k))),
@@ -654,11 +659,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Co-Analyst", "document.getElementById('chat-panel').classList.add('open')"),
           .msep(),
           proc_items,
-          .msep(),
-          # R Console opens the BOTTOM dock (not the right tool panel).
-          .mi("R Console", sprintf(
-            "var c=document.getElementById('%s'); eaConsole('%s', c.classList.contains('open') ? 'close' : 'dock');",
-            ns("console"), ns("console")))
         )),
         .menu("Controls", "sliders", tagList(
           tags$div(class = "gm-grp", "Map"),
@@ -669,9 +669,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Layers panel", "document.querySelector('.ea-wsx-grid').classList.toggle('no-left')"),
           .mi("Tool panel",   "document.querySelector('.ea-wsx-grid').classList.toggle('no-right')"),
           .mi("Results dock", "document.querySelector('.ea-wsx-grid').classList.toggle('no-dock')"),
-          .mi("Attribute table", "eaAttrSet((document.documentElement.getAttribute('data-attr-state')||'normal')==='closed'?'normal':'closed')"),
-          .msep(),
-          .mi("R Console", sprintf("document.getElementById('%s').classList.toggle('open')", ns("console")))
+          .mi("Attribute table", "eaAttrSet((document.documentElement.getAttribute('data-attr-state')||'normal')==='closed'?'normal':'closed')")
         )),
         .menu("Packages", "cube", tagList(
           .mi("Install a package…", sprintf("Shiny.setInputValue('%s', Date.now(), {priority:'event'})", ns("pkg_install_ui"))),
@@ -699,6 +697,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           tags$div(class = "gm-grp", "Available"),
           .mi("WhiteboxTools — 484 spatial tools",
               "Shiny.setInputValue('plugins_open', Date.now(), {priority:'event'})")
+        )),
+        # R Console gets its own top-level entry (item 78). It was in two different
+        # menus with two different behaviours -- one docked it, the other toggled a
+        # class -- so which one you found decided what it did.
+        .menu("R Console", "terminal", tagList(
+          .mi("Open / close console", sprintf(
+            "var c=document.getElementById('%s'); eaConsole('%s', c.classList.contains('open') ? 'close' : 'dock');",
+            ns("console"), ns("console")))
         )),
         .menu("Settings", "gear", tagList(
           .mi("Preferences…", "openSettings('set-display')"),
@@ -2540,8 +2546,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = NULL, map_based = TRUE),
       metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = NULL, map_based = TRUE),
       # --- Docs (R console is NOT here: it lives in the bottom dock) ---
-      docs           = list(nm = "Documentation",       grp = "More", tools = docsToolsUI,       canvas = docsCanvasUI),
-      references     = list(nm = "References",          grp = "More", tools = referencesToolsUI, canvas = referencesCanvasUI)
+      # hidden = TRUE: still real tools -- the Help menu opens them by key -- but
+      # they generate no menu group of their own. The "More" fly-out they used to
+      # create was pure redundancy: both are already in Help (item 78).
+      docs           = list(nm = "Documentation",       grp = "More", hidden = TRUE, tools = docsToolsUI,       canvas = docsCanvasUI),
+      references     = list(nm = "References",          grp = "More", hidden = TRUE, tools = referencesToolsUI, canvas = referencesCanvasUI)
     )
 
     # ---- Processing algorithms: one searchable tool each (algorithms.R) -----

@@ -5887,7 +5887,7 @@ layer so it survives into the project.
 
 ---
 
-### 78. Menu cleanup — R Console standalone, and delete "More"
+### 78. Menu cleanup — R Console standalone, and delete "More" — **DONE v0.11.14**
 
 > "Put R console in the top menu by itself and remove it from other places."
 > "'More' must be deleted. it adds no value. the options under More are already positioned in
@@ -6040,3 +6040,58 @@ input", which is worth doing later and is recorded here rather than half-done no
 `spec$provider` is set — visible *while the panel is open*, not just in the tool's title, which
 was the ask ("we don't know if we are using whitebox tools or not"). Built-in tools show no
 badge: there is nothing to disclose. Both directions are asserted, the second as a CONTROL.
+
+
+---
+
+### 77 — the two gaps, and where they landed
+
+Asked directly whether 77 was completely done. It was not, and the honest answer had two parts.
+
+**Gap 1, closed in v0.11.14: provenance on the RESULT.** The badge added in v0.11.13 says what is
+about to run, but three layers later nothing said which engine made which. The output object is
+now stamped with `attr(res, "ea_provider")` (provider, tool, timestamp), and the completion
+notification names the engine: *"Slope complete — added layer 'Slope' (via WhiteboxTools)."*
+
+**Gap 2, STILL OPEN and a deliberate design difference, not an oversight.** The request was:
+*"you search a command, and it opens in the sidebar (that is established already). if not
+activated, have the activate there for whitebox."* — i.e. the tool **opens in the sidebar** and
+Activate lives **there**.
+
+What was built instead: **Activate in the search dropdown**, which enables and opens in one click.
+
+Both reach the same end state. The difference is whether you can **inspect a tool before enabling
+somebody else's engine** — read its parameters and description, then decide. For an external
+provider that is a real argument, and it is the reporter's own design.
+
+**Why it was not simply built that way:** the sidebar panel is rendered from a registered tool, and
+an unenabled tool is deliberately not registered — that is the mechanism keeping the app fast.
+Previewing one means adding a single transient `preview_tool` entry to the catalogue and teaching
+`algoToolsUI()` to render **Activate in place of Run** when the tool is not enabled. That is
+bounded and doable; it was not smuggled in unasked after already substituting one design for
+another once.
+
+**Decision needed:** keep the one-click dropdown flow, or build the sidebar preview.
+
+---
+
+### 78 built v0.11.14 — one R Console, no "More"
+
+**R Console was in two menus with two different behaviours.** Analysis → R Console called
+`eaConsole(..., 'dock')`; View → R Console toggled a CSS class directly. **Which one you found
+decided what it did** — a genuine inconsistency, not just duplication. Both are gone; it now has
+its own top-level menu with a single Open/close entry.
+
+**"More" is gone from the menubar.** The claim that its contents are already positioned elsewhere
+was verified before deleting anything: Documentation and References are both in the **Help** menu
+(`mod_workspace.R:709-710`).
+
+They could not simply be deleted, though — Help opens them **by tool key**, so unregistering them
+would have broken Help. They are now marked `hidden = TRUE`: still real, still openable by key,
+but contributing no menu entry. The group builder filters hidden tools and drops any group left
+empty, so `More` disappears rather than becoming an empty fly-out.
+
+**Guarded on the RENDERED menubar**, not the source — the question is what a user can see, which
+is precisely the distinction v0.11.11 got wrong. Assertions: `More` absent, `Data` present as a
+control that the test works at all, Documentation still reachable, and `R Console` appearing
+**exactly once**.

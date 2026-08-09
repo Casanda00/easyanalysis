@@ -196,6 +196,23 @@ say(grepl('.menu("Plugins", "puzzle-piece"', w, fixed = TRUE),
     "Plugins has its OWN top-level menu, beside Packages")
 say(!grepl('"Whitebox tools", NULL, disabled = TRUE', w, fixed = TRUE),
     "CONTROL: the dead disabled Whitebox placeholder is gone")
+
+# ---- 10b. Menu structure (item 78) -----------------------------------------
+# Asserted on the RENDERED menubar, not the source: the question is what a user
+# can see, which is exactly the distinction v0.11.11 got wrong.
+MB <- NULL
+suppressWarnings(testServer(workspaceServer,
+  args = list(dataset_pool = reactiveValues(), raster_pool = reactiveValues(),
+              las_pool = reactiveValues(), vector_pool = reactiveValues(),
+              active_dataset = reactive(NULL)),
+  { MB <<- gsub("\\s+", " ", paste(as.character(output$menubar), collapse = " ")) }))
+.grp <- function(g) grepl(paste0('has-sub"> ', g, ' <div'), MB, fixed = TRUE)
+say(.grp("Data"), "CONTROL: the group test works -- 'Data' is a menu group")
+say(!.grp("More"), "the redundant 'More' group is gone from the menubar")
+say(grepl("Documentation", MB, fixed = TRUE),
+    "...but Documentation is still reachable, from Help")
+n_con <- lengths(regmatches(MB, gregexpr("R Console", MB)))
+say(n_con == 1, sprintf("R Console appears exactly once in the menus (%d)", n_con))
 s <- paste(readLines("server.R", warn = FALSE), collapse = " ")
 # Matched WITHOUT the closing paren: the call is multi-line since on_change was
 # added, and pinning the exact text made this fail against working code.

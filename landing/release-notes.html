@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.13.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.14.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.13</b> · 82 releases ·
+      <p class="meta">Latest: <b>v0.11.14</b> · 83 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-13"><h2><a class="anchor" href="#v0-11-13">v0.11.13</a><span class="when">2026-08-09</span></h2>
+<section class="rel" id="v0-11-14"><h2><a class="anchor" href="#v0-11-14">v0.11.14</a><span class="when">2026-08-09</span></h2>
+<h3>Tidier menus</h3>
+<p><strong>R Console</strong> now has its own place in the menu bar. It used to appear in two different menus and
+behave slightly differently depending on which one you used.</p>
+<p>The <strong>More</strong> menu is gone. Everything in it — Documentation and References — is already in
+<strong>Help</strong>, so it was one more place to look for no benefit.</p>
+<h3>Results say which engine produced them</h3>
+<p>When a WhiteboxTools tool finishes, the confirmation now names it, and the layer itself remembers
+where it came from.</p>
+</section><section class="rel" id="v0-11-13"><h2><a class="anchor" href="#v0-11-13">v0.11.13</a><span class="when">2026-08-09</span></h2>
 <h3>Search now finds WhiteboxTools tools you have not enabled</h3>
 <p>Searching for a WhiteboxTools tool used to return nothing, because the search only looked at
 tools already in your menus. It now searches the whole WhiteboxTools catalogue as well. A tool
