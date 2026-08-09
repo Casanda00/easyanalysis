@@ -4084,7 +4084,7 @@ into Step 2.
 
 ---
 
-### 52. Make the attribute table dockable, with window controls — **OPEN, not started**
+### 52. Make the attribute table dockable, with window controls — **PARTLY DONE v0.11.5**
 > "I think we should make the attribute table dockable. and in the header, instead of just
 > attribute table, use the state like dock attribute tabe or undock. for the table itself, we can
 > have the close, minimize (which docks it), maximize."
@@ -5250,3 +5250,60 @@ rather than code, which is the strongest evidence on record for the plugin direc
 
 **Regenerating:** the counts are a snapshot at v0.11.4 and will drift. Re-run the extraction
 and republish the same file path to keep the URL.
+
+
+---
+
+### 52 continued — window controls shipped v0.11.5, undocking deliberately not
+
+Built the half the backlog itself recommended first: *"Maximize is the highest value and the
+cheapest — a full-canvas attribute table solves the cramped-strip problem on its own."*
+
+**Shipped:** minimise, maximise, close, and drag-to-resize.
+
+**The real bug was underneath the request.** The dock is built inside `.map_ui()`, so it is
+destroyed and rebuilt on every map re-render — choosing a layer, toggling visibility, changing
+basemap. The old collapse button toggled a class **on the dock** and rewrote its own label, so
+both were thrown away at the first interaction and the panel sprang back open by itself. State
+now lives on `<html>`, which survives every rebuild; the drag height is a custom property there
+for the same reason. That is why collapsing never stuck, and it was not in the report — the
+reporter only saw a cramped strip.
+
+`.ea-wsx-attrhead` has advertised `cursor: ns-resize` since it was written, with nothing behind
+it. Drag-to-resize now honours it. An affordance that promises and does not deliver is worse
+than none.
+
+**Undocking (a floating, draggable panel) was NOT built, on purpose.** The backlog flagged it as
+a genuine step up needing position/size state, a drag implementation, and care not to fight the
+workspace grid — and item 52's own note is the deciding argument: *a floating panel that covered
+the map would fight click-to-identify*. Maximise gives the same benefit (a full-size table) with
+none of that risk, and can be dismissed in one click. **Revisit only if maximise proves
+insufficient in real use** — which is a question for the external testers, not for us.
+
+**Header wording** was left as "Attributes · <layer>". The request asked for the header to name
+the *action* ("Dock" / "Undock"); with undocking not built there is no state to name, and the
+three buttons carry their own titles. Reopen this if undocking is later built.
+
+**Guarded by `check_attrdock.R`**, which asserts the invariant that no screenshot would show:
+state selectors rooted at `html.ea-attr-*`, buttons holding no state. It lifts `eaAttrSet` out of
+the *rendered page* and runs it in node against a stub, so it tests what ships. One control was
+over-broad on the first run and failed against correct code — a bare search for
+`classList.toggle('collapsed')` also matched the split panes, which legitimately keep their own
+collapse. Scoped to the dock.
+
+---
+
+### 54 revisited — the editing actions are now unblocked
+
+"Zoom to selected" shipped in v0.10.18. **Edit attribute** and **add attribute** were held on the
+grounds that the table is read-only and a write-back needs an undo mechanism that did not yet
+exist — with the explicit instruction not to invent a second one.
+
+**That mechanism now exists.** Item 38's delete-features work built a write path into
+`vector_pool` with bounded undo (`.EDIT_UNDO_MAX <- 5L`) and an armed, visible edit mode. Both
+actions can now be built on it rather than beside it.
+
+Not built here — recorded so the dependency is not re-litigated later. The remaining design
+question is narrower than it was: whether a cell edit joins the same undo stack as a delete
+(it should) and whether adding a *column* belongs on that stack at all, since it is a schema
+change rather than a data change.

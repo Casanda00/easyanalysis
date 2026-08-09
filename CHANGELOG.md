@@ -22,6 +22,48 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.5 — 2026-08-09
+
+### Item 52 — attribute table window controls
+
+Minimise / maximise / close, plus drag-to-resize. Maximise was built first on the backlog's own
+reasoning: it solves the cramped-strip complaint outright and costs least.
+
+**The state lives on `<html>`, not on the dock, and that is the whole fix.** The dock is built
+inside `.map_ui()`, so it is destroyed and rebuilt on every map re-render — layer choice,
+visibility toggle, basemap change. The old button toggled `.collapsed` **on the dock** and
+rewrote its own `textContent`, so both were discarded at the first interaction and the panel
+sprang back open by itself. The root element survives all of it; the height is a custom property
+there for the same reason.
+
+`.ea-wsx-attrhead` has carried `cursor: ns-resize` since it was written with nothing behind it.
+Drag-to-resize now honours it — an affordance that promises and does not deliver is worse than
+none.
+
+Client-side by necessity, not preference: a server round-trip would queue behind any running fit
+(gotcha 29).
+
+Both menu entries that toggled `.collapsed` now go through `eaAttrSet`, so *Attribute table* can
+reopen a **closed** dock rather than only un-collapsing a visible one.
+
+### `check_attrdock.R` — new guard
+
+Asserts the invariant that is invisible in a screenshot: every state selector is rooted at
+`html.ea-attr-*`, and the buttons carry no state. It lifts `eaAttrSet` **out of the rendered
+page** and runs it in node against a stub implementing `classList` and the attribute pair, so it
+exercises what ships rather than a copy — proving the states replace rather than stack.
+
+**One control was over-broad on first run** and failed against working code: a bare search for
+`classList.toggle('collapsed')` also matched the split panes (`.ea-wsx-sp`), which legitimately
+keep their own collapse and are not rebuilt the same way. Scoped to the dock. The check was
+wrong, not the code — again.
+
+### Item 54 status
+
+"Zoom to selected" shipped in v0.10.18. The remaining two actions (edit attribute, add
+attribute) were held pending a write/undo model — **which now exists**, via edit mode's delete
+with bounded undo. They are unblocked; not built here.
+
 ## v0.11.4 — 2026-08-09
 
 ### Item 68a — the CV caveat was styled as a footnote

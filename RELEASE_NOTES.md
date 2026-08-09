@@ -20,6 +20,24 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.5 — 2026-08-09
+
+### The attribute table now has proper window controls
+
+Reading a wide table in a short strip at the bottom of the map was cramped. The table now has
+minimise, maximise and close buttons in its header:
+
+- **Maximise** fills the whole map area, which is the point — a full-size table instead of a
+  letterbox.
+- **Minimise** collapses it to its header.
+- **Close** hides it; *Attribute table* in the map menu brings it back.
+- **Drag the header up or down** to set any height in between. The header has always shown a
+  resize cursor; now it actually resizes.
+
+Your choice also **stays put**. Previously, collapsing the table and then selecting a layer,
+toggling visibility or changing the basemap made it spring back open, because the panel was
+rebuilt from scratch each time and forgot its state.
+
 ## v0.11.4 — 2026-08-09
 
 ### The cross-validation warning now looks like a warning

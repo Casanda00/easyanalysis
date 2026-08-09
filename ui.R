@@ -1258,8 +1258,33 @@ page_fillable(
       color: var(--ink);
     }
     .ea-wsx-seldel:hover { background: var(--danger); color: #fff; }
-    .ea-wsx-attrbody { max-height: 220px; overflow: auto; padding: 4px 8px; }
-    .ea-wsx-attrdock.collapsed .ea-wsx-attrbody { display: none; }
+    /* Attribute table window controls (backlog item 52).
+       The state lives on <html>, NOT on the dock element. The dock is built
+       inside .map_ui(), so it is destroyed and rebuilt every time the map
+       re-renders -- choosing a layer, toggling visibility, changing basemap.
+       A class set on the dock itself is therefore lost at the first interaction,
+       which is why the old collapse button kept springing back open. The root
+       element survives all of it. Same reason the height is a variable there. */
+    .ea-wsx-attrbtns { margin-left: auto; display: inline-flex; gap: 2px; }
+    .ea-wsx-attrbtn { border: none; background: transparent; color: var(--bark);
+                  cursor: pointer; font: 600 13px var(--mono); line-height: 1;
+                  padding: 3px 7px; border-radius: 4px; }
+    .ea-wsx-attrbtn:hover { background: var(--tint); color: var(--ink); }
+    .ea-wsx-attrbtn.x:hover { background: var(--danger); color: #fff; }
+    .ea-wsx-attrbody { max-height: var(--ea-attr-h, 220px); overflow: auto; padding: 4px 8px; }
+    .ea-wsx-attrdock.collapsed .ea-wsx-attrbody,
+    html.ea-attr-min .ea-wsx-attrbody { display: none; }
+    html.ea-attr-closed .ea-wsx-attrdock { display: none; }
+    /* Maximised: the cramped-strip problem the request was actually about.
+       .ea-wsx-canvas is already position:relative, so inset works against it. */
+    html.ea-attr-max .ea-wsx-attrdock {
+      position: absolute; inset: 14px; z-index: 1200; margin: 0;
+      display: flex; flex-direction: column;
+      box-shadow: 0 10px 34px rgba(0,0,0,.30);
+    }
+    html.ea-attr-max .ea-wsx-attrbody { max-height: none; flex: 1 1 auto; }
+    html.ea-attr-max .ea-wsx-attrhead { cursor: default; }
+    html.ea-attr-min .ea-wsx-attrhead { cursor: default; }
     .ea-wsx-attrinfo { padding: 10px 4px; font: 400 12px var(--mono); color: var(--bark); }
     /* Step 7: a migrated module's real canvas embedded in the workspace centre */
     .ea-wsx-modcanvas { min-height: 100%; }
@@ -2269,6 +2294,56 @@ page_fillable(
         if (e.target.closest && e.target.closest('.ea-pop')) return;
         document.querySelectorAll('.ea-pop.open').forEach(function(p){ p.classList.remove('open'); });
       });
+
+      /* Attribute-table window controls (backlog item 52) ------------------
+         Delegated, and the state is kept on <html>, because the dock is rebuilt
+         by .map_ui() on every map re-render. An inline onclick that toggled a
+         class on the dock lost its state at the first layer change -- which is
+         why collapsing it never stuck. Client-side by necessity too: Shiny is
+         single-threaded, so a server round-trip here would queue behind any
+         running fit (gotcha 29). */
+      var eaAttrSet = function(s){
+        var R = document.documentElement;
+        R.classList.remove('ea-attr-min', 'ea-attr-max', 'ea-attr-closed');
+        if (s !== 'normal') R.classList.add('ea-attr-' + s);
+        R.setAttribute('data-attr-state', s);
+      };
+      window.eaAttrSet = eaAttrSet;
+      eaAttrSet('normal');
+      document.addEventListener('click', function(e){
+        var b = e.target.closest && e.target.closest('[data-attr-act]');
+        if (!b) return;
+        e.preventDefault();
+        var a = b.getAttribute('data-attr-act');
+        var cur = document.documentElement.getAttribute('data-attr-state') || 'normal';
+        if (a === 'min')   eaAttrSet(cur === 'min' ? 'normal' : 'min');
+        else if (a === 'max') eaAttrSet(cur === 'max' ? 'normal' : 'max');
+        else if (a === 'close') eaAttrSet('closed');
+        else if (a === 'open')  eaAttrSet(cur === 'closed' ? 'normal' : 'closed');
+      });
+      /* Drag the header to resize. The header has advertised ns-resize since it
+         was written, with nothing behind it -- an affordance that promises and
+         does not deliver is worse than none. Height goes on <html> for the same
+         survival reason as the state. */
+      var eaAttrDrag = null;
+      document.addEventListener('mousedown', function(e){
+        if (!e.target.closest) return;
+        if (e.target.closest('[data-attr-act]')) return;
+        var h = e.target.closest('.ea-wsx-attrhead');
+        if (!h) return;
+        var R = document.documentElement;
+        if (R.classList.contains('ea-attr-max') || R.classList.contains('ea-attr-min')) return;
+        var body = h.parentElement && h.parentElement.querySelector('.ea-wsx-attrbody');
+        if (!body) return;
+        eaAttrDrag = { y: e.clientY, h: body.getBoundingClientRect().height };
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', function(e){
+        if (!eaAttrDrag) return;
+        var nh = Math.min(760, Math.max(90, eaAttrDrag.h + (eaAttrDrag.y - e.clientY)));
+        document.documentElement.style.setProperty('--ea-attr-h', nh + 'px');
+      });
+      document.addEventListener('mouseup', function(){ eaAttrDrag = null; });
       document.addEventListener('keydown', function(e){
         if (e.key === 'Escape') {
           var m = document.getElementById('ea-ctxmenu'); if (m) m.remove();

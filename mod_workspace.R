@@ -587,7 +587,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
           .mi("Layers panel", "document.querySelector('.ea-wsx-grid').classList.toggle('no-left')"),
           .mi("Tool panel",   "document.querySelector('.ea-wsx-grid').classList.toggle('no-right')"),
           .mi("Results dock", "document.querySelector('.ea-wsx-grid').classList.toggle('no-dock')"),
-          .mi("Attribute table", "var d=document.querySelector('.ea-wsx-attrdock'); if(d)d.classList.toggle('collapsed')"),
+          .mi("Attribute table", "eaAttrSet((document.documentElement.getAttribute('data-attr-state')||'normal')==='closed'?'normal':'closed')"),
           .msep(),
           .mi("R Console", sprintf("document.getElementById('%s').classList.toggle('open')", ns("console")))
         )),
@@ -982,7 +982,8 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
                 "Zoom to active layer"),
               div(class = "ea-ctx-sep"),
               tags$a(class = "ea-ctx-item", href = "#",
-                onclick = "var d=document.querySelector('.ea-wsx-attrdock'); if(d)d.classList.toggle('collapsed'); return false;",
+                onclick = paste0("eaAttrSet((document.documentElement.getAttribute('data-attr-state')",
+                                 "||'normal')==='closed'?'normal':'closed'); return false;"),
                 "Attribute table"),
               tags$a(class = "ea-ctx-item", href = "#",
                 onclick = "document.querySelector('.ea-wsx-grid').classList.toggle('no-left'); return false;",
@@ -1005,9 +1006,17 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
             # cosmetic: without it a user can hold a selection they cannot see
             # all of at once, and have no way to tell.
             uiOutput(ns("sel_info"), inline = TRUE),
-            tags$button(class = "ea-wsx-attrmin", type = "button",
-              onclick = paste0("var d=this.closest('.ea-wsx-attrdock');d.classList.toggle('collapsed');",
-                               "this.textContent=d.classList.contains('collapsed')?'▴':'▾';"), "▾")),
+            # Window controls (item 52). The old single button toggled a class on
+            # the dock AND rewrote its own label -- both were lost the moment
+            # .map_ui() rebuilt the dock, so collapsing never stuck. These carry
+            # no state; the handler in ui.R keeps it on <html>, which survives.
+            div(class = "ea-wsx-attrbtns",
+              tags$button(class = "ea-wsx-attrbtn", type = "button",
+                `data-attr-act` = "min", title = "Minimise", "–"),
+              tags$button(class = "ea-wsx-attrbtn", type = "button",
+                `data-attr-act` = "max", title = "Maximise / restore", "▢"),
+              tags$button(class = "ea-wsx-attrbtn x", type = "button",
+                `data-attr-act` = "close", title = "Close", "×"))),
           div(class = "ea-wsx-attrbody", uiOutput(ns("attr")))))
     }
 
