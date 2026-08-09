@@ -1291,7 +1291,7 @@ environment) — worth a quick eyeball that the dropdown populates as you type.
     5. *Python `geolibre` SDK & `reticulate` Sidecar Bridge:* Call GeoLibre's Python package (`geolibre`), `samgeo`, and FastAPI sidecar via R `reticulate` or CLI subprocesses to execute GeoLibre & GeoAI automated processing workflows.
     6. *Embedded Interactive Map Panel:* Add an embedded GeoLibre web canvas viewer (`iframe` or web component window) into EasyAnalysis's workspace view for interactive cloud GIS projects.
 
-### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite — **STEP 1 DONE v0.11.7, steps 2-3 open**
+### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite — **STEP 1 DONE v0.11.7, step 2 SUPERSEDED by item 74**
 > "do the sme for whitebox tools"
 - **Diagnosis & Integration Architecture:**
   - **WhiteboxTools Overview:** WhiteboxTools (developed by Prof. John Lindsay) is a Rust-based, high-performance geospatial analysis engine with over 700 algorithms spanning hydrology, terrain analysis, LiDAR processing, and remote sensing. The official `whitebox` R package provides direct R function wrappers (`whitebox::wbt_*`).
@@ -5476,3 +5476,114 @@ add is already available to QGIS users through the WhiteboxTools provider. That 
 against doing it here — our users are in *this* app — but it does mean step 2 is about making
 **EasyAnalysis** complete, not about contributing something new. Worth knowing before spending
 weeks on it.
+
+---
+
+### 74. WhiteboxTools as a PROVIDER, not 484 wrappers — investigated 2026-08-09
+
+> "instead of wiring all of the 800+ tools, can we create a centralized system that works with
+> the registry to call to the tools? like treat it as a plugin?"
+
+**Yes, and the tool describes itself well enough to make it clean.** Investigated rather than
+assumed; every number below is measured on this machine.
+
+#### What WhiteboxTools exposes about itself
+
+`whitebox::wbt_tool_parameters("<Tool>")` returns **structured JSON** per tool:
+
+```json
+{"parameters":[
+  {"name":"Input DEM File","flags":["-i","--dem"],"description":"Input raster DEM file.",
+   "parameter_type":{"ExistingFile":"Raster"},"default_value":null,"optional":false},
+  {"name":"Output File","flags":["-o","--output"],
+   "parameter_type":{"NewFile":"Raster"},"optional":false},
+  {"name":"Fix flat areas?","flags":["--fix_flats"],
+   "parameter_type":"Boolean","default_value":"true","optional":true},
+  {"name":"Maximum depth (z units)","flags":["--max_depth"],
+   "parameter_type":"Float","optional":true}]}
+```
+
+Name, CLI flag, description, type, default and optionality — everything a spec needs.
+`wbt_list_tools()` gives **484 tools** with one-line descriptions.
+
+#### The type vocabulary is small and closed
+
+Sampled across ten tools spanning hydrology, terrain, raster and LiDAR:
+
+| WhiteboxTools `parameter_type` | Our spec |
+|---|---|
+| `{"ExistingFile":"Raster"}` | `ea_in(key, label, "raster")` |
+| `{"ExistingFile":"Lidar"}` | `ea_in(key, label, "las")` |
+| `{"ExistingFile":"Point"}` / `"Vector"` | `ea_in(key, label, "vector")` |
+| `{"NewFile":"Raster"}` | `ea_out("raster", default)` |
+| `"Float"` / `"Integer"` | `ea_num()` |
+| `"OptionList": ["a","b","c"]` | `ea_sel()` — **the choices are in the type itself** |
+| `"String"` | `ea_txt()` |
+| `"Boolean"` | **`ea_bool()` — does not exist yet, needs adding** |
+
+Eight cases. That is the entire mapper.
+
+#### Why one `run()` serves every tool
+
+WhiteboxTools is uniformly file-based: `system()` on `whitebox_tools.exe` with `--flag=path`
+arguments in and files out. So the closure is identical for all 484 —
+write raster inputs to temp `.tif`, assemble flags from the params, call
+`whitebox::wbt_run_tool(tool, args)`, read the output back with `terra::rast()`. **No per-tool
+code at all.** That is the same argument the registry itself rests on, applied one level up.
+
+#### The one hard constraint: metadata is SLOW
+
+**0.55 s per `wbt_tool_parameters()` call — 484 tools is 266 s (4.4 minutes).** Each call spawns
+the executable. So enumeration must never happen at boot or on demand:
+
+- build the manifest **once**, cache it to disk as JSON, key it by `wbt_version()`;
+- ship a prebuilt manifest so a fresh install pays nothing;
+- rebuild only when the WhiteboxTools version changes.
+
+This is the piece that decides whether the feature feels instant or broken, so it is not an
+optimisation to defer.
+
+#### Curation is the real problem, not plumbing
+
+484 tools added to the current 88 makes **572**. Dumping them into the picker would make the app
+harder to use, not more capable — the exact failure item 67 is already about. Needed:
+
+- **Categories.** `wbt_toolbox()` is **broken**: it panics with
+  *"Unrecognized tool name …whitebox_tools.exe"* because the R package passes the executable path
+  where a tool name belongs. Categories must come from elsewhere — per-tool `wbt_toolbox(tool)`,
+  or the published tool index.
+- **A curated default set** surfaced in the menus, with the remaining hundreds reachable only by
+  search. Coverage is not the goal; *finding the right tool* is.
+- **Provenance in the label**, so a Whitebox tool is visibly not one of ours.
+
+#### Shape of the change
+
+`ea_algorithms()` becomes a concatenation of **providers** rather than one hand-built list:
+
+```r
+ea_algorithms <- function() c(ea_provider_builtin(), ea_provider_whitebox())
+```
+
+`ea_provider_whitebox()` reads the cached manifest and emits specs. Everything downstream —
+`mod_algo.R`, the workspace registration loop, `server.R`'s binding loop, the worker routing —
+already works on whatever the registry returns, so **nothing else changes**.
+
+**This is item 61's plugin SDK arriving through the back door, and that is an argument for doing
+it here first:** a provider that adapts an external toolbox is a smaller, testable instance of
+exactly the abstraction item 61 needs, against a real tool rather than a hypothetical one. If the
+provider interface survives WhiteboxTools, it will survive a plugin.
+
+#### Supersedes item 13 step 2
+
+Item 13 proposed hand-wrapping a chosen handful of `wbt_*` tools. **Do that only if the provider
+proves unworkable** — hand-wrapping is more code, covers less, and goes stale when WhiteboxTools
+updates, whereas a manifest rebuild picks up new tools for free.
+
+#### Verified while investigating: Stop is NOT leaking processes
+
+Flagged as a plausible risk beforehand, and **it turned out to be wrong** — recorded so nobody
+re-opens it. whitebox invokes the tool with a plain blocking `system(exeargs, intern = TRUE)`,
+so `whitebox_tools.exe` is a child of the worker R process. Tested three times: spawn an external
+program from inside a `callr::r_session`, `kill()` the session, check the child. It dies every
+time. `callr` uses `processx`, which places children in a Windows job object, so the whole tree
+goes down together. No orphaned processes, no action needed.
