@@ -48,6 +48,32 @@ showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE
 }
 
 # ==========================================================================
+# WhiteboxTools -- guard the PROGRAM, not just the package
+# ==========================================================================
+# WhiteboxTools is TWO installs. `whitebox` is a thin R wrapper; the tool itself
+# is a separate ~90 MB executable that `whitebox::install_whitebox()` downloads.
+# `launcher/deps.R` installs the wrapper, so requireNamespace() returned TRUE on
+# every machine that had ever run the installer -- and the run then failed INSIDE
+# WhiteboxTools with an error naming a missing file, rather than telling anyone
+# what to install. Guard what is actually used (gotcha 32: verifying a proxy for
+# the dependency is not verifying the dependency).
+.ea_require_whitebox <- function() {
+  if (!requireNamespace("whitebox", quietly = TRUE))
+    stop("The 'whitebox' R package is not installed. Run this once, then try again:\n",
+         "    install.packages('whitebox'); whitebox::install_whitebox()")
+  # check_whitebox_binary() is the only thing that proves the EXECUTABLE is
+  # present. It is wrapped because older versions of the package throw rather
+  # than return FALSE when the binary is absent -- which is the very case here.
+  ok <- tryCatch(isTRUE(whitebox::check_whitebox_binary()), error = function(e) FALSE)
+  if (!ok)
+    stop("The WhiteboxTools program is not installed yet.\n",
+         "The R package is only a wrapper -- the program itself is a separate ",
+         "download of about 90 MB. Run this once, then try again:\n",
+         "    whitebox::install_whitebox()")
+  invisible(TRUE)
+}
+
+# ==========================================================================
 # Cross-validation and classification metric helpers
 # ==========================================================================
 

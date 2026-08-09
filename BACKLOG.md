@@ -1291,7 +1291,7 @@ environment) — worth a quick eyeball that the dropdown populates as you type.
     5. *Python `geolibre` SDK & `reticulate` Sidecar Bridge:* Call GeoLibre's Python package (`geolibre`), `samgeo`, and FastAPI sidecar via R `reticulate` or CLI subprocesses to execute GeoLibre & GeoAI automated processing workflows.
     6. *Embedded Interactive Map Panel:* Add an embedded GeoLibre web canvas viewer (`iframe` or web component window) into EasyAnalysis's workspace view for interactive cloud GIS projects.
 
-### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite
+### 13. WhiteboxTools (`whitebox` R Package) 700+ Advanced Spatial Processing Suite — **STEP 1 DONE v0.11.7, steps 2-3 open**
 > "do the sme for whitebox tools"
 - **Diagnosis & Integration Architecture:**
   - **WhiteboxTools Overview:** WhiteboxTools (developed by Prof. John Lindsay) is a Rust-based, high-performance geospatial analysis engine with over 700 algorithms spanning hydrology, terrain analysis, LiDAR processing, and remote sensing. The official `whitebox` R package provides direct R function wrappers (`whitebox::wbt_*`).
@@ -5431,3 +5431,48 @@ SDK lands.
 **"and others" — recorded, not scoped.** ArcGIS (Python toolbox), R itself (the methods are
 already R functions and could be a package on their own), and a Python/Jupyter API are all
 plausible second targets. QGIS first, as instructed.
+
+
+---
+
+### 13 revisited 2026-08-09 — step 1 done, and the integration was quietly broken
+
+> Asked directly whether WhiteboxTools is fully integrated. It is not, and it was worse than
+> "only a few tools": the two we did expose could not run at all on a fresh machine.
+
+**What was wrong.** WhiteboxTools is TWO installs — the `whitebox` R package (a thin wrapper) and
+the WhiteboxTools **executable**, a separate ~90 MB download fetched by
+`whitebox::install_whitebox()`. `launcher/deps.R` listed `whitebox` in `extras`, so the *wrapper*
+installed and `requireNamespace("whitebox")` returned TRUE — **the guard passed on every machine
+that had ever run the installer.** Nothing anywhere called `install_whitebox()`. So the run
+proceeded and then failed inside WhiteboxTools with a missing-file error, rather than telling
+anyone what to install.
+
+This is gotcha 32's shape exactly: *verifying a proxy for the dependency is not verifying the
+dependency.* `requireNamespace()` proved the wrapper, never the program.
+
+**Fixed in v0.11.7 — this is step 1 of the integration architecture above:**
+
+- `.ea_require_whitebox()` (helpers.R) checks the **program** via
+  `whitebox::check_whitebox_binary()`, wrapped because older package versions throw rather than
+  return FALSE when the binary is absent — which is precisely the case being guarded. Replaces
+  the `requireNamespace`-only guard at all three call sites (`algorithms.R` ×2, `mod_hydro.R`).
+- `launcher/deps.R` now downloads the program once, where the user has already consented to
+  installing dependencies — not at the point of use, where a 90 MB download in the middle of an
+  analysis would be a surprise. Non-fatal: it is an extra, the download can fail on a restricted
+  network, and the app must still start.
+
+**Control-tested:** with the binary present the guard passes; with `check_whitebox_binary()`
+forced to FALSE, and separately forced to throw, it blocks with an actionable message. **The old
+guard passed in all three cases.**
+
+**Still open — steps 2 and 3, and this is the real answer to "is it integrated".** We expose
+**2 of 700+** WhiteboxTools algorithms (`fill_wb`, `flowacc_wb`). Step 2 (wrapping the useful
+`wbt_*` tools as `algorithms.R` entries) and step 3 (reading their file outputs back into the
+pools) are untouched.
+
+**Note the tension with item 73.** If the QGIS direction were pursued, most of what step 2 would
+add is already available to QGIS users through the WhiteboxTools provider. That does not argue
+against doing it here — our users are in *this* app — but it does mean step 2 is about making
+**EasyAnalysis** complete, not about contributing something new. Worth knowing before spending
+weeks on it.

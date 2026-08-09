@@ -22,6 +22,30 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.7 — 2026-08-09
+
+### Item 13 step 1 — WhiteboxTools was guarded on the wrong thing
+
+WhiteboxTools is two installs: the `whitebox` R wrapper, and the ~90 MB executable that
+`whitebox::install_whitebox()` fetches. `deps.R` listed `whitebox` in `extras`, so the wrapper
+installed and `requireNamespace("whitebox")` returned TRUE — **the guard passed on every machine
+that had run the installer** — while nothing anywhere called `install_whitebox()`. The run then
+died inside WhiteboxTools with a missing-file error.
+
+Gotcha 32's shape: verifying a proxy for the dependency is not verifying the dependency.
+
+- `.ea_require_whitebox()` (helpers.R) checks `whitebox::check_whitebox_binary()`, wrapped in
+  `tryCatch` because older package versions throw rather than return FALSE when the binary is
+  absent — exactly the case being guarded. Used at all three sites (`algorithms.R` ×2,
+  `mod_hydro.R`).
+- `deps.R` fetches the program once, at install time where consent already exists, rather than
+  mid-analysis. Non-fatal by design.
+
+**Control-tested:** passes with the binary present; blocks with `check_whitebox_binary()` forced
+to FALSE and separately forced to throw. The old guard passed in all three.
+
+**Steps 2–3 remain open: we expose 2 of 700+ WhiteboxTools algorithms.**
+
 ## v0.11.6 — 2026-08-09
 
 ### Item 65 — draggable layer reordering

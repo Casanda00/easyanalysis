@@ -430,8 +430,7 @@ ea_algorithms <- function() {
        "True depression filling. Requires the whitebox package.",
        default = "Filled",
        run = function(inp, p) {
-         if (!requireNamespace("whitebox", quietly = TRUE))
-           stop("Package 'whitebox' is not installed. Run: install.packages('whitebox'); whitebox::install_whitebox()")
+         .ea_require_whitebox()
          din <- tempfile(fileext = ".tif"); dout <- tempfile(fileext = ".tif")
          terra::writeRaster(inp$dem, din, overwrite = TRUE)
          whitebox::wbt_fill_depressions(din, dout)
@@ -442,8 +441,7 @@ ea_algorithms <- function() {
        "Fills depressions, then D8 accumulation in cells. Requires whitebox.",
        default = "FlowAcc",
        run = function(inp, p) {
-         if (!requireNamespace("whitebox", quietly = TRUE))
-           stop("Package 'whitebox' is not installed. Run: install.packages('whitebox'); whitebox::install_whitebox()")
+         .ea_require_whitebox()
          din <- tempfile(fileext = ".tif"); dfill <- tempfile(fileext = ".tif")
          dout <- tempfile(fileext = ".tif")
          terra::writeRaster(inp$dem, din, overwrite = TRUE)

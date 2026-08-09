@@ -133,4 +133,31 @@ if (length(missing_extra))
   message("deps: note — optional extras unavailable (screens degrade ",
           "gracefully): ", paste(missing_extra, collapse = ", "))
 
+# --- WhiteboxTools: the PROGRAM, not just the wrapper ----------------------
+# `whitebox` is a thin R wrapper around a separate ~90 MB executable. Installing
+# the package alone left the hydrology tools looking installed and failing at
+# run time with a missing-file error from inside WhiteboxTools, because
+# requireNamespace() only ever proved the wrapper was there. Fetch the program
+# too, once, here — where the user has already consented to installing
+# dependencies — rather than at the point of use, where a 90 MB download in the
+# middle of an analysis would be a surprise.
+#
+# Deliberately non-fatal: it is an extra, the download can fail on a restricted
+# network, and the app must still start. `.ea_require_whitebox()` (helpers.R)
+# reports the shortfall clearly if this did not succeed.
+if ("whitebox" %in% installed_now) {
+  have_wbt <- tryCatch(isTRUE(whitebox::check_whitebox_binary()),
+                       error = function(e) FALSE)
+  if (!have_wbt) {
+    message("deps: downloading the WhiteboxTools program (~90 MB, once)…")
+    ok <- tryCatch({ whitebox::install_whitebox(); TRUE },
+                   error = function(e) { message("deps: note — ", conditionMessage(e)); FALSE })
+    have_wbt <- ok && tryCatch(isTRUE(whitebox::check_whitebox_binary()),
+                               error = function(e) FALSE)
+    message(if (have_wbt) "deps: WhiteboxTools ready."
+            else paste("deps: note — WhiteboxTools program unavailable; the two",
+                       "whitebox hydrology tools will explain how to install it."))
+  }
+}
+
 message("deps: OK")

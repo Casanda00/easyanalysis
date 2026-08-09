@@ -20,6 +20,18 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.7 — 2026-08-09
+
+### The WhiteboxTools hydrology tools could not run on a new machine
+
+*Fill depressions* and *Flow accumulation* use WhiteboxTools, which comes in two parts: a small
+R package, and the WhiteboxTools program itself — a separate download of about 90 MB. The
+installer set up the package but never the program, and the app only checked for the package. So
+both tools looked available and then failed with a confusing file error.
+
+The installer now downloads the program too, once. If it is still missing — on a restricted
+network, say — the tools now say exactly that, and how to fix it, instead of failing obscurely.
+
 ## v0.11.6 — 2026-08-09
 
 ### Drag layers to reorder them

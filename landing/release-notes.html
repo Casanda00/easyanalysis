@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.6.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.7.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,22 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.6</b> · 75 releases ·
+      <p class="meta">Latest: <b>v0.11.7</b> · 76 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-6"><h2><a class="anchor" href="#v0-11-6">v0.11.6</a><span class="when">2026-08-09</span></h2>
+<section class="rel" id="v0-11-7"><h2><a class="anchor" href="#v0-11-7">v0.11.7</a><span class="when">2026-08-09</span></h2>
+<h3>The WhiteboxTools hydrology tools could not run on a new machine</h3>
+<p><em>Fill depressions</em> and <em>Flow accumulation</em> use WhiteboxTools, which comes in two parts: a small
+R package, and the WhiteboxTools program itself — a separate download of about 90 MB. The
+installer set up the package but never the program, and the app only checked for the package. So
+both tools looked available and then failed with a confusing file error.</p>
+<p>The installer now downloads the program too, once. If it is still missing — on a restricted
+network, say — the tools now say exactly that, and how to fix it, instead of failing obscurely.</p>
+</section><section class="rel" id="v0-11-6"><h2><a class="anchor" href="#v0-11-6">v0.11.6</a><span class="when">2026-08-09</span></h2>
 <h3>Drag layers to reorder them</h3>
 <p>Grab the handle at the left of any layer row and drag it up or down. The order you set is the
 <strong>drawing order on the map</strong> — put a vector outline above a raster, or one raster above another.

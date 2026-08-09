@@ -104,8 +104,7 @@ hydroServer <- function(id, raster_pool) {
         op <- input$operation %||% "twi"
 
         if (op %in% c("fill_wb", "flowacc_wb")) {
-          if (!requireNamespace("whitebox", quietly = TRUE))
-            stop("Package 'whitebox' is not installed. Run: install.packages('whitebox'); whitebox::install_whitebox()")
+          .ea_require_whitebox()
           tmp_dem  <- tempfile(fileext = ".tif")
           tmp_out  <- tempfile(fileext = ".tif")
           terra::writeRaster(dem, tmp_dem, overwrite = TRUE)
