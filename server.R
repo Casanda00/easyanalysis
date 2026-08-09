@@ -1066,6 +1066,7 @@ server <- function(input, output, session) {
   rs_ctx         <- rsSearchServer("rs_search", dataset_pool, active_dataset, raster_pool)
   rec_ctx        <- recommendServer("recommend", dataset_pool, active_dataset)
   plugins_ctx    <- pluginsServer("plugins",
+                    open = reactive(input$plugins_open),
                     on_change = function() plugin_epoch(isolate(plugin_epoch()) + 1))
   # Activation takes effect immediately: bind whatever became active, and the
   # workspace rebuilds its catalogue off the same epoch.

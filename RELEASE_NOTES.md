@@ -20,6 +20,15 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.12 — 2026-08-09
+
+### Plugins now opens as a dialog
+
+Choosing **Plugins** used to replace whatever you were working on with a full screen. It now
+opens as a pop-up, the same way **Packages** does, so your map and tool panel stay where they
+were. Everything is in the one dialog: enable WhiteboxTools, index its tools, search them, and
+switch individual tools on or off.
+
 ## v0.11.11 — 2026-08-09
 
 ### Plugins now has its own menu

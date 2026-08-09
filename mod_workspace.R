@@ -689,11 +689,16 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         # "what else can this app do". It was reachable only through
         # Analysis > More > Plugins, which is the item-67 failure again: built,
         # tested, and effectively invisible.
+        # App-level trigger, not .setTool(): Plugins is a DIALOG now, not a
+        # screen, so it must not take the canvas or the tool panel. Same shape as
+        # the Packages menu items above.
         .menu("Plugins", "puzzle-piece", tagList(
-          .mi("Manage plugins…", .setTool("plugins")),
+          .mi("Manage plugins…",
+              "Shiny.setInputValue('plugins_open', Date.now(), {priority:'event'})"),
           .msep(),
           tags$div(class = "gm-grp", "Available"),
-          .mi("WhiteboxTools — 484 spatial tools", .setTool("plugins"))
+          .mi("WhiteboxTools — 484 spatial tools",
+              "Shiny.setInputValue('plugins_open', Date.now(), {priority:'event'})")
         )),
         .menu("Settings", "gear", tagList(
           .mi("Preferences…", "openSettings('set-display')"),
@@ -2535,7 +2540,6 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       pointcloud     = list(nm = "Point cloud / 3D",    grp = "Spatial & LiDAR", tools = lidarPointcloudToolsUI, canvas = NULL, map_based = TRUE),
       metrics        = list(nm = "LiDAR metrics",       grp = "Spatial & LiDAR", tools = lidarMetricsToolsUI, canvas = NULL, map_based = TRUE),
       # --- Docs (R console is NOT here: it lives in the bottom dock) ---
-      plugins        = list(nm = "Plugins",           grp = "More", tools = pluginsToolsUI,  canvas = pluginsCanvasUI),
       docs           = list(nm = "Documentation",       grp = "More", tools = docsToolsUI,       canvas = docsCanvasUI),
       references     = list(nm = "References",          grp = "More", tools = referencesToolsUI, canvas = referencesCanvasUI)
     )

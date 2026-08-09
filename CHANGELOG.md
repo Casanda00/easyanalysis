@@ -22,6 +22,30 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.12 — 2026-08-09
+
+### Item 76b — Plugins is a dialog, not a screen
+
+Managing plugins is a settings action, so it should not take the canvas or displace the tool
+panel. Rebuilt on the Packages pattern rather than beside it.
+
+- **`ea_settings_modal()` (helpers.R)** — the general settings-dialog shape, extracted from the
+  Packages modals so Packages / Plugins / Preferences share one implementation.
+- `pluginsCanvasUI` / `pluginsToolsUI` deleted; the module is no longer in `MODUI`. The menu
+  fires an app-level `plugins_open`, the same way the Packages items fire `pkg_*_ui`.
+- Provider enable/disable and both Index buttons moved into the provider card, since a dialog has
+  no tools panel.
+
+**Structural detail worth keeping:** the search box is a real `textInput` in the dialog shell,
+not inside the reactive body — only the card and results are `uiOutput()`s. Rebuilding a text
+field on each keystroke wipes it mid-edit (gotcha 21). `ea_settings_modal()` documents that in
+its own comment.
+
+`check_plugins.R` gained *shape* controls: the canvas and tools UI must be absent, the dialog
+must use `ea_settings_modal`, and the module must not appear in `MODUI`. The reachability
+assertion was retargeted from "registered and bound" to "has a top-level menu" — the old one
+passed while Plugins was unreachable.
+
 ## v0.11.11 — 2026-08-09
 
 ### Plugins is now a top-level menu, beside Packages

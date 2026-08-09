@@ -5815,7 +5815,7 @@ only, as instructed.
 
 ---
 
-### 76. Plugins must behave like Packages — a dialog, not a screen
+### 76. Plugins must behave like Packages — a dialog, not a screen — **DONE v0.11.12**
 
 > "plugins should have the same behavior as packages. not a full screen just the pop up that
 > shows up. learn from packages screen. … not in the sidebar too."
@@ -5957,3 +5957,37 @@ dominate for a multi-GB raster:
 large file and fix whichever dominates. A progress indication is needed either way — the global
 "Running…" pill covers server-side work but **not** the browser-side upload, which is precisely
 the phase that feels like a hang.
+
+
+---
+
+### 76b built v0.11.12 — Plugins is a dialog, and the shape is reusable
+
+> "plugins should have the same behavior as packages. not a full screen just the pop up that
+> shows up. learn from packages screen. … and i hope we can have a general settings for this for
+> future use. not in the sidebar too."
+
+**Done, learned from Packages rather than invented alongside it.**
+
+- **`ea_settings_modal()` (helpers.R) is the general shape asked for.** Extracted from the
+  Packages modals — title, optional hint, body, footer — so Packages, Plugins, Preferences and
+  whatever follows are one implementation instead of three that merely look alike.
+- **`pluginsCanvasUI` / `pluginsToolsUI` are gone.** The module no longer has a canvas or a tools
+  panel and is no longer registered in `MODUI`, so it cannot take the centre or the sidebar. The
+  menu fires an app-level `plugins_open`, exactly as the Packages items fire `pkg_*_ui`.
+- Provider enable/disable and the two Index buttons **moved into the provider card**, because a
+  dialog has no tools panel — and a settings action should not need one.
+- The catalogue status became an inline "Indexing… <tool>" string rather than a panel block.
+
+**One deliberate structural detail.** The search box is a **real `textInput` in the dialog shell**,
+not inside the reactive body; only the card and the results list are `uiOutput()`s. Rebuilding a
+text field on every keystroke wipes it mid-edit — gotcha 21, which this project has already been
+bitten by once in the plot-appearance panel. `ea_settings_modal()` carries that warning in its
+own comment so the next caller does not rediscover it.
+
+**Guarded.** `check_plugins.R` gained controls for the *shape*, not just the behaviour: the canvas
+and tools UI must be **absent**, the dialog must be built on `ea_settings_modal`, and the module
+must **not** appear in `MODUI`. The reachability assertion was also retargeted — it used to
+assert the tool was *registered and bound*, which passed while Plugins sat buried in an
+`Analysis → More` fly-out nobody found. It now asserts the top-level menu exists. **Registration
+is not reachability**, and that was the lesson of v0.11.11.

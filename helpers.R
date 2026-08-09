@@ -48,6 +48,29 @@ showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE
 }
 
 # ==========================================================================
+# Settings dialogs -- one shape for every "manage something" screen
+# ==========================================================================
+# Packages, Plugins, Preferences and whatever follows are all the same kind of
+# thing: you open them, change a setting, and close them. None of them is an
+# analysis, so none should take the canvas or displace the tool panel -- which is
+# exactly what made the first Plugins screen wrong.
+#
+# This is that shape, extracted from the Packages modals rather than invented, so
+# there is ONE implementation instead of three that merely look alike.
+#
+# Note what is deliberately NOT here: the body. A settings dialog whose contents
+# are rebuilt reactively must keep its own inputs OUTSIDE the reactive part, or
+# every keystroke re-creates the field and wipes it mid-edit (gotcha 21). Callers
+# pass a static shell containing uiOutput()s, not a fully reactive body.
+ea_settings_modal <- function(title, ..., hint = NULL,
+                              footer = modalButton("Close"), size = "l") {
+  modalDialog(title = title, easyClose = TRUE, size = size,
+    if (!is.null(hint)) div(class = "ea-hint", hint),
+    ...,
+    footer = footer)
+}
+
+# ==========================================================================
 # WhiteboxTools -- guard the PROGRAM, not just the package
 # ==========================================================================
 # WhiteboxTools is TWO installs. `whitebox` is a thin R wrapper; the tool itself

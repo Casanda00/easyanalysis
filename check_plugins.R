@@ -138,8 +138,10 @@ ea_plugin_set("whitebox", FALSE)
 local({ st <- ea_plugin_state(); st$tools[["whitebox"]] <- character(0)
         ea_plugin_state_set(st) })
 
-R <- NULL
-suppressWarnings(testServer(pluginsServer, args = list(), {
+R  <- NULL
+OP <- reactiveVal(0)
+suppressWarnings(testServer(pluginsServer, args = list(open = OP), {
+  OP(1)                                   # open the dialog, as the menu does
   session$setInputs(q = "", filt = "feat")
   R <<- list(card = !is.null(output$provider_card),
              res  = !is.null(output$results))
@@ -159,7 +161,24 @@ suppressWarnings(testServer(pluginsServer, args = list(), {
   R$cleared <<- length(ea_plugin_state()$tools[["whitebox"]] %||% character(0)) == 0
 }))
 
-say(isTRUE(R$card) && isTRUE(R$res), "the Plugins screen renders its card and tool list")
+say(isTRUE(R$card) && isTRUE(R$res), "the Plugins dialog renders its card and tool list")
+
+# It must be a DIALOG, not a screen. The first version took the canvas and the
+# tool panel, which is wrong for a settings action -- and is the specific thing
+# item 76b exists to correct.
+mp <- paste(readLines("mod_plugins.R", warn = FALSE), collapse = "
+")
+say(!grepl("pluginsCanvasUI", mp, fixed = TRUE) &&
+    !grepl("pluginsToolsUI",  mp, fixed = TRUE),
+    "CONTROL: the canvas and tools UI are gone -- it is no longer a screen")
+say(grepl("ea_settings_modal", mp, fixed = TRUE),
+    "the dialog is built on the shared settings-modal shape")
+w2 <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = "
+")
+say(!grepl('plugins        = list(nm = "Plugins"', w2, fixed = TRUE),
+    "CONTROL: it is no longer registered as a workspace tool")
+say(grepl("Shiny.setInputValue('plugins_open'", w2, fixed = TRUE),
+    "the top-level menu opens it as a dialog")
 say(isTRUE(R$prov_on),  "the Enable button turns the provider on")
 say(isTRUE(R$tool_on),  "a per-tool switch enables that tool")
 say(isTRUE(R$tool_off), "and turns it off again")
@@ -170,8 +189,13 @@ say(isTRUE(R$cleared), "'Disable every tool' clears them")
 # ---- 10. The screen is reachable --------------------------------------------
 # A screen nobody can open is the item-67 failure in a new place.
 w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = " ")
-say(grepl('plugins        = list(nm = "Plugins"', w, fixed = TRUE),
-    "the Plugins tool is registered in the workspace catalogue")
+# Reachability, NOT registration. The previous version of this check asserted the
+# tool was registered and its server bound, and passed while Plugins sat buried in
+# an Analysis > More fly-out that nobody found. Registration is not reachability.
+say(grepl('.menu("Plugins", "puzzle-piece"', w, fixed = TRUE),
+    "Plugins has its OWN top-level menu, beside Packages")
+say(!grepl('"Whitebox tools", NULL, disabled = TRUE', w, fixed = TRUE),
+    "CONTROL: the dead disabled Whitebox placeholder is gone")
 s <- paste(readLines("server.R", warn = FALSE), collapse = " ")
 # Matched WITHOUT the closing paren: the call is multi-line since on_change was
 # added, and pinning the exact text made this fail against working code.

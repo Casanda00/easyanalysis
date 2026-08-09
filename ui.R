@@ -1277,6 +1277,17 @@ page_fillable(
     /* ---- Plugin menu (item 74 phase 2) --------------------------------
        Every colour is a token: a fixed light panel looks right in one theme and
        keeps its cream background under light text on every dark set (gotcha 31). */
+    /* Plugins is a DIALOG, not a screen (item 76b): the list scrolls inside the
+       modal so the modal itself never grows past the viewport. */
+    .ea-plug-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                  margin: 12px 0 8px; }
+    .ea-plug-bar .form-group { margin-bottom: 0; }
+    .ea-plug-bar > .form-group:first-child { flex: 1 1 220px; }
+    .ea-plug-bar .shiny-options-group { display: flex; gap: 10px; }
+    .ea-plug-scroll { max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+    .ea-plug-actions { display: flex; gap: 8px; align-items: center;
+                  flex-wrap: wrap; margin-top: 12px; }
+    .ea-plug-busy { font: 500 11.5px var(--mono); color: var(--bark); }
     .ea-plug-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
                   background: var(--panel); margin: 0 0 14px; }
     .ea-plug-card.on { border-color: var(--forest);
