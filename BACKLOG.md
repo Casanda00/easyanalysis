@@ -5666,22 +5666,22 @@ matters for speed — provider ON with no tools activated still contributes noth
 **More -> Plugins.** Built to the design as given: opt-in provider, per-tool activation, and
 search that reaches tools which are not yet enabled.
 
-- **Provider card** naming the authors -- Prof. John Lindsay, R package by Qiusheng Wu and
-  Andrew Brown (MIT) -- and linking out. Enabling somebody else another team wrote should be a
-  visible decision, not a feature that silently appeared.
+- **Provider card** naming the authors — Prof. John Lindsay, R package by Qiusheng Wu and
+  Andrew Brown (MIT) — and linking out. Enabling work another team wrote should be a visible
+  decision, not a feature that silently appeared.
 - **Per-tool switches** reuse the layer-visibility switch idiom, so it reads as the same kind of
   control rather than a new one.
 - **Search covers the whole catalogue** regardless of activation, and each row can be switched on
   from the result. This is the part that keeps the app fast without shrinking it.
-- **Indexing runs in the background** (, ). Shiny is
+- **Indexing runs in the background** (`ea_wbt_build_async()`, `callr::r_bg`). Shiny is
   single-threaded, so an in-process build would freeze the app for the whole ~8 minutes
   (gotcha 29); even the 31 featured tools would block for ~30 s. The child prints one line per
   tool and the module polls stdout, so progress needs no shared state between processes.
 
 #### The limitation, and why it was not papered over
 
-**A newly enabled tool needs a page reload, and the UI says so.**  is built once at
-workspace construction and  binds at session start, so immediate activation means
+**A newly enabled tool needs a page reload, and the UI says so.** `MODUI` is built once at
+workspace construction and `server.R` binds at session start, so immediate activation means
 making the tool catalogue reactive and binding modules mid-session. Tools enabled in a *previous*
 session are present at boot, so this only affects the session in which you enable something.
 
@@ -5693,5 +5693,5 @@ FIRST OPEN**, which is still open.
 
 - Lazy binding on first open, so no reload is needed.
 - A project that used a now-disabled tool should say so when it opens, like the missing-file flag.
-- Only WhiteboxTools has a provider. The interface is deliberately general -- 
-  concatenates providers -- so a second one is the test of whether this generalises to item 61.
+- Only WhiteboxTools has a provider. The interface is deliberately general — `ea_algorithms()`
+  concatenates providers — so a second one is the test of whether this generalises to item 61.
