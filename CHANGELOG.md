@@ -22,6 +22,32 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.4 — 2026-08-09
+
+### Item 68a — the CV caveat was styled as a footnote
+
+`.prf_dt()` wraps the note in `<span class="ea-cv-note">`; `ui.R` styles it as a bordered chip
+via `color-mix(in srgb, var(--warn) 18%, transparent)` — translucent so it takes its lightness
+from the background in every palette (gotcha 31). Position deliberately unchanged: a caveat
+moved away from the number is a caveat nobody reads.
+
+**Three faults in the fix, all caught by the guard — see BACKLOG item 71:**
+
+1. A literal `"` inside a CSS comment in `tags$style(HTML("..."))` broke the R parse. Gotcha 1,
+   in the file that documents gotcha 1.
+2. **DT escapes a character caption wholesale**, so the first version rendered
+   `&lt;span class='ea-cv-note'&gt;` — visible angle brackets, worse than the understyling it
+   replaced. Must be `htmltools::tags$caption(cap, tags$span(...))`. CONTROL assertion added
+   (`!grepl("&lt;span", cap)`) because the class-presence check passed while the page was
+   broken.
+3. **`as.character()` on a bslib page does not walk the whole tree** — the style-rule assertion
+   failed against a correct UI. `htmltools::renderTags()` is the idiom, as `check_ui_js.R`
+   already used. A CONTROL now confirms the stylesheet is present before asserting the rule.
+
+**Appearance still unverified** — the guard proves markup, escaping and presence of the rule,
+not contrast across the five palettes or wrapping in a narrow panel. Item 68 remains open,
+narrowed to that.
+
 ## v0.11.3 — 2026-08-09
 
 ### Error notifications are persistent — one wrapper, not 110 edits

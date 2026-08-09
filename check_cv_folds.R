@@ -29,7 +29,7 @@
 # Run:  Rscript check_cv_folds.R
 
 suppressMessages({library(shiny); library(bslib); library(shinyWidgets)})
-source("global.R")
+source("global.R"); source("ui.R")
 
 ok  <- TRUE
 say <- function(p, m) { cat(if (p) "PASS  " else "FAIL  ", m, "\n", sep = ""); if (!p) ok <<- FALSE }
@@ -74,6 +74,36 @@ say(inherits(.prf_dt(prf, 0.9), "datatables"), "CONTROL: .prf_dt unchanged with 
 cap <- .prf_dt(prf, 0.9, note = "Incomplete: something.")$x$caption
 say(grepl("Incomplete", cap) && grepl("90.0%", cap),
     "the caveat sits in the caption beside the accuracy")
+cap <- gsub("\\s+", " ", cap)
+say(grepl("class=[\"']ea-cv-note[\"']", cap),
+    "the caveat carries its own class, so it does not inherit caption styling")
+# CONTROL for the trap this actually hit: DT escapes a CHARACTER caption
+# wholesale, so a hand-built "<span>" arrives as visible &lt;span&gt;. Requiring a
+# real tag is the assertion -- the first attempt passed the class check above
+# while rendering angle brackets on screen.
+say(!grepl("&lt;span", cap),
+    "CONTROL: the span is real markup, not an escaped string DT would show literally")
+say(grepl("<span class=[\"']ea-cv-note[\"']>Incomplete: something[.]</span>", cap),
+    "the note text is inside that span, not merely near it")
+cap2 <- .prf_dt(prf, 0.9, note = "5 < 10 & \"quoted\"")$x$caption
+say(grepl("5 &lt; 10 &amp;", cap2),
+    "the note TEXT is still escaped, so a message containing < or & is safe")
+
+# The tone itself cannot be behaviour-tested without a browser. Asserting the rule
+# reaches the RENDERED ui is the strongest check available here; that it LOOKS
+# right remains an eyeball job (item 68).
+# htmltools::renderTags(), not as.character(): as.character() on a bslib page does
+# not walk the whole tree, so most of the stylesheet is simply absent from its
+# output and this assertion failed against a UI that was in fact correct -- a
+# harness fault of the usual kind (gotcha 33). Same idiom as check_ui_js.R.
+u  <- if (is.function(ui)) ui(NULL) else ui
+rt <- htmltools::renderTags(u)
+ui_html <- paste(paste(as.character(rt$head), collapse = "\n"),
+                 paste(as.character(rt$html), collapse = "\n"), sep = "\n")
+say(grepl("table.dataTable", ui_html, fixed = TRUE),
+    "CONTROL: the stylesheet is actually present in the rendered output")
+say(grepl("caption .ea-cv-note", ui_html, fixed = TRUE),
+    "the rendered UI ships a style rule for the caveat (appearance NOT verified)")
 
 # ---- 4. The real modules ----------------------------------------------------
 set.seed(1)

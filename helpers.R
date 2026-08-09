@@ -161,8 +161,21 @@ showNotification <- function(ui, action = NULL, duration = 5, closeButton = TRUE
     df$F1        <- fmt3(df$F1)
     cap <- if (!is.null(acc_or_list) && length(acc_or_list) == 1 && !is.na(acc_or_list))
       sprintf("Accuracy: %.1f%%", acc_or_list * 100) else NULL
+    # The caveat has to sit beside the number, but NOT inherit the caption's
+    # styling. DT injects the caption as a raw <caption>, which carries no class,
+    # and bootstrap paints bare `caption` with --bs-secondary-color (mapped to
+    # --bark in ui.R) -- the lowest-emphasis text the table has. A statement that
+    # the number next to it is unreliable was therefore rendered as a footnote.
+    #
+    # It must be built as a TAG, not as a string. DT escapes a character caption
+    # wholesale, so an inline "<span>" arrives as visible &lt;span&gt; -- angle
+    # brackets on screen, which is worse than the understyling it was meant to
+    # fix. Passing tags$caption() hands DT markup it will not re-escape, and
+    # htmltools escapes the message text itself, so a note containing < or & is
+    # still safe.
     if (!is.null(note) && nzchar(note))
-      cap <- if (is.null(cap)) note else paste0(cap, "  -  ", note)
+      cap <- htmltools::tags$caption(
+        cap, htmltools::tags$span(class = "ea-cv-note", note))
     tbl <- DT::datatable(df, rownames = FALSE, caption = cap,
       options = list(dom = "t", paging = FALSE, ordering = FALSE, scrollX = FALSE),
       class = "compact stripe")

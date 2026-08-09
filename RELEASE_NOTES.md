@@ -20,6 +20,18 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.4 — 2026-08-09
+
+### The cross-validation warning now looks like a warning
+
+The message that says part of your data was left out of a cross-validated score was correct,
+and sat in the right place — but it was rendered in the same faint style tables use for
+ordinary labels. A statement that the number next to it is unreliable read like a footnote.
+
+It now appears as a highlighted chip beside the score, in a colour that adapts to whichever
+theme you are using. It still sits next to the number rather than somewhere else on the page,
+because that is the only place it will actually be read.
+
 ## v0.11.3 — 2026-08-09
 
 ### Error messages now stay on screen until you dismiss them

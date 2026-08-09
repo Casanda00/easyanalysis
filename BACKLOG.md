@@ -5157,3 +5157,43 @@ saying so, so nobody reads it as dead code. The analysis was right; the delivery
 **Where it should return:** a panel the user opens when they want it — collapsed by default,
 on the data screen or in Recommend. Pull, not push. Not built yet, deliberately: it should be
 designed as something declined by default rather than re-added as a quieter interruption.
+
+---
+
+### 71. The CV caveat was styled as a footnote — FIXED v0.11.4 (item 68a)
+
+Item 68 recorded that the cross-validation caveat had never been looked at, and traced the
+cascade without a browser: `DT` injects the caption as a bare `<caption>` with no class,
+bootstrap paints bare `caption` with `--bs-secondary-color`, and `ui.R` maps that to `--bark`,
+the per-theme **secondary** text colour. Legible in every theme — and rendered in the
+lowest-emphasis style the table has. A statement that the number beside it was computed from
+less data than it claims, styled as a footnote.
+
+**Fixed by giving the caveat its own hook rather than moving it.** Position is not the problem:
+a caveat moved away from the number is a caveat nobody reads. `.prf_dt()` now wraps the note in
+`<span class="ea-cv-note">`, and `ui.R` styles it as a bordered chip using
+`color-mix(in srgb, var(--warn) 18%, transparent)` — translucent, so it takes its lightness
+from whatever is behind it in every theme rather than being a fixed tint that suits one
+(gotcha 31).
+
+#### Three faults in the fix itself, all caught by the guard
+
+1. **A literal `"` inside a CSS comment in `tags$style(HTML("…"))` broke the R parse** — gotcha
+   1, in the very file that documents it. The comment contained a quoted phrase.
+2. **DT escapes a CHARACTER caption wholesale.** The first version built the span as a string,
+   so it arrived as `&lt;span class='ea-cv-note'&gt;` — **visible angle brackets on screen**,
+   which is worse than the understyling it was meant to fix. It has to be a tag:
+   `htmltools::tags$caption(cap, tags$span(class = "ea-cv-note", note))`. DT does not re-escape
+   a tag, and htmltools still escapes the message text, so a note containing `<` or `&` stays
+   safe. There is now a CONTROL assertion for exactly this (`!grepl("&lt;span", cap)`), because
+   the class-presence check passed while the page rendered brackets.
+3. **`as.character()` on a bslib page does not walk the whole tree.** The assertion that the
+   style rule reaches the rendered UI failed against a UI that was correct — most of the
+   stylesheet was simply absent from `as.character()`'s output. `htmltools::renderTags()` is
+   the right idiom, as `check_ui_js.R` already knew. A CONTROL now asserts the stylesheet is
+   present at all before asserting the new rule is in it.
+
+**Still not verified visually.** The guard proves the markup, the escaping and the presence of
+the rule. Whether the chip *looks* right — contrast against each of the five palettes, wrapping
+on a narrow panel — remains an eyeball job. Item 68 stays open for that reason, now narrowed to
+appearance alone.

@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.3.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.4.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,22 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.3</b> · 72 releases ·
+      <p class="meta">Latest: <b>v0.11.4</b> · 73 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-3"><h2><a class="anchor" href="#v0-11-3">v0.11.3</a><span class="when">2026-08-09</span></h2>
+<section class="rel" id="v0-11-4"><h2><a class="anchor" href="#v0-11-4">v0.11.4</a><span class="when">2026-08-09</span></h2>
+<h3>The cross-validation warning now looks like a warning</h3>
+<p>The message that says part of your data was left out of a cross-validated score was correct,
+and sat in the right place — but it was rendered in the same faint style tables use for
+ordinary labels. A statement that the number next to it is unreliable read like a footnote.</p>
+<p>It now appears as a highlighted chip beside the score, in a colour that adapts to whichever
+theme you are using. It still sits next to the number rather than somewhere else on the page,
+because that is the only place it will actually be read.</p>
+</section><section class="rel" id="v0-11-3"><h2><a class="anchor" href="#v0-11-3">v0.11.3</a><span class="when">2026-08-09</span></h2>
 <h3>Error messages now stay on screen until you dismiss them</h3>
 <p>When something failed, the app explained why — and then deleted the explanation a few seconds
 later. Almost every error message in the app behaved this way.</p>

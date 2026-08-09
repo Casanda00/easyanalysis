@@ -288,6 +288,18 @@ page_fillable(
     .table > :not(caption) > * > * {
       background-color: transparent; color: var(--ink); border-color: var(--line);
     }
+    /* A results caption is secondary text by design, which is right for a label
+       and WRONG for a statement that the number beside it was computed from less
+       data than it claims. The caveat keeps its position next to the accuracy --
+       a caveat moved elsewhere is a caveat nobody reads -- but not the weight.
+       Translucent color-mix so it takes its lightness from whatever is behind it
+       in every theme, rather than a fixed tint that only suits one. */
+    caption .ea-cv-note {
+      display: inline-block; margin-left: 8px; padding: 1px 8px;
+      border: 1px solid var(--warn); border-radius: 5px;
+      background: color-mix(in srgb, var(--warn) 18%, transparent);
+      color: var(--ink); font-weight: 600; white-space: normal;
+    }
     .dataTables_wrapper, .dt-container, .dataTables_info, .dt-info,
     .dataTables_length, .dt-length, .dataTables_filter, .dt-search,
     .dataTables_paginate, .dt-paging { color: var(--ink); }
