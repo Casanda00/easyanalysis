@@ -52,7 +52,7 @@ pluginsToolsUI <- function(id) {
   )
 }
 
-pluginsServer <- function(id) {
+pluginsServer <- function(id, on_change = function() invisible(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -60,7 +60,9 @@ pluginsServer <- function(id) {
     build <- reactiveVal(NULL)          # the running background process
     blog  <- reactiveVal("")
 
-    .refresh <- function() bump(isolate(bump()) + 1)
+    # Every state change refreshes this screen AND tells the app to bind whatever
+    # became active. Activation is useless if the tool does not then appear.
+    .refresh <- function() { bump(isolate(bump()) + 1); on_change() }
     .state   <- reactive({ bump(); ea_plugin_state() })
 
     have_wbt <- reactive({
@@ -228,15 +230,14 @@ pluginsServer <- function(id) {
       ea_tool_set("whitebox", tg$tool, isTRUE(tg$on))
       .refresh()
       showNotification(
-        sprintf("%s %s. Reload the page to use it.", tg$tool,
-                if (isTRUE(tg$on)) "enabled" else "disabled"),
-        type = "message", duration = 6)
+        sprintf("%s %s.", tg$tool, if (isTRUE(tg$on)) "enabled" else "disabled"),
+        type = "message", duration = 4)
     })
 
     observeEvent(input$enable_feat, {
       ea_wbt_enable_featured(); .refresh()
-      showNotification(sprintf("Enabled %d common tools. Reload the page to use them.",
-                               length(EA_WBT_FEATURED)), type = "message", duration = 8)
+      showNotification(sprintf("Enabled %d common tools.", length(EA_WBT_FEATURED)),
+                       type = "message", duration = 5)
     })
     observeEvent(input$disable_all, {
       st <- ea_plugin_state(); st$tools[["whitebox"]] <- character(0)

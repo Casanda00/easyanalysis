@@ -20,6 +20,14 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.10 — 2026-08-09
+
+### Enabling a tool now works straight away
+
+Turning on a WhiteboxTools tool used to require reloading the page before you could use it. It
+does not any more — enable it and it appears in the tool list immediately, the same way an
+installed package is available as soon as it is installed.
+
 ## v0.11.9 — 2026-08-09
 
 ### New: a Plugins screen

@@ -22,6 +22,44 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.10 — 2026-08-09
+
+### Item 74 phase 2b — enabling a tool no longer needs a page reload
+
+The reload was rejected, correctly, and the underlying question was whether the plugin
+foundation is sound. It is — **at one joint it was not**: `MODUI` was built once at workspace
+construction and `server.R` bound algorithm modules in a one-shot `lapply`. Both assumed a static
+registry. Neither is a flaw in the provider design; both were assumptions from when the registry
+could only change between sessions.
+
+- `MODUI` construction became `.build_modui()` behind
+  `MODUI_R <- reactive({ plugin_epoch(); .build_modui() })`; the ten consumer references now read
+  the reactive, so menus, tool picker and search rebuild on activation. List construction only —
+  nothing like the 33 ms-per-tool cost of binding.
+- `.bind_algos()` binds only ids absent from `.algo_bound`. **Idempotence is the point:**
+  re-binding an id would create a second set of observers on one namespace, which surfaces as a
+  Run button firing an operation twice.
+- `plugin_epoch` joins them; `pluginsServer(on_change =)` bumps it. All "reload the page" wording
+  removed, because it is no longer true.
+
+`check_plugins.R` is now 40 assertions. The control that matters: the tool is absent from the
+workspace catalogue before enabling and present **in the same session** after, with its
+provenance label. A first bind pass takes 52 entries, a second takes **zero**, and enabling one
+more binds exactly one.
+
+**Left dynamic-but-not-yet:** `module_ctx` is a plain list assembled once, so a tool enabled
+mid-session is usable but does not report to the Co-Analyst until the next session. Recorded, not
+hidden.
+
+### Item 75 — provider roadmap, and the line between a provider and a feature
+
+Documented. The useful part is the distinction: **WhiteboxTools** is a tool library (a provider),
+**GeoAI** is a provider with a Python backend and probably a *declared* rather than generated
+spec list, **GeoLibre** is a source of feature ideas, and **swipe is a map feature that is not a
+plugin at all** — no pool inputs, no output layer, nothing to run. Forcing it through the
+provider interface would mean inventing a spec kind for "a UI gesture". Same reasoning that kept
+the draw-based crop/clip operations in `mod_raster.R`.
+
 ## v0.11.9 — 2026-08-09
 
 ### Item 74 phase 2 — the Plugin menu (`mod_plugins.R`)

@@ -75,7 +75,8 @@ workspaceToolsUI <- function(id) {
 
 workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool, active_dataset,
                             tool_request = reactive(NULL), layer_style = NULL,
-                            layer_order = NULL, src_paths = NULL, plot_opts = NULL) {
+                            layer_order = NULL, src_paths = NULL, plot_opts = NULL,
+                            plugin_epoch = reactive(0)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     wsview <- reactiveVal("map")
@@ -550,12 +551,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # Analysis = OUR tools, grouped exactly like GeoLibre's submenu list.
       # Each group is a ▸ FLY-OUT (GeoLibre style): hover the group, its tools
       # open in a nested panel to the side.
-      grps <- unique(vapply(MODUI, function(t) t$grp, character(1)))
+      grps <- unique(vapply(MODUI_R(), function(t) t$grp, character(1)))
       proc_items <- lapply(grps, function(g) {
-        ks <- names(MODUI)[vapply(MODUI, function(t) identical(t$grp, g), logical(1))]
+        ks <- names(MODUI_R())[vapply(MODUI_R(), function(t) identical(t$grp, g), logical(1))]
         tags$div(class = "gm-item has-sub", g,
           tags$div(class = "gm-sub",
-            lapply(ks, function(k) .mi(MODUI[[k]]$nm, .setTool(k))),
+            lapply(ks, function(k) .mi(MODUI_R()[[k]]$nm, .setTool(k))),
             # every Data & Exploration command, listed individually
             if (identical(g, "Data")) tagList(
               .msep(),
@@ -1124,7 +1125,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # in either view — the sidebar holds its controls. Map tools never do:
       # they draw on the map, which keeps the centre.
       t <- current_tool()
-      mi <- if (!is.null(t)) MODUI[[t]] else NULL
+      mi <- if (!is.null(t)) MODUI_R()[[t]] else NULL
       if (!is.null(mi) && !isTRUE(mi$map_based) && identical(tool_mode(), "dock"))
         return(tagList(
           div(class = "ea-wsx-resulthead",
@@ -2462,6 +2463,12 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # Step 7 (complete): EVERY analysis module is hosted here, using its ORIGINAL
     # namespace id — the module servers stay bound once in server.R and their old
     # standalone panes are retired, so there is exactly one instance of each.
+    # The catalogue is REBUILT whenever the plugin epoch changes, because a tool
+    # activated in the Plugin menu has to appear without a page reload. Building
+    # the list is cheap (metadata only, no module binding), so recomputing it is
+    # nothing like the 33 ms-per-tool cost of BINDING, which server.R does
+    # separately and only for tools that are newly active.
+    .build_modui <- function() {
     MODUI <- list(
       # --- Data ---
       data           = list(nm = "Data & Exploration",  grp = "Data", tools = dataToolsUI,          canvas = dataCanvasUI),
@@ -2549,6 +2556,9 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       })
     }
     for (k in names(MODUI)) MODUI[[k]]$id <- k   # original namespace = the tool key
+    MODUI
+    }
+    MODUI_R <- reactive({ plugin_epoch(); .build_modui() })
     # Built-in scaffold tools (no dedicated module) keep working alongside.
     TOOLS <- list(
       clip    = list(nm = "Clip raster (scaffold)",  grp = "Spatial", kind = "spatial"),
@@ -2557,7 +2567,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
     # A menubar click elsewhere in the app can request a tool here.
     observeEvent(tool_request(), {
       tr <- tool_request()
-      if (isTruthy(tr) && (tr %in% names(MODUI) || tr %in% names(TOOLS))) current_tool(tr)
+      if (isTruthy(tr) && (tr %in% names(MODUI_R()) || tr %in% names(TOOLS))) current_tool(tr)
     }, ignoreInit = TRUE)
     observeEvent(input$tool_pick, {
       current_tool(if (nzchar(input$tool_pick %||% "")) input$tool_pick else NULL)
@@ -2574,7 +2584,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       if (!nzchar(input$tool_pick %||% "")) return()
       tool_mode("dock")
       # A map-based tool needs the map on screen — switch to it (unless split).
-      mi <- MODUI[[input$tool_pick]]
+      mi <- MODUI_R()[[input$tool_pick]]
       if (!is.null(mi) && isTRUE(mi$map_based) && !identical(wsview(), "split")) wsview("map")
     })
     observeEvent(input$tool_float, { tool_mode("float") })
@@ -2587,7 +2597,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
 
     .tool_title <- function() {
       t <- current_tool(); if (is.null(t)) return(NULL)
-      (MODUI[[t]] %||% TOOLS[[t]])$nm %||% t
+      (MODUI_R()[[t]] %||% TOOLS[[t]])$nm %||% t
     }
     # header buttons shared by the sidebar and the floating panel
     .tool_ctrls <- function(mode) tags$span(class = "ea-wsx-toolctl",
@@ -2634,7 +2644,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       t <- current_tool()
       if (is.null(t)) return(div(class = "ea-hint",
         "Pick a tool above. Its settings load here; spatial ops add a layer, models drop a result (Step 4)."))
-      mi <- MODUI[[t]]
+      mi <- MODUI_R()[[t]]
       if (!is.null(mi)) {
         # Signal AFTER this panel has been sent to the browser. Bumping on
         # tool_pick alone was timing-fragile: the module's repopulate ran while
@@ -2769,7 +2779,7 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
       # The ACTIVE TOOL's own output renders as a pop-out panel over the canvas —
       # the canvas itself stays the map / chart (new design).
       t0 <- current_tool()
-      mi0 <- if (!is.null(t0)) MODUI[[t0]] else NULL
+      mi0 <- if (!is.null(t0)) MODUI_R()[[t0]] else NULL
       # DEFAULT = sidebar controls + results in the CENTRE. A tool only becomes a
       # floating pop-out when the user asks for it (the float button), or when a
       # map tool needs the map to stay in the centre.

@@ -645,6 +645,10 @@ server <- function(input, output, session) {
   # "never reordered" -- the workspace then derives a default. Persisted next
   # to layer_style, because a stacking order set once must survive reopening.
   layer_order      <- reactiveVal(character(0))
+  # Bumped whenever the Plugin menu changes what is active. The workspace rebuilds
+  # its tool catalogue from it and the binding loop binds whatever is new, so a
+  # tool becomes usable the moment it is enabled -- no page reload.
+  plugin_epoch     <- reactiveVal(0)
 
   # Plot appearance (title / axis labels / colour), per screen. Installed into
   # the helper env so print.ggplot and ea_opt() can reach it from any module
@@ -1023,8 +1027,32 @@ server <- function(input, output, session) {
   # gotcha 27 (that was an observeEvent evaluating its eventExpr immediately).
   .on_tool <- reactive(list(n    = workspace_ctx$tool_open(),
                             tool = workspace_ctx$plot_ctx()))
-  algo_ctx <- lapply(ea_algorithms(), function(a)
-    algoServer(paste0("algo_", a$id), a, .algo_pools, tool_open = .on_tool))
+  # Bound once each, and RE-bound as tools are activated in the Plugin menu.
+  #
+  # This was a one-shot lapply, which is precisely why enabling a plugin tool used
+  # to need a page reload: the registry was read once and never again. It is now a
+  # function driven by `plugin_epoch`, binding only what is not yet bound -- so
+  # enabling one tool costs one binding (~33 ms, imperceptible) instead of a
+  # reload, and enabling nothing costs nothing.
+  #
+  # `.algo_bound` is what makes it idempotent. Re-binding an id would create a
+  # SECOND set of observers on the same namespace, and duplicate observers on a
+  # Run button are the kind of fault that only shows up as an operation running
+  # twice.
+  .algo_bound <- new.env(parent = emptyenv())
+  algo_ctx    <- list()
+  .bind_algos <- function() {
+    n <- 0L
+    for (a in ea_algorithms()) {
+      if (!is.null(.algo_bound[[a$id]])) next
+      ctx <- algoServer(paste0("algo_", a$id), a, .algo_pools, tool_open = .on_tool)
+      assign(a$id, TRUE, envir = .algo_bound)
+      algo_ctx[[a$id]] <<- ctx
+      n <- n + 1L
+    }
+    n
+  }
+  .bind_algos()
   # One statServer per registry entry, namespaced "stat_<id>" to match the tool
   # key the workspace registers. Adding an analysis needs no change here.
   stat_ctx <- lapply(ea_statistics(), function(s)
@@ -1037,7 +1065,15 @@ server <- function(input, output, session) {
   land_cls_ctx   <- landClassifyServer("land_classify", raster_pool)
   rs_ctx         <- rsSearchServer("rs_search", dataset_pool, active_dataset, raster_pool)
   rec_ctx        <- recommendServer("recommend", dataset_pool, active_dataset)
-  plugins_ctx    <- pluginsServer("plugins")
+  plugins_ctx    <- pluginsServer("plugins",
+                    on_change = function() plugin_epoch(isolate(plugin_epoch()) + 1))
+  # Activation takes effect immediately: bind whatever became active, and the
+  # workspace rebuilds its catalogue off the same epoch.
+  observeEvent(plugin_epoch(), {
+    n <- .bind_algos()
+    if (n > 0) showNotification(sprintf("%d tool%s ready to use.", n,
+                                        if (n == 1) "" else "s"), type = "message")
+  }, ignoreInit = TRUE)
   # New spatial modeling & analysis modules
   ntl_ctx        <- ntlServer("ntl", dataset_pool, active_dataset, vector_pool)
   climate_ctx    <- climateTrendServer("climate_trend", raster_pool)
@@ -1138,6 +1174,7 @@ server <- function(input, output, session) {
                                     las_pool, vector_pool, active_dataset,
                                     tool_request = reactive(input$current_view),
                                     layer_style = layer_style, layer_order = layer_order,
+                                    plugin_epoch = plugin_epoch,
                                     src_paths = src_paths,
                                     plot_opts = plot_opts)
 

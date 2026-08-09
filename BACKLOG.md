@@ -5695,3 +5695,113 @@ FIRST OPEN**, which is still open.
 - A project that used a now-disabled tool should say so when it opens, like the missing-file flag.
 - Only WhiteboxTools has a provider. The interface is deliberately general — `ea_algorithms()`
   concatenates providers — so a second one is the test of whether this generalises to item 61.
+
+---
+
+### 74 phase 2b — activation without a reload, FIXED v0.11.10
+
+> "page reload. thats not convenient. we cant do that. same way we manage installed packages, we
+> could do the same. so is the plugins foundation solid?"
+
+**Correct on both counts, and the honest answer to the question is: solid underneath, weak at one
+joint.**
+
+Solid and proven: state on disk, the manifest cache, the type mapper, generated specs, one
+`run()` closure for all 484, provider concatenation into `ea_algorithms()`. A generated spec
+runs end to end.
+
+**Not solid: two loops assumed a STATIC registry.** `MODUI` was built once at workspace
+construction, and `server.R` bound algorithm modules in a one-shot `lapply`. Neither was a flaw
+in the provider design — both were assumptions made when the registry could only change between
+sessions. That is why a newly enabled tool needed a reload, and the package analogy is exactly
+right: installing a package does not make you restart R.
+
+#### What changed
+
+- **`MODUI` is now a reactive.** The construction block became `.build_modui()` and
+  `MODUI_R <- reactive({ plugin_epoch(); .build_modui() })`; the ten consumer references read
+  the reactive, so menus, the tool picker and search all rebuild when activation changes.
+  Rebuilding the list is metadata only — nothing like the 33 ms-per-tool cost of *binding*.
+- **Binding is incremental and idempotent.** `.bind_algos()` walks the registry and binds only
+  ids not already in `.algo_bound`. Enabling one tool costs one binding (~33 ms, imperceptible);
+  enabling nothing costs nothing. The guard matters: re-binding an id would create a **second
+  set of observers on the same namespace**, and duplicate observers on a Run button show up as
+  an operation silently running twice.
+- **`plugin_epoch`** ties them together. `pluginsServer(on_change =)` bumps it on every state
+  change; `server.R` binds what is new and the workspace rebuilds its catalogue from the same
+  signal.
+- All "reload the page" wording removed from the UI, because it is no longer true.
+
+**Proven by `check_plugins.R`** (40 assertions), with the control that matters: the tool is
+absent from the workspace catalogue before enabling and present **in the same session** after,
+carrying its provenance label. Plus: a first bind pass binds 52 entries, a second binds **zero**,
+and enabling one more tool binds exactly one.
+
+#### Still not dynamic: the Co-Analyst context
+
+`module_ctx` is assembled once as a plain list after the initial binding, so a tool enabled
+mid-session is usable but does not yet report itself to the Co-Analyst until the next session.
+Recorded rather than hidden. Making it dynamic means `module_ctx` becoming `reactiveValues` —
+small, but it touches every module's registration and is not worth bundling into this change.
+
+---
+
+### 75. More providers — GeoAI, GeoLibre, and features that are NOT plugins
+
+> "document adding geoai, geolibre and other plugins too would be nice. like the swipe feature
+> and so on."
+
+Recorded as direction. **The most useful thing this entry can do is draw a line**, because the
+three examples named are three different kinds of thing and treating them alike would produce a
+bad abstraction.
+
+#### They are not the same kind of thing
+
+| | What it is | How it should arrive |
+|---|---|---|
+| **WhiteboxTools** | An external *tool library* — 484 file-in/file-out algorithms that describe themselves | **A provider.** Done (v0.11.8–0.11.10). |
+| **GeoAI** | Deep learning for geospatial data — segmentation, feature extraction. **Python.** | **A provider, but a different backend.** See below. |
+| **GeoLibre** | The project this app's whole layout is modelled on (DESIGN.md north star) | **A source of feature ideas**, not a tool library to wrap. |
+| **Swipe** | Drag a divider to compare two layers on the map | **A map feature.** Belongs in `mod_workspace.R`, nowhere near the plugin system. |
+
+**Swipe is the clarifying case.** It is a map *interaction*: no inputs from a pool, no output
+layer, nothing to run. The provider interface generates **algorithm specs** — things that take
+layers in and produce a layer out. Forcing swipe through it would mean inventing a spec kind for
+"a UI gesture", which is how a clean abstraction turns into a grab-bag. Same reasoning already
+applied to "Crop to drawn shape" and "Clip vector to drawn shape", which stayed in
+`mod_raster.R` because they read a polygon drawn on the map rather than a pool entry.
+
+**So: swipe is worth building, and it is not a plugin.** Alongside it, the same family from
+GeoLibre and QGIS: layer transparency slider, split-screen compare, a magnifier/spyglass.
+
+#### GeoAI is the real test of the provider interface
+
+It is the second provider, and deliberately the *hard* one, because it differs on every axis
+that matters:
+
+- **Python, not R** — the first exercise of item 64's policy (R for statistics, Python under the
+  hood for deep learning). Needs a transport decision: `reticulate`, or a subprocess with files
+  in and files out, which is what WhiteboxTools already does and what the current `run()` shape
+  fits.
+- **Models are downloads, often large**, so the manifest/cache pattern extends to weights, and
+  the opt-in argument gets stronger, not weaker.
+- **GPU is optional and machine-specific**, so capability detection has to be honest — a tool
+  that will take four hours on CPU should say so before it starts.
+- **Self-description is unlikely.** WhiteboxTools describes its own parameters, which is what
+  made generation possible. A Python library probably will not, so this provider likely needs a
+  hand-written spec list — meaning the interface must support **both** generated and declared
+  providers. That is the design question to answer before writing any of it.
+
+If the provider interface survives GeoAI, it is the plugin SDK of item 61 in all but name.
+
+#### Sequence
+
+1. **Swipe and the compare family** — a map feature, independent of all of this, and the
+   cheapest visible win.
+2. **A second *generated* provider** if a self-describing tool library presents itself — it would
+   confirm the interface generalises before the harder case.
+3. **GeoAI**, once the transport and the declared-vs-generated question are settled.
+4. **GeoLibre** as a feature backlog, mined for interactions rather than wrapped.
+
+**Not started.** Recorded so the distinction between a provider and a feature is settled before
+anyone builds the wrong one.

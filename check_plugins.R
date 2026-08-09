@@ -173,7 +173,61 @@ w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = " ")
 say(grepl('plugins        = list(nm = "Plugins"', w, fixed = TRUE),
     "the Plugins tool is registered in the workspace catalogue")
 s <- paste(readLines("server.R", warn = FALSE), collapse = " ")
-say(grepl('pluginsServer("plugins")', s, fixed = TRUE), "and its server is bound")
+# Matched WITHOUT the closing paren: the call is multi-line since on_change was
+# added, and pinning the exact text made this fail against working code.
+say(grepl('pluginsServer("plugins"', s, fixed = TRUE), "and its server is bound")
+say(grepl("on_change = function() plugin_epoch(", s, fixed = TRUE),
+    "and it reports activation changes back to the app")
+
+# ---- 11. Activation takes effect WITHOUT a page reload ----------------------
+# This is the property the whole phase-2 rework exists for. The workspace's tool
+# catalogue was built once at construction, so an enabled tool did not appear
+# until the session restarted. It is now a reactive over `plugin_epoch`.
+ea_plugin_set("whitebox", TRUE)
+local({ st <- ea_plugin_state(); st$tools[["whitebox"]] <- character(0)
+        ea_plugin_state_set(st) })
+
+EP <- reactiveVal(0)
+W  <- NULL
+suppressWarnings(testServer(workspaceServer,
+  args = list(dataset_pool = reactiveValues(), raster_pool = reactiveValues(),
+              las_pool = reactiveValues(), vector_pool = reactiveValues(),
+              active_dataset = reactive(NULL), plugin_epoch = EP),
+  {
+    W <<- list(before = "algo_wbt_slope" %in% names(MODUI_R()))
+    # Enable the tool the way the Plugin menu does, then bump the epoch.
+    ea_tool_set("whitebox", "Slope", TRUE)
+    EP(EP() + 1)
+    W$after <<- "algo_wbt_slope" %in% names(MODUI_R())
+    W$named <<- (MODUI_R()[["algo_wbt_slope"]] %||% list())$nm
+  }))
+
+say(isFALSE(W$before), "CONTROL: the tool is absent from the catalogue before enabling")
+say(isTRUE(W$after),
+    "enabling a tool puts it in the workspace catalogue IN THE SAME SESSION")
+say(is.character(W$named) && grepl("WhiteboxTools", W$named %||% "", fixed = TRUE),
+    paste0("and it carries its provenance label: ", W$named %||% "(none)"))
+
+# ---- 12. Binding is idempotent ---------------------------------------------
+# Re-binding an id would create a SECOND set of observers on one namespace, so a
+# Run button would fire the operation twice. Proven on the registry ids rather
+# than on Shiny internals: the guard must never re-offer an id it has bound.
+bound <- new.env(parent = emptyenv())
+take  <- function() {
+  n <- 0L
+  for (a in ea_algorithms()) {
+    if (!is.null(bound[[a$id]])) next
+    assign(a$id, TRUE, envir = bound); n <- n + 1L
+  }
+  n
+}
+first  <- take()
+second <- take()
+say(first > 0L, sprintf("the first pass binds every entry (%d)", first))
+say(second == 0L, "a second pass with no changes binds NOTHING")
+ea_tool_set("whitebox", "FillDepressions", TRUE)
+third <- take()
+say(third == 1L, sprintf("enabling one more tool binds exactly one (%d)", third))
 
 cat(if (ok) "\nPLUGIN CHECK: PASS\n" else "\nPLUGIN CHECK: FAIL\n")
 quit(status = if (ok) 0L else 1L)
