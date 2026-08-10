@@ -25,7 +25,7 @@
     "@type": "TechArticle",
     "headline": "EasyAnalysis release notes",
     "url": "https://easyanalysis.dev/release-notes",
-    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.25.",
+    "description": "Version history for EasyAnalysis, newest first. Latest release v0.11.26.",
     "about": { "@type": "SoftwareApplication", "name": "EasyAnalysis", "url": "https://easyanalysis.dev/" }
   }
   </script>
@@ -126,14 +126,23 @@
       <h1>Release notes</h1>
       <p class="lede">What changed in each version, newest first. Every entry says what
         was actually fixed and why it mattered — not just that something changed.</p>
-      <p class="meta">Latest: <b>v0.11.25</b> · 94 releases ·
+      <p class="meta">Latest: <b>v0.11.26</b> · 95 releases ·
         updated with every release</p>
     </div>
   </header>
 
   <main>
     <div class="wrap">
-<section class="rel" id="v0-11-25"><h2><a class="anchor" href="#v0-11-25">v0.11.25</a><span class="when">2026-08-10</span></h2>
+<section class="rel" id="v0-11-26"><h2><a class="anchor" href="#v0-11-26">v0.11.26</a><span class="when">2026-08-10</span></h2>
+<h3>Large files are much faster to add and draw</h3>
+<p>Two hidden costs are gone.</p>
+<p>Adding a file <strong>no longer copies it</strong>. EasyAnalysis now points at the file where it already is, so
+a 500 MB file costs nothing to add and a multi-gigabyte one costs nothing either. (Files you
+upload through a browser are still copied, because those are temporary.)</p>
+<p>Drawing a large raster <strong>no longer reads the whole thing</strong>. The map now reads only the detail it
+needs to show — about <strong>13× faster</strong> on a 500 MB file, and the difference grows the larger the
+file is.</p>
+</section><section class="rel" id="v0-11-25"><h2><a class="anchor" href="#v0-11-25">v0.11.25</a><span class="when">2026-08-10</span></h2>
 <h3>Fixed: Add Data ▸ From file did nothing</h3>
 <p>In the workspace, <strong>Add Data ▸ From file…</strong> never opened anything. It now works, and behaves
 exactly like the <strong>Add Data</strong> button in the panel on the left.</p>

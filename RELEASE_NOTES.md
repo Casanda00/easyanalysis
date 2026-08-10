@@ -20,6 +20,20 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.26 — 2026-08-10
+
+### Large files are much faster to add and draw
+
+Two hidden costs are gone.
+
+Adding a file **no longer copies it**. EasyAnalysis now points at the file where it already is, so
+a 500 MB file costs nothing to add and a multi-gigabyte one costs nothing either. (Files you
+upload through a browser are still copied, because those are temporary.)
+
+Drawing a large raster **no longer reads the whole thing**. The map now reads only the detail it
+needs to show — about **13× faster** on a 500 MB file, and the difference grows the larger the
+file is.
+
 ## v0.11.25 — 2026-08-10
 
 ### Fixed: Add Data ▸ From file did nothing

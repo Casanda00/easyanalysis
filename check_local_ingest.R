@@ -103,5 +103,26 @@ say(grepl("ea_files_from_paths(paths)", s, fixed = TRUE) &&
     grepl(".ingest_files(files)", s, fixed = TRUE),
     "reusing .ingest_files verbatim, so every file type behaves identically")
 
+# ---- 5. The project must REFERENCE a user's file, not copy it ---------------
+# The transport cost came back at a different layer: .keep_source() copied every
+# added file into the project folder -- 0.88 s for a 500 MB raster, unbounded for
+# a multi-GB one. Removing it at the browser and reinstating it here is exactly
+# the kind of thing no UI test would notice, because everything still WORKS.
+say(grepl("from_temp <- startsWith(", s, fixed = TRUE),
+    "the project distinguishes an uploaded temp file from the user's own path")
+say(grepl("!is.null(pid) && from_temp", s, fixed = TRUE),
+    "CONTROL: it copies ONLY the temp case, which would otherwise vanish on reopen")
+
+# ---- 6. Display decimates on READ, not after reading ------------------------
+# terra::aggregate must read every cell to average them; spatSample pushes the
+# decimation into GDAL, which reads only what it needs. Measured on 505 MB /
+# 132 M cells: 1.39 s -> 0.11 s. The property is WHICH function runs, since both
+# produce a small raster and only one of them reads the whole file.
+w2 <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = "\n")
+say(grepl("terra::spatSample(x, size = 4e5", w2, fixed = TRUE),
+    "the map decimates on read via spatSample")
+say(grepl("terra::aggregate(x, fact", w2, fixed = TRUE),
+    "with aggregate kept as a fallback, so a display can never fail closed")
+
 cat(if (ok) "\nLOCAL INGEST CHECK: PASS\n" else "\nLOCAL INGEST CHECK: FAIL\n")
 quit(status = if (ok) 0L else 1L)

@@ -953,11 +953,22 @@ server <- function(input, output, session) {
   .src_path <- function(nm) src_paths[[nm]] %||% ""
   .keep_source <- function(nm, path, name, extra = character(0)) {
     pid <- current_project()
-    stored <- if (!is.null(pid))
+    # A file the user already has is REFERENCED, not copied. Copying it was the
+    # transport cost returning at a different layer: 0.88 s for a 500 MB raster,
+    # and unbounded for a multi-GB one -- exactly what "Add Data" removed at the
+    # browser. It also contradicts the documented design, which stores spatial
+    # layers as path references precisely so a multi-GB file is never duplicated.
+    #
+    # An UPLOAD is different: its temp file is deleted when the session ends, so
+    # that one must be copied into the project or the layer breaks on reopen.
+    # `tempdir()` is what distinguishes them.
+    from_temp <- startsWith(normalizePath(path, winslash = "/", mustWork = FALSE),
+                            normalizePath(tempdir(), winslash = "/", mustWork = FALSE))
+    stored <- if (!is.null(pid) && from_temp)
       tryCatch(ea_project_import_file(pid, path, name, extra), error = function(e) "")
       else ""
-    # No project open (or the copy failed): fall back to the temp path so the
-    # layer at least works this session.
+    # Referenced path, or the copy if one was made (or if the copy failed, the
+    # original, so the layer at least works this session).
     src_paths[[nm]] <- if (nzchar(stored)) stored else path
   }
 

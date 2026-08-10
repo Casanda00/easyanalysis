@@ -6708,3 +6708,53 @@ disappears without explanation.
   the others is the same single line, and until then those screens answer honestly rather than
   silently.
 - **Map predictions**, reported twice now and still not investigated.
+
+
+---
+
+### 88. A 500 MB file was still slow — the transport had come back, twice — FIXED v0.11.26
+
+> "I added a file. 500mb nd its not instant. its loading slowly again"
+
+Measured on a 505 MB / 132 M-cell raster. **Opening it is 0.14 s.** The wait was two things after
+that, and both were work the app did not need to do.
+
+#### 1. The project was COPYING the file — the transport, at a different layer
+
+`.keep_source()` called `ea_project_import_file()`, which does `file.copy()` into the project's
+`files/` folder. **0.88 s for 500 MB, and unbounded for a multi-GB file.**
+
+This is the same cost "Add Data" was built to remove, reinstated one layer down — and no UI test
+would ever have noticed, because everything still *works*. It also contradicted the documented
+design, which stores spatial layers as **path references** precisely so a multi-GB file is never
+duplicated.
+
+**A file the user already has is now referenced, not copied.** An *upload* still is copied,
+because its temp file is deleted when the session ends and the layer would break on reopen —
+`tempdir()` is what distinguishes them.
+
+#### 2. The map read every cell to draw a thumbnail
+
+`.disp_raster()` used `terra::aggregate`, which must read **every cell** to average them. That is
+rule 3 of THE DATA RULE broken in the one place the rule names explicitly.
+
+`terra::spatSample(method = "regular", as.raster = TRUE)` pushes the decimation down to GDAL,
+which reads only the pixels it needs:
+
+| | 505 MB / 132 M cells |
+|---|---|
+| `terra::aggregate` (old) | **1.39 s** |
+| `spatSample` decimate-on-read | **0.11 s** |
+
+**13x, and the gap widens with file size** — aggregate scales with the file, spatSample with the
+screen. `aggregate` is kept as a fallback so a display can never fail closed.
+
+#### Why this was not caught earlier
+
+`check_perf.R` measured `aggregate` and called it the display path, which it was. It never asked
+whether the display *should* be doing that. **A budget answers "is this slower than it was", not
+"is this the right amount of work"** — and the second question is the one rule 3 exists to ask.
+The suite now measures both, with the old path kept beside the new one so the gap stays visible.
+
+The no-copy property is guarded too, with a CONTROL that copying happens **only** for the temp
+case.

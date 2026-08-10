@@ -22,6 +22,30 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.26 — 2026-08-10
+
+### A 500 MB file was still slow — the transport had come back, twice
+
+Opening a 505 MB / 132 M-cell raster is **0.14 s**. The wait was two pieces of work the app did
+not need to do.
+
+**1. The project was copying the file.** `.keep_source()` → `ea_project_import_file()` →
+`file.copy()` into the project folder: **0.88 s for 500 MB**, unbounded for multi-GB. The exact
+cost "Add Data" removed, reinstated one layer down — and invisible to any UI test, because
+everything still worked. It also contradicted the documented design of storing spatial layers as
+**path references**. A user's own file is now referenced; an upload is still copied, since its
+temp file vanishes with the session.
+
+**2. The map read every cell to draw a thumbnail.** `terra::aggregate` must read everything to
+average it — rule 3 of THE DATA RULE broken where the rule names it explicitly.
+`terra::spatSample(method = "regular", as.raster = TRUE)` pushes decimation into GDAL:
+**1.39 s → 0.11 s (13x)**, and the gap widens with file size, because aggregate scales with the
+file and spatSample with the screen. `aggregate` remains a fallback.
+
+**Why the perf suite missed it:** it measured `aggregate` and called that the display path, which
+it was. A budget answers *"is this slower than it was"*, not *"is this the right amount of work"*
+— and rule 3 exists to ask the second. Both paths are now measured side by side.
+
 ## v0.11.25 — 2026-08-10
 
 ### Add Data > From file was dead — my regression

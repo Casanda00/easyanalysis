@@ -128,7 +128,15 @@ phase("raster", "metadata (ncell/ext/crs)", 0.5,
 shrink <- function(x) if (terra::ncell(x) > 4e5)
   terra::aggregate(x, fact = ceiling(sqrt(terra::ncell(x) / 4e5)),
                    fun = "mean", na.rm = TRUE) else x
-sm <- phase("display", "aggregate to <=400k cells", if (BIG) 8 else 3, shrink(rr))
+sm <- phase("display", "aggregate to <=400k cells [OLD path]", if (BIG) 8 else 3, shrink(rr))
+
+# What the map ACTUALLY does now: push the decimation down to GDAL so only the
+# needed pixels are read. Budgeted tightly against the aggregate above -- if this
+# ever creeps back toward it, the read-decimation has silently stopped happening.
+# Measured on 505 MB / 132 M cells: aggregate 1.39 s, this 0.11 s.
+phase("display", "spatSample decimate-on-read [what the map uses]",
+      if (BIG) 2 else 1,
+      terra::spatSample(rr, size = 4e5, method = "regular", as.raster = TRUE))
 phase("display", "project to WGS84 (after shrink)", if (BIG) 6 else 3, .to_wgs84(sm))
 
 # CONTROL: the order that was fixed. Kept because a refactor could silently
@@ -157,7 +165,9 @@ phase("vector", sprintf("ea_read_vector  [%0.f MB, %d features]", mb_gp, n_v),
 # Transport -- the floor the browser upload can never beat
 # ============================================================================
 cp <- file.path(tmp, "copy.bin")
-phase("transport", sprintf("plain disk copy of the raster  [%0.f MB]", mb_tif),
+# This is the cost the project store USED to pay on every added file, by copying
+# it into the project folder. A referenced path pays none of it.
+phase("transport", sprintf("plain disk copy  [%0.f MB, avoided by referencing]", mb_tif),
       NA, file.copy(tif, cp, overwrite = TRUE))
 el_cp <- res[[length(res)]]$secs
 unlink(cp)
