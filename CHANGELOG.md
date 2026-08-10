@@ -22,6 +22,29 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.25 — 2026-08-10
+
+### Add Data > From file was dead — my regression
+
+`mod_workspace.R` did `getElementById('upload_files').click()`. Fine while the rail rendered a
+file input; v0.11.24 made it a **button**, so the element vanished, `.click()` threw on `null`,
+and the menu item did nothing. It still worked on Projects because that rail keeps the file input.
+
+Both surfaces now fire one app-level action into one handler, so they cannot drift. Where no
+native dialog exists the handler asks the page to open the file input. CONTROL asserts the
+`getElementById(...).click()` shape is gone — the shape, not the symptom.
+
+### See script is on the pages, not in Help
+
+A menu nobody opens is the same as not shipping it. The button now sits at `mi$tools(mi$id)` in
+`mod_workspace.R` — the one place **every** module's panel renders — so it reaches all screens at
+once instead of the handful someone edits. The check asserts placement *at that seam*, since
+"exists on some screens" is the failure being prevented.
+
+Rendered unconditionally: the workspace cannot see `module_ctx`, and the handler already
+distinguishes "run the analysis first" from "this screen does not expose a model", which beats a
+button that disappears without saying why.
+
 ## v0.11.24 — 2026-08-10
 
 ### One way to add data

@@ -121,6 +121,10 @@ page_fillable(
       # returned null, `if(fi)` skipped, and the listener never attached. The
       # feedback shipped in v0.11.16 was dead code, which is exactly why a 4 GB
       # upload produced no message at all. Delegation cannot have that bug.
+      # Opens the fallback file input when there is no native dialog. Delegated
+      # lookup at CALL time, not at script time -- the element may not exist yet.
+      "if(window.Shiny){Shiny.addCustomMessageHandler('ea_click_upload',function(){",
+      "var el=document.getElementById('upload_files'); if(el)el.click();});}",
       "if(window.Shiny){document.addEventListener('change',function(e){",
       "var el=e.target; if(!el||el.id!=='upload_files') return;",
       "var fs=el.files; if(!fs||!fs.length) return;",
@@ -1305,6 +1309,15 @@ page_fillable(
        keeps its cream background under light text on every dark set (gotcha 31). */
     /* Plugins is a DIALOG, not a screen (item 76b): the list scrolls inside the
        modal so the modal itself never grows past the viewport. */
+    /* See-script control in every tool panel. Quiet by design: it is an escape
+       hatch, not an action the screen is about. */
+    .ea-wsx-scriptrow { margin-top: 14px; padding-top: 10px;
+                  border-top: 1px solid var(--line); }
+    .ea-wsx-scriptbtn { width: 100%; border: 1px solid var(--line); border-radius: 6px;
+                  background: transparent; color: var(--bark); cursor: pointer;
+                  font: 500 12px var(--ui); padding: 6px 10px; }
+    .ea-wsx-scriptbtn:hover { border-color: var(--forest); color: var(--forest);
+                  background: color-mix(in srgb, var(--forest) 8%, transparent); }
     /* See-script dialog (item 57): code in a modal. Monospace, scrollable and
        themed -- a fixed light code block is gotcha 31 at its most obvious. */
     .ea-script { font: 12px/1.55 var(--mono); white-space: pre; overflow: auto;

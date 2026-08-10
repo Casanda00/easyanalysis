@@ -645,7 +645,14 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         )),
         .menu("Add Data", "database", tagList(
           # no redundant "Add data" item — the menu is already Add Data
-          .mi("From file…", "document.getElementById('upload_files').click()"),
+          #
+          # Fires the SAME app-level action as the rail button. It used to click
+          # #upload_files directly, which broke the moment the rail started
+          # rendering a button instead of a file input: getElementById returned
+          # null and .click() threw, so the menu item did nothing at all. A menu
+          # item must never depend on another control's DOM node existing.
+          .mi("From file…",
+              "Shiny.setInputValue('add_data_request', Date.now(), {priority:'event'})"),
           .mi("Create a table…", "Shiny.setInputValue('new_dataset', Date.now(), {priority:'event'})"),
           .msep(),
           .mi("Download spatial data", .setTool("rs_search"))
@@ -2693,7 +2700,20 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         if (isTRUE(mi$map_based))
           div(class = "ea-wsx-mapnote2", icon("map-location-dot"),
               " Results are drawn on the workspace map and added to the Layers panel."),
-        mi$tools(mi$id)))            # real migrated module's own settings panel
+        mi$tools(mi$id),             # real migrated module's own settings panel
+        # See script, on EVERY screen. This is the one place every tool panel is
+        # rendered, so putting it here reaches all of them at once -- the reason
+        # it was buried in a Help menu was that no shared surface had been found
+        # yet, and a menu nobody opens is the same as not shipping it.
+        #
+        # Always rendered rather than conditioned on the screen exposing a model:
+        # the workspace has no access to module_ctx, and the handler already
+        # answers precisely ("run the analysis first" vs "this screen does not
+        # expose a model"), which is more useful than a button that vanishes.
+        div(class = "ea-wsx-scriptrow",
+          tags$button(class = "ea-wsx-scriptbtn", type = "button",
+            onclick = "Shiny.setInputValue('script_open', Date.now(), {priority:'event'})",
+            icon("code"), " See script"))))
       spec <- TOOLS[[t]]; cols <- .cols()
       head <- div(class = "ea-wsx-toolhead",
         span(class = "ea-wsx-sw", style = "background:var(--forest);"),

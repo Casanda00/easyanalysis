@@ -20,6 +20,18 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.25 — 2026-08-10
+
+### Fixed: Add Data ▸ From file did nothing
+
+In the workspace, **Add Data ▸ From file…** never opened anything. It now works, and behaves
+exactly like the **Add Data** button in the panel on the left.
+
+### See script is now a button on the analysis itself
+
+Every analysis panel has a **See script** button at the bottom. Previously this was only in the
+Help menu, where nobody would think to look for it.
+
 ## v0.11.24 — 2026-08-10
 
 ### Adding data is one button again

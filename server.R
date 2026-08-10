@@ -332,11 +332,19 @@ server <- function(input, output, session) {
   # shape fileInput produces, so every type, the shapefile grouping and the
   # project bookkeeping all behave identically. The only thing that changes is
   # that `datapath` is the real file.
-  observeEvent(input$add_data, {
+  # ONE action, two surfaces: the rail button and the workspace's Add Data menu.
+  # Both call this, so neither can drift from the other -- and neither depends on
+  # the other's DOM node existing, which is what broke the menu item.
+  .add_data <- function() {
+    if (!isTRUE(.ea_tk_ready())) {
+      # No native dialog (browser build): the rail is showing a file input, so
+      # ask the page to open it rather than doing nothing.
+      session$sendCustomMessage("ea_click_upload", list())
+      return()
+    }
     paths <- tryCatch(ea_pick_files("Add data to the project"),
                       error = function(e) NULL)
     if (is.null(paths)) {
-      # Should not happen: the button only renders when the dialog is available.
       showNotification("The file browser could not be opened.", type = "error")
       return()
     }
@@ -353,7 +361,9 @@ server <- function(input, output, session) {
                              else sprintf("%.0f MB", sum(files$size, na.rm = TRUE)/1024^2)),
                      type = "message", duration = 5)
     .ingest_files(files)
-  })
+  }
+  observeEvent(input$add_data,         .add_data())   # rail button
+  observeEvent(input$add_data_request, .add_data())   # workspace Add Data menu
 
   observeEvent(input$upload_files, {
     req(input$upload_files)

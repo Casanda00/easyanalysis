@@ -85,6 +85,20 @@ say(grepl("output$add_data_ui", s, fixed = TRUE) &&
     "the control is chosen by whether a native dialog exists, not by the user")
 say(grepl('buttonLabel = "Add Data"', s, fixed = TRUE),
     "and the fallback carries the SAME name, so only the mechanism differs")
+
+# The workspace's Add Data > From file must reach the SAME action. It used to do
+# document.getElementById('upload_files').click(), which broke silently the moment
+# the rail rendered a button instead of a file input: getElementById returned null
+# and .click() threw, so the menu item did nothing at all. A menu item must never
+# depend on another control's DOM node existing.
+w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = "\n")
+say(!grepl("getElementById('upload_files').click()", w, fixed = TRUE),
+    "CONTROL: the menu no longer clicks a DOM node that may not exist")
+say(grepl("Shiny.setInputValue('add_data_request'", w, fixed = TRUE),
+    "the Add Data menu fires the shared action instead")
+say(grepl("observeEvent(input$add_data_request", s, fixed = TRUE) &&
+    grepl("observeEvent(input$add_data,", s, fixed = TRUE),
+    "and both surfaces call one handler, so they cannot drift apart")
 say(grepl("ea_files_from_paths(paths)", s, fixed = TRUE) &&
     grepl(".ingest_files(files)", s, fixed = TRUE),
     "reusing .ingest_files verbatim, so every file type behaves identically")

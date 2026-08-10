@@ -149,6 +149,17 @@ say(is.null(ea_script_from_fit(prcomp(dat[, c("age", "dbh")]), "pca", "d")),
 w <- paste(readLines("mod_workspace.R", warn = FALSE), collapse = "\n")
 say(grepl("Shiny.setInputValue('script_open'", w, fixed = TRUE),
     "Help offers See script for this analysis")
+
+# ON THE PAGE, not buried in a menu. A Help entry is not a feature anyone finds:
+# the button has to be where the analysis is. This asserts it sits at the shared
+# tool-panel seam, which is what makes it appear on EVERY screen at once rather
+# than on the handful somebody remembered to edit.
+say(grepl("ea-wsx-scriptbtn", w, fixed = TRUE),
+    "and every tool panel carries a See script button of its own")
+i_seam <- regexpr("mi$tools(mi$id)", w, fixed = TRUE)
+i_btn  <- regexpr("ea-wsx-scriptbtn", w, fixed = TRUE)
+say(i_seam > 0 && i_btn > i_seam && (i_btn - i_seam) < 1200,
+    "placed at the shared seam, so it reaches all screens rather than a chosen few")
 s <- paste(readLines("server.R", warn = FALSE), collapse = "\n")
 say(grepl("observeEvent(input$script_open", s, fixed = TRUE), "and it is handled")
 m <- paste(readLines("mod_linear_regression.R", warn = FALSE), collapse = "\n")

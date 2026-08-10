@@ -6662,3 +6662,49 @@ done as the reported case; each of the others is the same single line.
 
 **"sending predictions (map predictions) does not work"** — reported in the same message, not
 investigated here. Item 42's write-back is next.
+
+
+---
+
+### 87. Add Data > From file was dead, and See script was buried — FIXED v0.11.25
+
+> "click add data, then from file and it never opens. never works."
+> "Help > See script for this analysis: too difficult. no one will do that. a simple button
+> should be placed on the pages themselves."
+
+#### Why "From file" never opened — and it was my regression
+
+`mod_workspace.R` did `document.getElementById('upload_files').click()`. That worked while the
+rail rendered a **file input**. v0.11.24 replaced it with a **button**, so `upload_files` no
+longer exists — `getElementById` returned `null`, `.click()` threw, and the menu item did nothing
+at all. It worked on the Projects page because that rail still renders the file input.
+
+**A menu item must never depend on another control's DOM node existing.** Both surfaces now fire
+one app-level action and call one handler, so they cannot drift apart. Where there is no native
+dialog, the handler asks the page to open the file input instead — the fallback still works
+without the menu knowing anything about it.
+
+Asserted with a CONTROL that the `getElementById(...).click()` form is gone, because that is the
+shape that broke rather than the symptom.
+
+#### See script belongs on the page
+
+Putting it under Help was wrong and the objection is right: **a menu nobody opens is the same as
+not shipping it.** It is now a button in every tool panel.
+
+**One line, at the shared seam.** `mi$tools(mi$id)` in `mod_workspace.R` is where *every* module's
+panel is rendered, so a control added there reaches all of them at once — rather than the handful
+somebody remembers to edit. The check asserts the button sits at that seam, not merely that it
+exists somewhere, because "exists on some screens" is the failure being prevented.
+
+It is rendered **unconditionally** rather than only where a model exists: the workspace has no
+access to `module_ctx`, and the handler already answers precisely — *"run the analysis first"*
+versus *"this screen does not expose a model"* — which is more useful than a button that
+disappears without explanation.
+
+#### Still open
+
+- `fit = function()` on the remaining hand-written screens. Linear regression is done; each of
+  the others is the same single line, and until then those screens answer honestly rather than
+  silently.
+- **Map predictions**, reported twice now and still not investigated.
