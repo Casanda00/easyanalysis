@@ -172,6 +172,28 @@ ea_analysis_script <- function(spec, roles = list(), params = list(),
 }
 
 # ==========================================================================
+# Timing -- report where the time actually went, on the user's own machine
+# ==========================================================================
+# Added because "it is still slow" was being answered with synthetic fixtures on
+# a different machine. Guessing at somebody else's file is not diagnosis: their
+# raster may be compressed, multi-band, in an awkward CRS, or not a raster at
+# all, and each of those has a different answer.
+#
+# Prints one line per phase to the console the app is already running in. On by
+# default while large-file performance is being worked on; silence with
+# options(ea.timing = FALSE).
+ea_time <- function(label, expr) {
+  if (!isTRUE(getOption("ea.timing", TRUE))) return(force(expr))
+  t0 <- Sys.time()
+  on.exit({
+    el <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    if (el >= 0.05)                       # skip noise; only report real cost
+      message(sprintf("[timing] %-42s %7.2f s", substr(label, 1, 42), el))
+  }, add = TRUE)
+  force(expr)
+}
+
+# ==========================================================================
 # How to cite -- ONE source, every surface
 # ==========================================================================
 # The landing page carried APA and BibTeX; the app carried neither, and the app

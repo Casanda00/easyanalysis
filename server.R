@@ -142,9 +142,10 @@ server <- function(input, output, session) {
           # fread via ea_read_table(): 60x faster than read.csv on the same file
           # (2.42 s -> 0.04 s on 14 MB, measured by check_perf.R). Excel still
           # goes through readxl -- there is no fast path for a zip container.
-          df <- if (ext == "csv")                 ea_read_table(fpath, sep)
+          df <- ea_time(paste("read table", fname),
+                if (ext == "csv")                  ea_read_table(fpath, sep)
                 else if (ext %in% c("xlsx","xls")) as.data.frame(readxl::read_excel(fpath))
-                else                                ea_read_table(fpath, "")
+                else                               ea_read_table(fpath, ""))
           clean_df <- init_data(df)
           raw_pool[[fname]] <- clean_df
           dataset_pool[[fname]] <- clean_df
@@ -155,8 +156,8 @@ server <- function(input, output, session) {
           nm <- tools::file_path_sans_ext(fname)
           existing <- names(reactiveValuesToList(raster_pool))
           if (nm %in% existing) nm <- make.unique(c(existing, nm), sep = "_")[length(existing) + 1L]
-          raster_pool[[nm]] <- terra::rast(fpath)
-          .keep_source(nm, fpath, fname)
+          raster_pool[[nm]] <- ea_time(paste("open raster", fname), terra::rast(fpath))
+          ea_time(paste("project bookkeeping", fname), .keep_source(nm, fpath, fname))
           showNotification(paste0("Raster '", nm, "' added to the project."), type = "message")
 
         } else if (ext %in% c("las","laz")) {
@@ -203,7 +204,7 @@ server <- function(input, output, session) {
           # ---- Vector (single-file) ----
           # EVERY layer, not just the first. A multi-layer GeoPackage used to load
           # its first layer and discard the rest, warning only to the console.
-          vecs <- ea_read_vector(fpath, fname)
+          vecs <- ea_time(paste("read vector", fname), ea_read_vector(fpath, fname))
           for (ln in names(vecs)) {
             vector_pool[[ln]] <- vecs[[ln]]
             .keep_source(ln, fpath, fname)
@@ -869,7 +870,7 @@ server <- function(input, output, session) {
                detail = paste0(nm, " (", lab, if (cached) ", cached" else "", ")"))
       if (isTRUE(s$missing)) { failed <- c(failed, nm); next }
       okl <- tryCatch({
-        obj <- .spatial_get(kind, path, nm)
+        obj <- ea_time(paste("project reopen", kind, nm), .spatial_get(kind, path, nm))
         if (is.null(obj)) FALSE else {
           if (identical(kind, "raster"))      raster_pool[[nm]] <- obj
           else if (identical(kind, "las"))    las_pool[[nm]]    <- obj

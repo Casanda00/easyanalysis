@@ -6758,3 +6758,113 @@ The suite now measures both, with the old path kept beside the new one so the ga
 
 The no-copy property is guarded too, with a CONTROL that copying happens **only** for the temp
 case.
+
+
+---
+
+### 89. Stop guessing: instrument the real machine — v0.11.27
+
+> "stop guessinng"
+> "the loading in the software UI pretends as if the loading is fast but the app kinda freezes.
+> when you watch the terminal, thats where you see what is actually happening - the file loading."
+
+**Both fair, and the second is a diagnosis I should have reached myself.**
+
+#### The UI lies about which phase is slow
+
+`.ingest_files()` wraps its loop in `withProgress`. For a raster the loop body is
+`terra::rast(path)` — **lazy**, so it returns almost instantly and the progress bar completes and
+vanishes. The heavy read happens **afterwards**, when the map draws, and **the draw has no
+progress indicator at all**.
+
+So the UI reports "done" and then R blocks while GDAL reads. The terminal shows the truth because
+GDAL writes its own progress bar there. The bar is not wrong about what it covers — it covers the
+wrong thing.
+
+#### And I was guessing
+
+Three rounds of synthetic fixtures on a *different machine* answered "is it slow for me", not "is
+it slow for them". Their file may be compressed, multi-band, in an awkward CRS, or not a raster
+at all, and each has a different answer. Building a 500 MB GeoPackage to test a theory about a
+file I had never seen was the point to stop.
+
+**`ea_time()` reports where the time went, on the user's own machine**, one line per phase to the
+console they already have open:
+
+```
+[timing] open raster myfile.tif                       0.15 s
+[timing] project bookkeeping myfile.tif               0.02 s
+[timing] display prep myfile.tif                      0.91 s
+[timing]   decimate on read                           0.11 s
+[timing]   reproject to WGS84                         0.51 s
+[timing]   decimate again                             0.12 s
+```
+
+Instrumented: raster open, vector read, table read, project bookkeeping, the three display steps,
+and **project reopen** — the case reported as "loads the whole file again".
+
+Only phases above 0.05 s print, so a fast run stays quiet. On by default while this is being
+worked on; `options(ea.timing = FALSE)` silences it.
+
+#### Still to fix, and now measurable rather than argued
+
+- **The draw needs a progress indicator**, since that is where the time is. The `#ea-busy` pill is
+  CSS keyed off `shiny-busy`, so it should cover this — that it does not is the next thing to
+  check, not assume.
+- Whatever the timing lines actually show.
+
+
+---
+
+### 90. Quit does not stop the R process — REPORTED, not yet fixed
+
+> "even quitting the softare using the quit button does not end the terminal. it keeps running."
+> "cus the browser says EasyAnalysis has closed but the terminal keeps running."
+
+The browser reports the app closed, the R process keeps running. So the port stays held, a second
+launch may collide with it, and the user has no way to tell the app is still there except by
+looking at a terminal they were told they would not need.
+
+Not investigated yet. The likely shape is `stopApp()` ending the *session* while the process
+lives on — `runApp()` returns and the script ends, unless something (the compute worker, a
+`callr` session, Tk) keeps it alive. `compute_worker.R` holds a persistent `callr::r_session`, and
+`ea_worker_shutdown()` is already wired to `onSessionEnded`, so the first thing to check is
+whether that actually runs and whether Tk (now warmed on first use for the file dialog) holds the
+process open.
+
+**Diagnose before changing anything** — the rule from item 82 applies here too.
+
+---
+
+### 91. "If R is slow, use C++ or Python where they shine" — the standing answer
+
+> "I told you, if R is slow, we can use c++ or python or others where they shine."
+
+Recorded as a rule so it is answered once rather than each time.
+
+**The heavy work is already not R**, and this is measured, not asserted: `terra`, `sf`, `lidR`,
+`xgboost`, `randomForest`, `data.table` and `nnet` are all compiled C/C++/Fortran, and `sf`/`terra`
+are thin wrappers over **GDAL 3.12.1, GEOS 3.14.1, PROJ 9.7.1**. WhiteboxTools is Rust in its own
+process. R is the orchestration layer — a few percent of the runtime.
+
+So for the file-loading complaints specifically, **rewriting in another language would rewrite the
+part that is not the cost.** Every slow phase found so far was work the app should not have been
+doing at all, in any language:
+
+| Cause found | Fix | Language relevance |
+|---|---|---|
+| 3 GiB upload cap, silent | remove the cap | none |
+| Bytes copied through the browser | reference the path | none |
+| File copied again into the project | reference the path | none |
+| Whole grid read to draw a thumbnail | decimate on read | none |
+| `read.csv` | `fread` (C, already) | already not R |
+
+**Where the argument does hold**, and these stay on the table:
+- **R's BLAS is single-threaded here** — a 1200x1200 multiply took **1.47 s**, roughly 10x a
+  threaded BLAS. That is a configuration change, not a rewrite.
+- **Deep learning** — item 64's policy already says Python, under the hood.
+- **Anything with no good R implementation** — the WhiteboxTools provider is the proven pattern
+  for reaching outside without rewriting inside.
+
+The test is not "is R slow" but "is this work necessary, and is it already in C". So far the
+answer has been no and yes.

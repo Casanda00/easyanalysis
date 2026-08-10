@@ -1224,7 +1224,11 @@ workspaceServer <- function(id, dataset_pool, raster_pool, las_pool, vector_pool
         terra::aggregate(x, fact = ceiling(sqrt(terra::ncell(x) / 4e5)),
                          fun = "mean", na.rm = TRUE)
       }
-      out <- shrink(.to_wgs84(shrink(r[[idx]])))  # reprojection can re-inflate a little
+      out <- ea_time(paste("display prep", nm), {
+        a <- ea_time("  decimate on read", shrink(r[[idx]]))
+        b <- ea_time("  reproject to WGS84", .to_wgs84(a))
+        ea_time("  decimate again", shrink(b))
+      })
       # Bounded, like the results store: rasters are big and this must not grow.
       if (length(ls(.disp_cache)) > 6L) rm(list = ls(.disp_cache), envir = .disp_cache)
       assign(key, out, envir = .disp_cache)

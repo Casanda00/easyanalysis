@@ -22,6 +22,25 @@ Format: `## vMAJOR.MINOR.PATCH — date`, newest first. Version single-sourced i
 
 ---
 
+## v0.11.27 — 2026-08-10
+
+### Instrumentation, because I was guessing
+
+Three rounds of synthetic fixtures on a different machine answered "is it slow for me", not "is
+it slow for them". `ea_time()` now reports each phase to the console the app already runs in:
+raster open, vector read, table read, project bookkeeping, the three display steps, and project
+reopen. Only phases above 0.05 s print; `options(ea.timing = FALSE)` silences it.
+
+### Why the UI looked fast while the app froze
+
+`.ingest_files()` wraps its loop in `withProgress`, and for a raster that loop is
+`terra::rast(path)` — **lazy**, so it finishes instantly and the bar disappears. The heavy read
+happens afterwards, when **the map draws**, which has no progress indicator at all. The terminal
+showed the truth because GDAL prints its own progress there.
+
+The bar is not wrong about what it covers; it covers the wrong phase. Fixing that is next, now
+that the timing lines will say exactly where the cost is.
+
 ## v0.11.26 — 2026-08-10
 
 ### A 500 MB file was still slow — the transport had come back, twice
